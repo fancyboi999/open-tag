@@ -108,7 +108,7 @@
     "workspaceEmpty": "工作区为空",
     "workspaceHint": "点左侧文件查看内容",
     "nameRequired": "Name 必填",
-    "nameInvalid": "Name 必须以字母开头，且只能包含字母、数字、连字符和下划线",
+    "nameInvalid": "Name 必须为 1-64 个字符，以字母开头，且只能包含字母、数字、连字符和下划线",
     "machineOnline": "在线",
     "machineOffline": "离线",
     "createAgentTitle": "创建 Agent",
