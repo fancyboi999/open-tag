@@ -12,6 +12,7 @@ import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { TaskBoard, ynOptions, ST_LABEL } from "../TaskBoard.tsx";
 import { AgentProfile, CreateAgentModal } from "./Members.tsx";
 import { ChatSidebar, CreateChannelModal } from "./ChatSidebar.tsx";
+import { AddComputerModal } from "./misc.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 
 const fmtSize = (n?: number) => (!n ? "" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB");
@@ -269,12 +270,6 @@ export function Chat() {
             <button className="joinbtn" title={t("chat.channelSettings")} onClick={() => setShowEdit(true)}>⋯</button>
           )}
         </div>
-        {machines.length === 0 && capabilities.manageMachines && (
-          <div className="onboard-banner">
-            <span>{t("chat.noComputerBanner")}</span>
-            <button onClick={() => nav(`/s/${slug}/computer`)}>{t("chat.connectComputer")}</button>
-          </div>
-        )}
         {chatTab === "tasks" && cur ? <TaskBoard channelId={cur.id} onOpenThread={startThread} />
           : chatTab === "files" && cur ? <ChannelFiles channelId={cur.id} />
           : <>
@@ -417,6 +412,7 @@ export function Chat() {
                 : traj.map((t, i) => <div className={"traj" + (t.tool ? " tool" : "")} key={i}>{t.tool && <IconWrench size={12} />}{t.name ? "@" + t.name + " · " : ""}{t.text}</div>)}
             </>}
       </aside>}
+      <AddComputerModal />
       {showMembers && cur && <ChannelMembersModal channelId={cur.id} channelName={cur.name} onClose={() => setShowMembers(false)} />}
       {showEdit && cur && <EditChannelModal channel={cur} onClose={() => setShowEdit(false)} onDone={async () => { setShowEdit(false); await reload(); }} onDeleted={() => { setShowEdit(false); reload(); nav(`/s/${slug}/channel`); }} />}
       {ctxMenu && (() => {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Star, Bookmark, AlertTriangle, Lock, MessageCircle } from "lucide-react";
 import { useStore, fmtTime } from "../store.tsx";
@@ -274,6 +274,58 @@ function ConnectMachineModal({ onClose }: { onClose: () => void }) {
           <div className="codebox"><code className="grow">{cmd}</code><button className="joinbtn" onClick={() => copy(cmd, "cmd")}>{copied === "cmd" ? t("misc.connectModalCopied") : t("misc.connectModalCopyBtn")}</button></div>
           <div className="acts"><button className="ok" onClick={onClose}>{t("misc.connectModalDone")}</button></div>
         </>}
+      </div>
+    </div>
+  );
+}
+
+// Add-computer onboarding modal: when the current workspace has no machine connected and the viewer
+// can manage machines, nudge them to connect one (agents have nowhere to run otherwise). Replaces the
+// old persistent onboard-banner. Self-contained — Chat.tsx renders it unconditionally and this owns its
+// own show/dismiss state. Auto-shows once per browser-tab session; the "Don't remind me again" checkbox
+// opts out permanently. Dismiss = Skip button / Esc / backdrop click.
+const COMPUTER_OPTOUT_KEY = "open-tag.onboard.computer.optout";        // localStorage: permanent opt-out (global, not per-workspace)
+const COMPUTER_DISMISSED_KEY = "open-tag.onboard.computer.dismissed";  // sessionStorage: closed for this tab session
+
+export function AddComputerModal() {
+  const { machines, capabilities, slug } = useStore();
+  const nav = useNavigate();
+  const { t } = useTranslation();
+  const [dontRemind, setDontRemind] = useState(false);
+  // Seed the dismissed flag from storage so a same-tab refresh stays closed (session key) and an
+  // opted-out user never sees it again (local key). Reads are guarded — storage access can throw.
+  const [dismissed, setDismissed] = useState(() => {
+    try { return sessionStorage.getItem(COMPUTER_DISMISSED_KEY) === "1" || localStorage.getItem(COMPUTER_OPTOUT_KEY) === "1"; } catch { return false; }
+  });
+  const visible = machines.length === 0 && !!capabilities.manageMachines && !dismissed;
+  const close = useCallback(() => {
+    try { sessionStorage.setItem(COMPUTER_DISMISSED_KEY, "1"); if (dontRemind) localStorage.setItem(COMPUTER_OPTOUT_KEY, "1"); } catch { /* storage unavailable — dismiss in memory only */ }
+    setDismissed(true);
+  }, [dontRemind]);
+  // Esc-to-dismiss, registered only while visible. (useEscClose is unconditional and would keep a
+  // listener alive after dismissal — wrong for a self-contained, conditionally-shown modal.)
+  useEffect(() => {
+    if (!visible) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visible, close]);
+  if (!visible) return null;
+  const goConnect = () => { close(); nav(`/s/${slug}/computer`); };
+  return (
+    <div className="modal-bg" onClick={close}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>{t("chat.addComputerTitle")}</h3>
+        <div className="onboard-lead">
+          <span className="onboard-ico"><IconMonitor size={22} /></span>
+          <p>{t("chat.addComputerBody")}</p>
+        </div>
+        <p className="modal-note">{t("chat.addComputerRuntimes")}</p>
+        <div className="acts">
+          <label className="onboard-optout"><input type="checkbox" checked={dontRemind} onChange={(e) => setDontRemind(e.target.checked)} /> {t("chat.addComputerDontRemind")}</label>
+          <button className="cancel" onClick={close}>{t("chat.addComputerSkip")}</button>
+          <button className="ok" onClick={goConnect}><IconMonitor size={14} /> {t("chat.addComputerConnect")}</button>
+        </div>
       </div>
     </div>
   );

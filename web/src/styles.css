@@ -145,8 +145,11 @@ mark{background:var(--g-peach);color:var(--ink);padding:0 2px;border-radius:4px}
 .ch-menu button{text-align:left;border:0;background:transparent;cursor:pointer;padding:7px 10px;border-radius:6px;font-size:13px;color:var(--ink)}
 .ch-menu button:hover{background:var(--surface)}
 .ch-menu button.danger{color:var(--error)}
-.onboard-banner{display:flex;align-items:center;gap:12px;padding:11px 18px;background:var(--surface);border-bottom:1px solid var(--hair-strong);font-size:14px;color:var(--ink)}
-.onboard-banner button{margin-left:auto;font-size:13px;color:var(--on-ink);background:var(--ink-2);border:0;padding:6px 14px;border-radius:9999px;cursor:pointer;flex:0 0 auto;white-space:nowrap}
+/* Add-computer onboarding modal (replaces the old persistent onboard-banner): icon + lead text; the opt-out checkbox shares the .acts footer row, pushed to the left of the buttons via margin-right:auto */
+.onboard-lead{display:flex;gap:14px;align-items:flex-start;margin:2px 0 12px}
+.onboard-ico{flex:0 0 auto;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--surface-strong);color:var(--ink-2)}
+.onboard-lead p{margin:0;font-size:14px;line-height:1.6;color:var(--body)}
+.modal .onboard-optout{margin:0 auto 0 0;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;text-transform:none;letter-spacing:normal}
 .rt-list{display:flex;flex-wrap:wrap;gap:6px;margin:2px 4px 6px}
 .rt-chip{font-size:12px;padding:3px 10px;border:1px solid var(--hair-strong);border-radius:9999px;background:var(--surface);color:var(--body)}
 .item .meta{font-size:12px;color:var(--muted-soft);flex:none}
