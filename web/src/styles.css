@@ -153,7 +153,11 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .mav.agent{background:radial-gradient(circle at 30% 28%,var(--g-mint),var(--g-lav) 70%,var(--g-sky))}
 .mav.human{background:var(--surface-strong);color:var(--muted)}.mav.system{background:var(--surface-strong);color:var(--muted-soft)}
 .who{font-weight:600;font-size:16px;color:var(--ink)} .ts{font-size:12px;color:var(--muted-soft);margin-left:8px}
-.mbody{white-space:pre-wrap;color:var(--body)}
+/* overflow-wrap:anywhere (inherited by .md and all descendants): break long unbreakable tokens
+   — URLs, file paths, IDs — so a single token can't blow the body past a narrow column, most
+   visibly the 320px thread panel. Pairs with .msg-col's min-width:0; does not affect explicit
+   line breaks in code blocks. */
+.mbody{white-space:pre-wrap;color:var(--body);overflow-wrap:anywhere}
 /* Message body markdown (MessageContent .md): react-markdown+remark-breaks already structures line breaks, explicit white-space:normal overrides pre-wrap inherited from .mbody — otherwise consecutive blank lines/paragraphs are double-preserved and inflate height (diagnosed: .md inherits pre-wrap + p default 16px margin → 3 paragraphs = 176px). Paragraph/list spacing tightened for compact body; code blocks retain their own line breaks */
 .md{white-space:normal}
 .md > :first-child{margin-top:0}.md > :last-child{margin-bottom:0}

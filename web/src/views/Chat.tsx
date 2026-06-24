@@ -535,7 +535,8 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
     return (
     <div className="msg" key={m.id}>
       {ag ? <span className="msg-av clickable" onClick={() => onOpenProfile(m.senderId!)}><Avatar seed={m.senderName} size={32} /></span> : <Avatar seed={m.senderName} size={32} />}
-      <div>
+      {/* content column reuses .msg-col (flex:1;min-width:0) like the main chat — without it a flex child defaults to min-width:auto and a long unbreakable token blows the message past this narrow thread panel */}
+      <div className="msg-col">
         <div>{ag ? <span className="who clickable" onClick={() => onOpenProfile(m.senderId!)}>{m.senderName}</span> : <span className="who">{m.senderName}</span>}<span className="ts">{fmtTime(m.createdAt)}</span></div>
         {!!m.content && <div className="mbody"><MessageContent content={m.content} agents={agents} humans={humans} channels={channels} nav={navToken} /></div>}
         {!!m.attachments?.length && <div className="msg-atts">{m.attachments.map((a) => <AttCard key={a.id} a={a} url={attachmentUrl(a.id)} />)}</div>}
