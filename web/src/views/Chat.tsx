@@ -130,6 +130,7 @@ export function Chat() {
   const [asTask, setAsTask] = useState(false);
   const [text, setText] = useState("");
   const [atQuery, setAtQuery] = useState<string | null>(null); // @ mention autocomplete: null = hidden
+  const [atSel, setAtSel] = useState(0); // highlighted candidate index for ↑/↓ keyboard navigation in the @ menu
   const [showMembers, setShowMembers] = useState(false);
   const [pendingAtts, setPendingAtts] = useState<any[]>([]); // attachments that have been uploaded and are queued to be sent with the next message
   const [uploading, setUploading] = useState(false);
@@ -230,12 +231,14 @@ export function Chat() {
     }
   };
 
-  // @ mention autocomplete: candidates are split between agents and humans (members)
+  // @ mention autocomplete: candidates are all workspace agents + humans (not just current channel members) —
+  // in a public channel, @-ing a non-member pulls them in (server-side auto-join), so suggesting them is intended.
   const onInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
     const v = e.target.value; setText(v);
     const pos = e.target.selectionStart ?? v.length;
     const m = /@([\p{L}\p{N}_-]*)$/u.exec(v.slice(0, pos)); // same Unicode character class as the messageRender side (\p{L}), supports CJK and diacritic names
     if (m) { setAtQuery(m[1]); atPosRef.current = pos - m[0].length; } else setAtQuery(null);
+    setAtSel(0); // typing narrows the list → restart highlight at the top
   };
   const cands = atQuery === null ? [] : [
     ...agents.map((a) => ({ name: a.name, label: a.displayName || a.name, kind: "agent" })),
@@ -302,7 +305,7 @@ export function Chat() {
                         : <span className="who">{m.senderName}</span>}
                       {ag?.description ? <span className="msg-role">{ag.description}</span> : isMember ? <span className="member-badge">member</span> : null}
                       <span className="ts">{fmtTime(m.createdAt)}</span></div>
-                    {!!m.content && <div className="mbody"><MessageContent content={m.content} agents={agents} humans={humans} channels={channels} nav={navToken} /></div>}
+                    {!!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
                     {!!m.attachments?.length && <div className="msg-atts">{m.attachments.map((a) => <AttCard key={a.id} a={a} url={attachmentUrl(a.id)} />)}</div>}
                     {/* persistent meta row: task badge + thread button + reactions all on the same line (reactions no longer occupy a separate row) */}
                     <div className="msg-meta">
@@ -345,8 +348,9 @@ export function Chat() {
               })()}
               {atQuery !== null && cands.length > 0 && (
                 <div className="mention-menu">
-                  {cands.map((c) => (
-                    <button key={c.kind + c.name} className="mention-opt" onMouseDown={(e) => { e.preventDefault(); pick(c); }}>
+                  {cands.map((c, i) => (
+                    <button key={c.kind + c.name} className={"mention-opt" + (i === atSel ? " sel" : "")} aria-selected={i === atSel}
+                      onMouseEnter={() => setAtSel(i)} onMouseDown={(e) => { e.preventDefault(); pick(c); }}>
                       <Avatar seed={c.name} size={22} />
                       <span className="grow">{c.label} <span className="mk-name">@{c.name}</span></span>
                       <span className="mk">{c.kind === "agent" ? "agent" : t("chat.memberKind")}</span>
@@ -372,7 +376,12 @@ export function Chat() {
                   placeholder={asTask ? t("chat.taskPlaceholder") : isDm ? t("chat.dmPlaceholder", { name: cur?.name }) : t("chat.channelPlaceholder")}
                   onKeyDown={(e) => {
                     if (e.nativeEvent.isComposing) return; // IME composition in progress (CJK input): Enter is for candidate selection, not send
-                    if (atQuery !== null && cands.length) { if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(cands[0]); return; } if (e.key === "Escape") { setAtQuery(null); return; } }
+                    if (atQuery !== null && cands.length) { // @ menu open: ↑/↓ move the highlight, Enter/Tab pick it, Esc closes
+                      if (e.key === "ArrowDown") { e.preventDefault(); setAtSel((i) => Math.min(i + 1, cands.length - 1)); return; }
+                      if (e.key === "ArrowUp") { e.preventDefault(); setAtSel((i) => Math.max(i - 1, 0)); return; }
+                      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(cands[Math.min(atSel, cands.length - 1)]!); return; }
+                      if (e.key === "Escape") { e.preventDefault(); setAtQuery(null); return; }
+                    }
                     if (e.key === "Enter") {
                       if ((e.metaKey || e.ctrlKey) && e.shiftKey) { e.preventDefault(); send(true); return; } // ⌘/Ctrl+Shift+Enter sends as a task
                       if (e.shiftKey) return; // Shift+Enter inserts a line break
@@ -538,7 +547,7 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
       {/* content column reuses .msg-col (flex:1;min-width:0) like the main chat — without it a flex child defaults to min-width:auto and a long unbreakable token blows the message past this narrow thread panel */}
       <div className="msg-col">
         <div>{ag ? <span className="who clickable" onClick={() => onOpenProfile(m.senderId!)}>{m.senderName}</span> : <span className="who">{m.senderName}</span>}<span className="ts">{fmtTime(m.createdAt)}</span></div>
-        {!!m.content && <div className="mbody"><MessageContent content={m.content} agents={agents} humans={humans} channels={channels} nav={navToken} /></div>}
+        {!!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
         {!!m.attachments?.length && <div className="msg-atts">{m.attachments.map((a) => <AttCard key={a.id} a={a} url={attachmentUrl(a.id)} />)}</div>}
         <Reactions m={m} mine={me?.id ?? ""} onReact={(emoji, remove) => react(m.id, emoji, remove)} />
       </div>

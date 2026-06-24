@@ -72,6 +72,38 @@ export function parseMentions(content: string, members: Member[]) {
   return [...found.values()];
 }
 
+/** All @-addressable members of a workspace: its live agents + human server-members.
+ *  Basis for Slack-style mention auto-join — only names that resolve here may be pulled into a channel
+ *  (a human in the users table who isn't a member of this server, or another server's agent, is excluded). */
+export async function workspaceMembers(serverId: string): Promise<Member[]> {
+  const out: Member[] = [];
+  const ags = await db.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), isNull(schema.agents.deletedAt)));
+  for (const a of ags) out.push({ type: "agent", id: a.id, name: a.name, displayName: a.displayName });
+  const sm = await db.select().from(schema.serverMembers).where(eq(schema.serverMembers.serverId, serverId));
+  const uids = sm.map((s) => s.userId);
+  const us = uids.length ? await db.select().from(schema.users).where(inArray(schema.users.id, uids)) : [];
+  for (const u of us) out.push({ type: "user", id: u.id, name: u.name, displayName: u.displayName });
+  return out;
+}
+
+/** Pure decision for Slack-style auto-join: of the workspace members @-referenced in `content`, which are
+ *  not yet members of the channel (`current`) and therefore need to be added. Reuses parseMentions so the
+ *  matching can never drift from how mentions are actually recorded. */
+export function membersToAutoJoin(content: string, workspace: Member[], current: Member[]): Member[] {
+  const have = new Set(current.map((m) => m.type + ":" + m.id));
+  return parseMentions(content, workspace).filter((r) => !have.has(r.type + ":" + r.id));
+}
+
+/** Add @-mentioned workspace non-members to a channel (caller gates on channel type); returns those added.
+ *  Idempotent via onConflictDoNothing; broadcasts a membership update so every client refreshes. */
+async function autoJoinMentioned(serverId: string, channelId: string, content: string, current: Member[]): Promise<Member[]> {
+  const toAdd = membersToAutoJoin(content, await workspaceMembers(serverId), current);
+  if (!toAdd.length) return [];
+  await db.insert(schema.channelMembers).values(toAdd.map((m) => ({ channelId, memberType: m.type, memberId: m.id }))).onConflictDoNothing();
+  await publish(serverId, { type: "channel:members-updated", channelId });
+  return toAdd;
+}
+
 // Message serialization shape for message:new socket event (omits internal searchVector/agentSendKey).
 export interface ReactionAgg { emoji: string; count: number; reactorIds: string[]; reactorNames: string[]; }
 export function serializeMsg(msg: typeof schema.messages.$inferSelect, mentions: Member[], atts: (typeof schema.attachments.$inferSelect)[] = [], reactions: ReactionAgg[] = []) {
@@ -228,13 +260,13 @@ export async function createMessage(opts: {
     taskStatus: opts.asTask ? "todo" : null, taskNumber,
   }).returning();
 
+  // Channel row fetched once; its type drives thread auto-follow, mention auto-join, and wake routing below.
+  const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, opts.channelId)))[0];
+
   // auto-follow: reply to thread → sender auto-joins; replying after done clears done and brings thread back to inbox
-  if (opts.senderId && opts.senderType !== "system") {
-    const ch = (await db.select({ type: schema.channels.type }).from(schema.channels).where(eq(schema.channels.id, opts.channelId)))[0];
-    if (ch?.type === "thread") {
-      await db.insert(schema.channelMembers).values({ channelId: opts.channelId, memberType: opts.senderType, memberId: opts.senderId }).onConflictDoNothing();
-      await db.update(schema.channelMembers).set({ threadDoneAt: null }).where(eq(schema.channelMembers.channelId, opts.channelId)); // new reply → reset done for thread followers (thread becomes active again in inbox)
-    }
+  if (opts.senderId && opts.senderType !== "system" && ch?.type === "thread") {
+    await db.insert(schema.channelMembers).values({ channelId: opts.channelId, memberType: opts.senderType, memberId: opts.senderId }).onConflictDoNothing();
+    await db.update(schema.channelMembers).set({ threadDoneAt: null }).where(eq(schema.channelMembers.channelId, opts.channelId)); // new reply → reset done for thread followers (thread becomes active again in inbox)
   }
 
   // Attachments: backfill messageId/channelId onto the attachment uploaded earlier, so it appears in the channel Files list
@@ -244,7 +276,16 @@ export async function createMessage(opts: {
     atts = await db.select().from(schema.attachments).where(inArray(schema.attachments.id, opts.attachmentIds));
   }
 
-  const members = await channelMembers(opts.channelId);
+  let members = await channelMembers(opts.channelId);
+  // Slack-style mention auto-join: @-mentioning a workspace member who isn't in this channel pulls them in,
+  // so the mention is recorded + delivered (wake / inbox) instead of being silently dropped. Scoped to public
+  // `channel` only — private/dm/thread are intentionally excluded: auto-adding to a private channel would leak
+  // member-only history (see channel-list visibility in routes-api), and a DM is a fixed two-party conversation.
+  // In those, an @ to a non-member stays a no-op, exactly as before.
+  if (ch?.type === "channel" && opts.senderType !== "system") {
+    const joined = await autoJoinMentioned(opts.serverId, opts.channelId, opts.content, members);
+    if (joined.length) members = [...members, ...joined];
+  }
   const mentions = parseMentions(opts.content, members);
   if (mentions.length) {
     await db.insert(schema.messageMentions).values(
@@ -267,7 +308,6 @@ export async function createMessage(opts: {
   }
 
   // Agent-side wake: only wake agents @-mentioned (in channel), or agent members in a DM.
-  const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, opts.channelId)))[0];
   const isDm = ch?.type === "dm";
   // Message in thread channel → broadcast thread:updated (parentMessageId + replyCount + participantIds)
   if (ch?.type === "thread" && ch.parentMessageId) {
