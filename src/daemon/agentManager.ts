@@ -1,8 +1,9 @@
 // Manages local agents: spawns processes via the runtime interface, bridges events to the server, and handles delivery/sleep. Runtime protocol details live in each runtime file.
-import { mkdir, writeFile, access, rm } from "node:fs/promises";
+import { mkdir, writeFile, readFile, access, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { buildSystemPrompt, STARTUP_NUDGE, RESUME_NUDGE, inboxNotice } from "./prompt.js";
+import { seedMemory, applyProfileToMemory } from "./memory.js";
 import { ensureOpenTagBin } from "./openTagBin.js";
 import { getRuntime } from "./runtimes.js";
 import type { RuntimeSession, RuntimeCallbacks } from "./runtime.js";
@@ -51,6 +52,23 @@ export class AgentManager {
     this.send({ type: "agent:activity", agentId, activity: "offline", detail: "reset" });
     this.log.info("agent reset", { agentId, wipeWorkspace, clearMemory });
   }
+  /** Profile changed on the server (displayName/description) — surgically sync the workspace MEMORY.md
+   *  title + `## Role`, preserving the agent's own sections. No-op if the workspace/file doesn't exist
+   *  yet (a not-yet-started agent gets fresh values from the DB when start() seeds it). */
+  async syncProfile(agentId: string, displayName: string, description?: string | null): Promise<void> {
+    const mem = path.join(DATA_DIR, agentId, "MEMORY.md");
+    let content: string;
+    try { content = await readFile(mem, "utf8"); }
+    catch { this.log.debug("syncProfile: no MEMORY.md yet", { agentId }); return; }
+    const next = applyProfileToMemory(content, displayName || agentId, description);
+    if (next !== content) {
+      try { await writeFile(mem, next); this.log.info("profile synced to MEMORY.md", { agentId }); }
+      catch (e) { this.log.warn("syncProfile write failed", { agentId, detail: String(e) }); return; }
+    }
+    // Keep a running agent's cached config fresh so a later --resume uses the new values.
+    const r = this.agents.get(agentId);
+    if (r) { r.config.displayName = displayName; r.config.description = description ?? null; }
+  }
   private resetIdle(agentId: string): void {
     const r = this.agents.get(agentId); if (!r) return;
     if (r.idleTimer) clearTimeout(r.idleTimer);
@@ -71,7 +89,7 @@ export class AgentManager {
     await mkdir(path.join(dir, "notes"), { recursive: true });
     const mem = path.join(dir, "MEMORY.md");
     try { await access(mem); } catch {
-      await writeFile(mem, `# ${config.displayName || config.name}\n\n## Role\n${config.description || "Undefined"}\n\n## Key Knowledge\n- None yet\n\n## Active Context\n- First startup\n`);
+      await writeFile(mem, seedMemory(config.displayName || config.name, config.description));
     }
 
     const systemPrompt = buildSystemPrompt({

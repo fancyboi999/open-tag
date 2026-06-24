@@ -4,7 +4,7 @@ import { and, eq, gt, ne, or, inArray, asc, desc, count, isNotNull, isNull, ilik
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, serverIdHeader } from "./util.js";
 import { verifyUser, signUser, hashPassword, verifyPassword, newKey, hashToken } from "./auth.js";
-import { createMessage, getOrCreateDM, getOrCreateThread, convertMessageToTask, claimTask, unclaimTask, setTaskStatus, deleteTask, TASK_STATUSES, startAgent, stopAgent, resetAgent, addReaction, removeReaction, aggregateReactions, saveMessage, unsaveMessage, checkSaved, listSaved, descTooLong, DESC_TOO_LONG, createServer } from "./core.js";
+import { createMessage, getOrCreateDM, getOrCreateThread, convertMessageToTask, claimTask, unclaimTask, setTaskStatus, deleteTask, TASK_STATUSES, startAgent, stopAgent, resetAgent, syncAgentProfile, addReaction, removeReaction, aggregateReactions, saveMessage, unsaveMessage, checkSaved, listSaved, descTooLong, DESC_TOO_LONG, createServer } from "./core.js";
 import { publish } from "./realtime.js";
 import { requestDaemon } from "./daemonHub.js";
 import { parseUpload } from "./attachments.js";
@@ -216,6 +216,11 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     for (const k of ["displayName", "description", "model", "runtime", "avatarUrl"]) if (b[k] !== undefined) patch[k] = b[k];
     if (b.envVars !== undefined) patch.envVars = b.envVars;
     await db.update(schema.agents).set(patch).where(and(eq(schema.agents.id, am[1]!), eq(schema.agents.serverId, serverId)));
+    // Title/role changed → push the current profile to the daemon so it syncs the workspace MEMORY.md.
+    if (patch.displayName !== undefined || patch.description !== undefined) {
+      const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, am[1]!), eq(schema.agents.serverId, serverId))))[0];
+      if (a) syncAgentProfile(serverId, am[1]!, a.displayName, a.description);
+    }
     return (sendJson(res, 200, { ok: true }), true);
   }
   if (am && method === "DELETE") {

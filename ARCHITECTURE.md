@@ -52,7 +52,7 @@ Agent data plane   Agent process → HTTP /agent-api/*  (Bearer per-agent token 
 
 ### Local daemon (`src/daemon/`)
 
-- `index.ts` — Daemon entry point: connects to server control-plane WS, dispatches `agent:start / stop / sleep / reset / deliver / workspace:list / workspace:read / skills:list / ping`.
+- `index.ts` — Daemon entry point: connects to server control-plane WS, dispatches `agent:start / stop / sleep / reset / profile / deliver / workspace:list / workspace:read / skills:list / ping` (`profile` = surgically sync the workspace `MEMORY.md` title + `## Role` when the agent's displayName/description is edited).
 - `connection.ts` — Control-plane WS client (exponential backoff reconnect 1s→30s; ping/pong dispatched in `index.ts`, this class only manages reconnection).
 - `agentManager.ts` — **Agent lifecycle**: start / sleep / stop / reset / deliver; two-dimensional status `status(inactive/active/sleeping) × activity(online/working/thinking/sleeping/offline/error)` (non-zero exit → `sleeping/error`, see §I state machine). Wake = `start()` with archived sessionId. **Includes idle-sleep** (`IDLE_MS`). `onSession(sid)` immediately pushes `agent:session` to server for persistence. Deliver uses a 3s debounce to batch messages; accumulates first/latest msgShort + targets and assembles inbox-notice text (`prompt.ts inboxNotice`, with `· task` / `· dm` / `changed target` suffixes).
 - `runtime.ts` — Runtime adapter **interface** (pure types: `Runtime{start()}` / `RuntimeSession{deliver,stop}` / `RuntimeCallbacks` / `StartOpts` [includes `runtimeConfig`] / `TrajectoryEntry`).

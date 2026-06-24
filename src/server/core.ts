@@ -514,3 +514,8 @@ export async function resetAgent(serverId: string, agentId: string, wipeWorkspac
   await publishAgentState(serverId, agentId);
   return true;
 }
+/** Profile (displayName/description) changed → ask the daemon to sync the workspace MEMORY.md title + `## Role`.
+ *  Pass the full current values (not just the changed field); the daemon rewrites only those, preserving the rest. */
+export function syncAgentProfile(serverId: string, agentId: string, displayName: string, description?: string | null): void {
+  broadcastToDaemons(serverId, { type: "agent:profile", agentId, displayName, description: description ?? null });
+}

@@ -44,6 +44,7 @@ conn = new Connection(serverUrl, apiKey, (msg) => {
     case "agent:stop": mgr.stop(msg.agentId); break;
     case "agent:sleep": mgr.sleep(msg.agentId); break;
     case "agent:reset": void mgr.reset(msg.agentId, !!msg.wipeWorkspace, !!msg.clearMemory); break;
+    case "agent:profile": void mgr.syncProfile(msg.agentId, msg.displayName ?? "", msg.description); break;
     case "agent:workspace:list": void listWorkspace(msg.agentId, msg.path ?? "").then((r) => conn.send({ type: "workspace:file_tree", requestId: msg.requestId, agentId: msg.agentId, ...r })); break;
     case "agent:workspace:read": void readWorkspaceFile(msg.agentId, msg.path ?? "").then((r) => conn.send({ type: "workspace:file_content", requestId: msg.requestId, agentId: msg.agentId, ...r })); break;
     case "agent:skills:list": void listSkills(msg.agentId).then((r) => conn.send({ type: "skills:list", requestId: msg.requestId, agentId: msg.agentId, ...r })); break;
@@ -53,7 +54,7 @@ conn = new Connection(serverUrl, apiKey, (msg) => {
   const runtimes = detectRuntimes();
   log.info("ready", { runtimes, hostname: os.hostname() });
   conn.send({
-    type: "ready", capabilities: ["agent:start", "agent:stop", "agent:sleep", "agent:reset", "agent:deliver", "agent:workspace"],
+    type: "ready", capabilities: ["agent:start", "agent:stop", "agent:sleep", "agent:reset", "agent:profile", "agent:deliver", "agent:workspace"],
     runtimes, runningAgents: mgr.running(), hostname: os.hostname(), os: `${os.platform()} ${os.arch()}`, daemonVersion: "0.1.0",
     machineId: readMachineId(), // Stable identity: empty on first connection; server sends it back via ready:ack for persistence.
   });
