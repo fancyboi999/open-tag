@@ -162,3 +162,26 @@ hardening tier) and what was not exercised.
 - **`forcePathStyle: true`** stays (required by MinIO/Garage); harmless for OSS. Not
   changed.
 - E2E depends on Docker being available; this worktree confirmed Docker 28.3.3.
+
+## Addendum — discovered during E2E (scope expanded with user approval)
+
+The fail-fast E2E surfaced a **pre-existing crash**, not anticipated by this spec: when
+`saveObject` rejects **before the file stream is consumed** (exactly what `s3Config()`'s
+new validation does), the unconsumed busboy stream means `"close"` never fires, leaving
+the rejected promise unhandled — which **crashes the whole server process** on Node ≥15
+(`--unhandled-rejections=throw`). Original S3 errors (network/PutObject) reject *after*
+the stream is read, so they were handled; only the consume-before-fail path was exposed.
+
+Because shipping fail-fast without this fix would turn a misconfig into a DoS (any upload
+crashes the server), the fix was folded in (user-approved scope expansion beyond the
+original storage.ts-only plan):
+
+- **`src/server/attachments.ts`** — each per-file task self-catches, `stream.resume()`s to
+  drain so busboy can emit `"close"`, and the first error is surfaced via `reject` → the
+  upload returns `500` with a clear detail instead of crashing. Hardens **all** saveObject
+  failure modes (S3 config/network, local disk full), not just S3.
+- **`test/attachments.unit.test.ts`** — regression test: a save that fails before consuming
+  the stream makes `parseUpload` reject (not hang, not crash).
+
+The busboy oversized-upload **silent truncation** (separate, pre-existing) remains deferred
+and is recorded as tech-debt I31.

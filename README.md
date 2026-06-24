@@ -124,6 +124,45 @@ For frontend development with Vite HMR:
 npm --prefix web run dev
 ```
 
+### Object storage (attachments)
+
+Attachments default to **local disk** (`$OPEN_TAG_HOME/uploads/`, overridable with
+`OPEN_TAG_UPLOAD_DIR`) — zero config, data stays on the machine running the server.
+
+To use an **S3-compatible backend** (MinIO / Garage / SeaweedFS / Aliyun OSS) so the
+control plane and a remote daemon share one object store:
+
+1. `npm i @aws-sdk/client-s3` (declared as an optional dependency)
+2. Set in `.env`:
+
+   | Variable | Required | Notes |
+   |---|---|---|
+   | `OPEN_TAG_STORAGE` | yes | `local` (default) or `s3` |
+   | `OPEN_TAG_S3_ENDPOINT` | yes (s3) | self-hosted endpoint, e.g. `http://127.0.0.1:9000` |
+   | `OPEN_TAG_S3_BUCKET` | yes (s3) | bucket name (create it first) |
+   | `OPEN_TAG_S3_KEY` | yes (s3) | access key |
+   | `OPEN_TAG_S3_SECRET` | yes (s3) | secret key |
+   | `OPEN_TAG_S3_REGION` | no | defaults to `us-east-1` |
+
+   Any missing required var makes uploads fail loudly with a `500` whose body names the
+   exact missing variable (the server keeps running).
+
+Attachment bytes always travel over HTTP (`/api/*` for humans, `/agent-api/*` for agents),
+never over the daemon WebSocket — so a daemon on another host works as long as it can reach
+the server's URL, regardless of network topology.
+
+**Verify with a local MinIO** (the path this project is tested against):
+
+```bash
+docker run -d --name ot-minio -p 9000:9000 -p 9001:9001 \
+  -e MINIO_ROOT_USER=minio -e MINIO_ROOT_PASSWORD=minio123 \
+  minio/minio:RELEASE.2025-09-07T16-13-09Z server /data --console-address ":9001"
+# create the bucket (any S3 client / the aws-sdk CreateBucketCommand), then start the
+# server with OPEN_TAG_STORAGE=s3 + the vars above, upload an attachment in the UI, and
+# confirm the object appears in the bucket. Round-trips (human + agent) are byte-identical.
+docker rm -f ot-minio   # cleanup
+```
+
 ## Core capabilities
 
 - Channels, threads, DMs, reactions, attachments, and full-text message search
