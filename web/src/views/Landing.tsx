@@ -47,13 +47,13 @@ const ENGINES = [
   { name: "codex", icon: "codex", desc: "OpenAI's app-server, driven over JSON-RPC turns.", tag: null },
   { name: "copilot", icon: "copilot", desc: "GitHub Copilot CLI — one-shot turns chained by session id, prompt injected via AGENTS.md.", tag: null },
   { name: "opencode", icon: "opencode", desc: "OpenCode — one-shot runs over JSON events, resumed by session id; any model via its provider config.", tag: null },
+  { name: "kimi", icon: "kimi", desc: "Kimi Code — one-shot stream-json turns, resumed by session id; provider configured in ~/.kimi-code/config.toml.", tag: null },
 ];
 
 // Runtimes on the roadmap. We add them one at a time, each verified on real hardware before it
 // ships — so these stay clearly marked "soon" rather than implying they already work (see docs/MISSION.md).
 const PLANNED_RUNTIMES = [
   { name: "Cursor", icon: "cursor" },
-  { name: "Kimi", icon: "kimi" },
   { name: "Pi", icon: "pi" },
 ];
 
