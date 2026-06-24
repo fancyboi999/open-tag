@@ -13,8 +13,11 @@ export function verifyUser(token: string | null): string | null {
 }
 
 /** dev-login gate: a public username→JWT shortcut for local dev. Disabled by default so production never ships it open.
+ *  Defense in depth: even if ALLOW_DEV_LOGIN=true leaks into a production deploy, NODE_ENV==='production' (set by the
+ *  Dockerfile runtime stage) force-disables it — the env flag is not the only line of defense.
  *  Read at call-time (not module load) so the value is honored even if the env is mutated after import (e.g. tests). */
-export const devLoginEnabled = (): boolean => process.env.ALLOW_DEV_LOGIN === "true";
+export const devLoginEnabled = (): boolean =>
+  process.env.ALLOW_DEV_LOGIN === "true" && process.env.NODE_ENV !== "production";
 
 /** First-deploy admin setup token (`POST /api/auth/setup`). When unset, the setup endpoint is disabled entirely (404). */
 export const setupToken = (): string | null => {
