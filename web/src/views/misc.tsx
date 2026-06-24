@@ -254,7 +254,7 @@ function ConnectMachineModal({ onClose }: { onClose: () => void }) {
     try { const r = await api("POST", `/api/servers/${serverId}/machines`, { name: name.trim() }); if (r?.key) { setRes({ key: r.key, name: r.name }); await reload(); } }
     finally { setBusy(false); }
   };
-  const cmd = res ? `npm run daemon -- --server-url ${window.location.origin} --api-key ${res.key}` : "";
+  const cmd = res ? `npx @fancyboi999/open-tag-daemon --server-url ${window.location.origin} --api-key ${res.key}` : "";
   const copy = (text: string, tag: string) => { navigator.clipboard?.writeText(text); setCopied(tag); setTimeout(() => setCopied(""), 1500); };
   return (
     <div className="modal-bg" onClick={onClose}>
