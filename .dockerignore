@@ -1,0 +1,17 @@
+# Build context hygiene: keep secrets, local state, and reinstalled/rebuilt artifacts out of the image.
+.git
+node_modules
+**/node_modules
+web/dist
+dist
+logs
+*.log
+# Never bake env/secrets into the image — they are injected at runtime via compose env_file.
+.env
+.env.*
+# Local-only / private material (also excluded from the public repo)
+CLAUDE.local.md
+reference
+recon
+_vendor
+.DS_Store
