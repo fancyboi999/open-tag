@@ -19,6 +19,8 @@ interface Store {
   ready: boolean; serverId: string; slug: string; me: Me | null; myRole: string; serverAvatar: string | null;
   servers: ServerInfo[]; capabilities: Record<string, boolean>;
   uploadServerAvatar: (file: File) => Promise<void>;
+  uploadAgentAvatar: (agentId: string, file: File) => Promise<string>;
+  uploadUserAvatar: (file: File) => Promise<string>;
   createServer: (name: string, slug?: string) => Promise<void>;
   logout: () => void;
   channels: Channel[]; dms: Dm[]; unread: Record<string, number>; agents: Agent[]; machines: Machine[]; humans: Human[];
@@ -122,6 +124,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || "upload failed");
     const { avatarUrl } = await r.json();
     setServerAvatar(avatarUrl ? `${avatarUrl}?token=${encodeURIComponent(tokenRef.current)}` : null);
+  };
+  const uploadAgentAvatar = async (agentId: string, file: File): Promise<string> => {
+    const fd = new FormData(); fd.append("files", file);
+    const r = await fetch(`/api/agents/${agentId}/avatar`, { method: "POST", headers: { authorization: "Bearer " + tokenRef.current, "x-server-id": sidRef.current }, body: fd });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || "upload failed");
+    const { avatarUrl } = await r.json();
+    return `${avatarUrl}?token=${encodeURIComponent(tokenRef.current)}`;
+  };
+  const uploadUserAvatar = async (file: File): Promise<string> => {
+    const fd = new FormData(); fd.append("files", file);
+    const r = await fetch("/api/auth/me/avatar", { method: "POST", headers: { authorization: "Bearer " + tokenRef.current, "x-server-id": sidRef.current }, body: fd });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || "upload failed");
+    const { avatarUrl } = await r.json();
+    return `${avatarUrl}?token=${encodeURIComponent(tokenRef.current)}`;
   };
   const react = async (messageId: string, emoji: string, remove = false) => { await api(remove ? "DELETE" : "POST", `/api/messages/${messageId}/reactions`, { emoji }); };
   const openThread = async (parentChannelId: string, parentMessageId: string) => { const r = await api("POST", `/api/channels/${parentChannelId}/threads`, { parentMessageId }); return r?.threadChannelId ?? null; };
@@ -232,7 +248,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; sock?.close(); if (unreadTimer) clearTimeout(unreadTimer); };
   }, []);
 
-  return <Ctx.Provider value={{ ready, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, channels, dms, unread, agents, machines, humans, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ready, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, humans, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
 }
 
 export const fmtTime = (iso?: string) => { try { return iso ? new Date(iso).toLocaleTimeString("zh-CN", { hour12: false }) : ""; } catch { return ""; } };

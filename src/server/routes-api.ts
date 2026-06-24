@@ -556,6 +556,31 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     }
     return (sendJson(res, 200, { attachments: out, attachmentId: out[0]?.attachmentId }), true);
   }
+  // Agent avatar upload: manageAgents capability required → stored as attachment → agents.avatarUrl
+  const agavatar = /^\/api\/agents\/([^/]+)\/avatar$/.exec(p);
+  if (agavatar && method === "POST") {
+    if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
+    const agentId = agavatar[1]!;
+    const { files } = await parseUpload(req);
+    const f = files[0];
+    if (!f) return (sendErr(res, 400, "no file"), true);
+    if (!(f.mimeType || "").startsWith("image/")) return (sendErr(res, 400, "avatar must be an image"), true);
+    const [att] = await db.insert(schema.attachments).values({ serverId, channelId: null, uploaderType: "user", uploaderId: userId, filename: f.filename, mimeType: f.mimeType, sizeBytes: f.size, storageKey: f.storageKey }).returning();
+    const avatarUrl = `/api/attachments/${att!.id}`;
+    await db.update(schema.agents).set({ avatarUrl }).where(and(eq(schema.agents.id, agentId), eq(schema.agents.serverId, serverId)));
+    return (sendJson(res, 200, { avatarUrl }), true);
+  }
+  // Current user avatar upload → stored as attachment → users.avatarUrl
+  if (p === "/api/auth/me/avatar" && method === "POST") {
+    const { files } = await parseUpload(req);
+    const f = files[0];
+    if (!f) return (sendErr(res, 400, "no file"), true);
+    if (!(f.mimeType || "").startsWith("image/")) return (sendErr(res, 400, "avatar must be an image"), true);
+    const [att] = await db.insert(schema.attachments).values({ serverId, channelId: null, uploaderType: "user", uploaderId: userId, filename: f.filename, mimeType: f.mimeType, sizeBytes: f.size, storageKey: f.storageKey }).returning();
+    const avatarUrl = `/api/attachments/${att!.id}`;
+    await db.update(schema.users).set({ avatarUrl }).where(eq(schema.users.id, userId));
+    return (sendJson(res, 200, { avatarUrl }), true);
+  }
   // Workspace avatar upload: owner/admin uploads image → stored as attachment → servers.avatarUrl
   const savatar = /^\/api\/servers\/([^/]+)\/avatar$/.exec(p);
   if (savatar && method === "POST") {

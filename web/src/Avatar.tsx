@@ -11,7 +11,7 @@ function uriFor(seed: string): string {
   return u;
 }
 
-export function Avatar({ seed, size = 24 }: { seed: string; size?: number }) {
+export function Avatar({ seed, size = 24, url }: { seed: string; size?: number; url?: string | null }) {
   const uri = useMemo(() => uriFor(seed), [seed]);
-  return <img className="av-img" src={uri} width={size} height={size} alt={seed} title={seed} />;
+  return <img className="av-img" src={url || uri} width={size} height={size} alt={seed} title={seed} />;
 }

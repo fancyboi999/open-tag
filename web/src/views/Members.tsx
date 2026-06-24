@@ -115,7 +115,7 @@ function Roster({ agents, onCreate, canCreate }: { agents: any[]; onCreate: () =
 
 export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string; onDeleted: () => void; onClose?: () => void; onMessage?: () => void }) {
   const { t } = useTranslation();
-  const { api, reload, onEvent, capabilities, openDM, slug } = useStore();
+  const { api, reload, onEvent, capabilities, openDM, slug, uploadAgentAvatar, attachmentUrl } = useStore();
   const confirm = useConfirm();
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
@@ -123,9 +123,12 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const [a, setA] = useState<any>(null);
   const [edit, setEdit] = useState(false); const [dn, setDn] = useState(""); const [ds, setDs] = useState(""); // profile edit state (displayName/description)
   const [showRestart, setShowRestart] = useState(false);
-  const refetch = async () => setA(await api("GET", "/api/agents/" + id));
+  const [avBusy, setAvBusy] = useState(false); const [avErr, setAvErr] = useState(""); const [signedAvatar, setSignedAvatar] = useState<string | null>(null);
+  const avFileRef = useRef<HTMLInputElement>(null);
+  const refetch = async () => { const data = await api("GET", "/api/agents/" + id); setA(data); setSignedAvatar(data?.avatarUrl ? attachmentUrl(data.avatarUrl.replace("/api/attachments/", "")) : null); };
   useEffect(() => { refetch(); }, [id]);
   useEffect(() => onEvent((e) => { if (e.type === "agent" && e.id === id) setA((p: any) => (p ? { ...p, status: e.status ?? p.status, activity: e.activity ?? p.activity } : p)); }), [id]);
+  const onPickAvatar = async (e: any) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; setAvBusy(true); setAvErr(""); try { const url = await uploadAgentAvatar(id, f); setSignedAvatar(url); await refetch(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   if (!a) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
   const ctl = async (action: string) => { await api("POST", `/api/agents/${id}/${action}`); setTimeout(refetch, 400); };
   // Three restart modes: restart=keep session+workspace; reset=clear session, keep workspace; full=clear session+delete workspace. All modes end with a restart.
@@ -156,12 +159,12 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
     <>
       {onClose ? ( // panel mode (embedded in chat right sidebar: click avatar → profile panel)
         <div className="profile-panel-head">
-          <Avatar seed={a.name} size={28} />
+          <Avatar seed={a.name} url={signedAvatar} size={28} />
           <div className="pph-id"><span className="pph-name">{a.displayName || a.name} <span className={"dot " + live} /></span><span className="pph-handle">@{a.name}</span></div>
           <button className="joinbtn pph-close" title={t("members.close")} onClick={onClose}><X size={14} /></button>
           {acts}
         </div>
-      ) : <div className="head head-agent"><div><h1>{a.displayName || a.name}</h1><small>@{a.name}</small></div>{acts}</div>}
+      ) : <div className="head head-agent"><Avatar seed={a.name} url={signedAvatar} size={48} /><div><h1>{a.displayName || a.name}</h1><small>@{a.name} <span className={"dot " + live} /></small></div>{acts}</div>}
       <div className="ptabs">
         {/* Tab order follows AgentDetailPanel spec: integrations (not apps) */}
         {([
@@ -187,6 +190,12 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
             <div className="card">
               {edit ? (
                 <div className="setform">
+                  <input type="file" ref={avFileRef} accept="image/*" style={{ display: "none" }} onChange={onPickAvatar} />
+                  <div className="avatar-edit">
+                    {signedAvatar ? <img className="avatar-edit-img" src={signedAvatar} alt="" /> : <Avatar seed={a.name} size={56} />}
+                    <div><button type="button" disabled={avBusy} onClick={() => avFileRef.current?.click()}>{avBusy ? t("misc.serverAvatarUploading") : signedAvatar ? t("misc.serverAvatarChange") : t("misc.serverAvatarUpload")}</button>
+                    {avErr && <div className="form-err" style={{ marginTop: 6 }}>{avErr}</div>}</div>
+                  </div>
                   <label>{t("members.displayName")}</label><input value={dn} onChange={(e) => setDn(e.target.value)} placeholder={a.name} />
                   <label>{t("members.agentDescriptionLabel")}</label><textarea value={ds} maxLength={3000} onChange={(e) => setDs(e.target.value)} placeholder={t("members.agentDescriptionPlaceholder")} />
                   <div className="ta-count">{ds.trim().length}/3000</div>
@@ -446,23 +455,34 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
 // Description is visible to other humans and agents in the server; agents fetch it via `open-tag server info` for collaboration context.
 function HumanProfile({ uid }: { uid: string }) {
   const { t } = useTranslation();
-  const { api, serverId, me, reload, slug, capabilities } = useStore();
+  const { api, serverId, me, reload, slug, capabilities, uploadUserAvatar, attachmentUrl } = useStore();
   const confirm = useConfirm();
   const nav = useNavigate();
   const [p, setP] = useState<any>(null);
   const [edit, setEdit] = useState(false); const [ds, setDs] = useState("");
-  const refetch = async () => setP(await api("GET", `/api/servers/${serverId}/members/${uid}/profile`));
-  useEffect(() => { setP(null); refetch(); }, [uid, serverId]);
+  const [avBusy, setAvBusy] = useState(false); const [avErr, setAvErr] = useState(""); const [signedAvatar, setSignedAvatar] = useState<string | null>(null);
+  const avFileRef = useRef<HTMLInputElement>(null);
+  const refetch = async () => { const data = await api("GET", `/api/servers/${serverId}/members/${uid}/profile`); setP(data); setSignedAvatar(data?.avatarUrl ? attachmentUrl(data.avatarUrl.replace("/api/attachments/", "")) : null); };
+  useEffect(() => { setP(null); setSignedAvatar(null); refetch(); }, [uid, serverId]);
+  const onPickAvatar = async (e: any) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; setAvBusy(true); setAvErr(""); try { const url = await uploadUserAvatar(f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   if (!p) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
   const isMe = me?.id === uid;
   const save = async () => { await api("PATCH", "/api/auth/me", { description: ds.trim() }); setEdit(false); await refetch(); await reload(); };
   return (
     <>
-      <div className="head"><h1 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={p.name} size={26} />{p.displayName || p.name}</h1><small>@{p.name} · {p.role}</small></div>
+      <div className="head"><h1 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={p.name} url={signedAvatar} size={26} />{p.displayName || p.name}</h1><small>@{p.name} · {p.role}</small></div>
+      <input type="file" ref={avFileRef} accept="image/*" style={{ display: "none" }} onChange={onPickAvatar} />
       <div className="scroll">
         <div className="card">
           {edit ? (
             <div className="setform">
+              {isMe && (
+                <div className="avatar-edit">
+                  {signedAvatar ? <img className="avatar-edit-img" src={signedAvatar} alt="" /> : <Avatar seed={p.name} size={56} />}
+                  <div><button type="button" disabled={avBusy} onClick={() => avFileRef.current?.click()}>{avBusy ? t("misc.serverAvatarUploading") : signedAvatar ? t("misc.serverAvatarChange") : t("misc.serverAvatarUpload")}</button>
+                  {avErr && <div className="form-err" style={{ marginTop: 6 }}>{avErr}</div>}</div>
+                </div>
+              )}
               <label>{t("members.humanDescriptionLabel")}</label>
               <textarea value={ds} maxLength={3000} onChange={(e) => setDs(e.target.value)} placeholder="Describe yourself for other humans and agents in this server" />
               <div className="ta-count">{ds.trim().length}/3000</div>
