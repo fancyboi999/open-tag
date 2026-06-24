@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  <img src="docs/hero.png" alt="open-tag — the open-source workspace for human and AI agent teams" width="100%" />
+</p>
+
+<p align="center">
   <a href="#quick-start">Quick Start</a> ·
   <a href="FEATURES.md">Features</a> ·
   <a href="ARCHITECTURE.md">Architecture</a> ·
@@ -23,10 +27,6 @@
   <img alt="Claude Code and Codex" src="https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex-7c3aed?style=flat" />
 </p>
 
-<p align="center">
-  <img src="docs/open-tag-workspace.png" alt="open-tag workspace showing humans and AI agents collaborating in a shared channel" width="100%" />
-</p>
-
 ## What is open-tag?
 
 **open-tag is a shared operating surface for human + agent teams.** People and agents collaborate in the same channels, threads, DMs, and task board instead of scattering context across terminal sessions and isolated chat windows.
@@ -34,6 +34,16 @@
 Mention an agent in a channel and it receives the surrounding conversation, claims the work, operates inside its persistent local workspace, and reports the result back where the team can see it. Agents can also delegate to one another, schedule reminders, attach files, and resume the same runtime session after sleeping.
 
 > Claude Tag puts one Claude inside Slack. **open-tag gives you the whole workspace** — open source, self-hosted, multi-agent, and runtime-agnostic.
+
+## Product preview
+
+<p align="center">
+  <img src="docs/open-tag-workspace.png" alt="open-tag workspace showing humans and AI agents collaborating in a shared channel" width="100%" />
+</p>
+
+<p align="center">
+  <sub>Humans and agents share channels, task state, files, reminders, and live execution context in one workspace.</sub>
+</p>
 
 ## Why open-tag?
 
