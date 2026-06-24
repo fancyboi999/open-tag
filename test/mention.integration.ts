@@ -3,7 +3,7 @@
 // Creates a fully isolated workspace, exercises the actual createMessage() path, asserts, then cleans up.
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../src/db/index.ts";
-import { createMessage } from "../src/server/core.ts";
+import { createMessage, getOrCreateThread } from "../src/server/core.ts";
 
 const ts = Date.now();
 const owner = `owner_${ts}`, bob = `bob_${ts}`, ghost = `ghost_${ts}`;
@@ -56,7 +56,9 @@ async function cleanup() {
   const msgs = await db.select({ id: schema.messages.id }).from(schema.messages).where(eq(schema.messages.serverId, serverId));
   for (const m of msgs) await db.delete(schema.messageMentions).where(eq(schema.messageMentions.messageId, m.id));
   await db.delete(schema.messages).where(eq(schema.messages.serverId, serverId));
-  for (const c of [pubCh, privCh, dmCh]) await db.delete(schema.channelMembers).where(eq(schema.channelMembers.channelId, c));
+  // Delete members for EVERY channel of this run's server (covers the thread channels created dynamically in [5]/[6]).
+  const chans = await db.select({ id: schema.channels.id }).from(schema.channels).where(eq(schema.channels.serverId, serverId));
+  for (const c of chans) await db.delete(schema.channelMembers).where(eq(schema.channelMembers.channelId, c.id));
   await db.delete(schema.channels).where(eq(schema.channels.serverId, serverId));
   await db.delete(schema.agents).where(eq(schema.agents.serverId, serverId));
   await db.delete(schema.serverMembers).where(eq(schema.serverMembers.serverId, serverId));
@@ -90,6 +92,22 @@ async function main() {
   const m4 = await createMessage({ serverId, channelId: dmCh, senderType: "user", senderId: ownerId, senderName: owner, content: `@${bob} look here` });
   check("bob NOT added to the DM", !inChannel(await members(dmCh), "user", bobId));
   check("no mention recorded for bob in DM", !mentioned(await mentionsOf(m4.id), "user", bobId));
+
+  // A thread inherits its PARENT channel's @-reach (mentionAutoJoinPool) — the core of this fix. ghost is a
+  // workspace member but NOT a member of the freshly-created thread, so before the fix the @ was dropped.
+  console.log("\n[5] THREAD under a PUBLIC channel: @ a non-thread-member agent inherits the parent's workspace reach (auto-join + wake)");
+  const parent5 = await createMessage({ serverId, channelId: pubCh, senderType: "user", senderId: ownerId, senderName: owner, content: "open a thread under the public channel" });
+  const th5 = await getOrCreateThread(serverId, parent5.id, { type: "user", id: ownerId });
+  const m5 = await createMessage({ serverId, channelId: th5.id, senderType: "user", senderId: ownerId, senderName: owner, content: `@${ghost} please pick up this thread` });
+  check("non-member agent ghost auto-joined the THREAD (parent is public → workspace reach)", inChannel(await members(th5.id), "agent", ghostId));
+  check("mention to ghost recorded in the thread (no longer silently dropped)", mentioned(await mentionsOf(m5.id), "agent", ghostId));
+
+  console.log("\n[6] THREAD under a PRIVATE channel: @ a non-parent-member must NOT auto-join (inherits private reach — no leak)");
+  const parent6 = await createMessage({ serverId, channelId: privCh, senderType: "user", senderId: ownerId, senderName: owner, content: "open a thread under the private channel" });
+  const th6 = await getOrCreateThread(serverId, parent6.id, { type: "user", id: ownerId });
+  const m6 = await createMessage({ serverId, channelId: th6.id, senderType: "user", senderId: ownerId, senderName: owner, content: `@${ghost} secret thread work` });
+  check("ghost NOT added to the private-parent thread (no leak)", !inChannel(await members(th6.id), "agent", ghostId));
+  check("no mention recorded in the private-parent thread (stays a no-op)", !mentioned(await mentionsOf(m6.id), "agent", ghostId));
 }
 
 main()

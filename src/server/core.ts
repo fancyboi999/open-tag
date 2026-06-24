@@ -106,6 +106,9 @@ async function mentionAutoJoinPool(serverId: string, ch: typeof schema.channels.
     const parent = (await db.select().from(schema.messages).where(eq(schema.messages.id, ch.parentMessageId)))[0];
     const pch = parent ? (await db.select().from(schema.channels).where(eq(schema.channels.id, parent.channelId)))[0] : undefined;
     if (pch) target = pch; // depth 1: a parent channel is never itself a thread
+    // Orphaned thread (parent message/channel deleted): fall back to the thread's own members — a conservative
+    // no-op for @-ing a non-member (the pre-fix behaviour), but log it so a silently-dropped @ is debuggable.
+    else log.warn("thread parent channel unresolved; @-mention reach falls back to thread members", { channelId: ch.id, parentMessageId: ch.parentMessageId });
   }
   return target.type === "channel" ? await workspaceMembers(serverId) : await channelMembers(target.id);
 }
