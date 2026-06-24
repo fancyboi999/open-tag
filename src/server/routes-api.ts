@@ -377,7 +377,6 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
         { id: "claude-opus-4.7", label: "Claude Opus 4.7" }, { id: "claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
         { id: "claude-sonnet-4.5", label: "Claude Sonnet 4.5" }, { id: "claude-haiku-4.5", label: "Claude Haiku 4.5" },
       ],
-      gemini: [{ id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" }, { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }],
       kimi: [{ id: "kimi-k2", label: "Kimi K2" }],
       opencode: [{ id: "default", label: "Default" }],
     };

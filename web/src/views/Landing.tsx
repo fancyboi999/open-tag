@@ -51,7 +51,6 @@ const ENGINES = [
 // Runtimes on the roadmap. We add them one at a time, each verified on real hardware before it
 // ships — so these stay clearly marked "soon" rather than implying they already work (see docs/MISSION.md).
 const PLANNED_RUNTIMES = [
-  { name: "Gemini", icon: "gemini" },
   { name: "Cursor", icon: "cursor" },
   { name: "OpenCode", icon: "opencode" },
   { name: "Kimi", icon: "kimi" },

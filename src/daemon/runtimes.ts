@@ -9,7 +9,7 @@ export type { Runtime, RuntimeSession, RuntimeCallbacks, StartOpts, TrajectoryEn
 
 function has(tool: string): boolean { try { execSync(`command -v ${tool}`, { stdio: "pipe" }); return true; } catch { return false; } }
 export function detectRuntimes(): string[] {
-  const found = ["claude", "codex", "copilot", "kimi", "gemini", "opencode"].filter(has);
+  const found = ["claude", "codex", "copilot", "kimi", "opencode"].filter(has);
   return found;
 }
 
