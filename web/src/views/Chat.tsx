@@ -8,7 +8,7 @@ import { Smile, X, ExternalLink, CheckCircle2, MessageCircle, MoreHorizontal, Im
 // Task badge per message row: icon changes with task status; color tokens from DESIGN.md (see .task-pill.st-* styles)
 const TASK_ICON: Record<string, typeof Circle> = { todo: Circle, in_progress: Play, in_review: Eye, done: CheckCircle2, closed: Ban };
 import { IconWrench, IconFile, IconExternalLink, IconDownload } from "../icons.tsx";
-import { Avatar } from "../Avatar.tsx";
+import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { TaskBoard, ynOptions, ST_LABEL } from "../TaskBoard.tsx";
 import { AgentProfile, CreateAgentModal } from "./Members.tsx";
 import { ChatSidebar, CreateChannelModal } from "./ChatSidebar.tsx";
@@ -72,7 +72,7 @@ function Reactions({ m, mine, onReact }: { m: Msg; mine: string; onReact: (emoji
 // Action card: a proposal card sent by an agent. User clicks it → a pre-filled creation dialog opens → resource is created on behalf of the user → markExecuted is called.
 function ActionCardMsg({ m }: { m: Msg }) {
   const { t } = useTranslation();
-  const { createChannel, markActionExecuted, slug } = useStore();
+  const { createChannel, markActionExecuted, slug, agents, attachmentUrl } = useStore();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const meta = m.actionMetadata!;
@@ -84,7 +84,7 @@ function ActionCardMsg({ m }: { m: Msg }) {
     : <>{t("chat.createAgent", { name: a.name })}</>;
   return (
     <div className="msg action-card-msg" id={"m-" + m.id} key={m.id}>
-      <Avatar seed={m.senderName} size={36} />
+      <Avatar seed={m.senderName} url={resolveAvatar(agents.find((a) => a.id === m.senderId)?.avatarUrl, attachmentUrl)} size={36} />
       <div className="msg-col">
         <div className="msg-head"><span className="who">{m.senderName}</span><span className="member-badge">{t("chat.proposed")}</span><span className="ts">{fmtTime(m.createdAt)}</span></div>
         <div className="action-card">
@@ -115,6 +115,9 @@ function ActionCardMsg({ m }: { m: Msg }) {
 export function Chat() {
   const { t } = useTranslation();
   const { api, channels, dms, unread, agents, humans, machines, slug, me, myRole, capabilities, reload, onEvent, subscribeChannel, openDM, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg } = useStore();
+  const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
+  // A message's sender avatar: look the sender up in the loaded agents/humans lists (carry avatarUrl) — no message-schema change needed.
+  const senderAvatar = (m: Msg) => avFor(m.senderType === "agent" ? agents.find((a) => a.id === m.senderId)?.avatarUrl : humans.find((h) => h.userId === m.senderId)?.avatarUrl);
   const confirm = useConfirm();
   const [showEdit, setShowEdit] = useState(false);
   const manageServer = myRole === "owner" || myRole === "admin"; // server admins get the full task-status dropdown (matches TaskBoard permission model)
@@ -241,8 +244,8 @@ export function Chat() {
     setAtSel(0); // typing narrows the list → restart highlight at the top
   };
   const cands = atQuery === null ? [] : [
-    ...agents.map((a) => ({ name: a.name, label: a.displayName || a.name, kind: "agent" })),
-    ...humans.map((h) => ({ name: h.name, label: h.displayName || h.name, kind: "human" })),
+    ...agents.map((a) => ({ name: a.name, label: a.displayName || a.name, kind: "agent", avatarUrl: a.avatarUrl })),
+    ...humans.map((h) => ({ name: h.name, label: h.displayName || h.name, kind: "human", avatarUrl: h.avatarUrl })),
   ].filter((c) => c.name && c.name.toLowerCase().includes((atQuery || "").toLowerCase())).slice(0, 8);
   const pick = (c: { name: string }) => {
     const start = atPosRef.current;
@@ -294,8 +297,8 @@ export function Chat() {
                   {ag
                     ? <span className="msg-av clickable" onClick={() => setProfileAgentId(m.senderId!)}
                         onMouseEnter={(e) => setHoverAgent({ id: m.senderId!, x: e.currentTarget.getBoundingClientRect().right + 8, y: e.currentTarget.getBoundingClientRect().top })}
-                        onMouseLeave={() => setHoverAgent(null)}><Avatar seed={m.senderName} size={36} />{ag.activity && ag.activity !== "offline" && <span className={"av-status " + ag.activity} />}</span>
-                    : <Avatar seed={m.senderName} size={36} />}
+                        onMouseLeave={() => setHoverAgent(null)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={36} />{ag.activity && ag.activity !== "offline" && <span className={"av-status " + ag.activity} />}</span>
+                    : <Avatar seed={m.senderName} url={senderAvatar(m)} size={36} />}
                   <div className="msg-col">
                     <div className="msg-head">
                       {ag
@@ -351,7 +354,7 @@ export function Chat() {
                   {cands.map((c, i) => (
                     <button key={c.kind + c.name} className={"mention-opt" + (i === atSel ? " sel" : "")} aria-selected={i === atSel}
                       onMouseEnter={() => setAtSel(i)} onMouseDown={(e) => { e.preventDefault(); pick(c); }}>
-                      <Avatar seed={c.name} size={22} />
+                      <Avatar seed={c.name} url={avFor(c.avatarUrl)} size={22} />
                       <span className="grow">{c.label} <span className="mk-name">@{c.name}</span></span>
                       <span className="mk">{c.kind === "agent" ? "agent" : t("chat.memberKind")}</span>
                     </button>
@@ -440,7 +443,7 @@ export function Chat() {
         const live = (a.activity && a.activity !== "offline" ? a.activity : a.status) || "offline";
         return (
           <div className="agent-hovercard" style={{ left: Math.min(hoverAgent.x, window.innerWidth - 260), top: Math.min(hoverAgent.y, window.innerHeight - 120) }}>
-            <Avatar seed={a.name} size={40} />
+            <Avatar seed={a.name} url={avFor(a.avatarUrl)} size={40} />
             <div className="ahc-body">
               <div className="ahc-name">{a.displayName || a.name} <span className={"dot " + live} /></div>
               <div className="ahc-handle">@{a.name}</div>
@@ -518,6 +521,7 @@ function EditChannelModal({ channel, onClose, onDone, onDeleted }: { channel: an
 function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId: string; parent: Msg; onClose: () => void; onOpenProfile: (id: string) => void }) {
   const { t } = useTranslation();
   const { api, onEvent, subscribeChannel, attachmentUrl, me, react, agents, humans, channels, slug } = useStore();
+  const senderAvatar = (m: Msg) => resolveAvatar(m.senderType === "agent" ? agents.find((a) => a.id === m.senderId)?.avatarUrl : humans.find((h) => h.userId === m.senderId)?.avatarUrl, attachmentUrl);
   const nav = useNavigate();
   const navToken = async (type: string, args: string[]) => {
     if (type === "agent") return onOpenProfile(args[0]!); // @agent click inside a thread also opens the profile panel (profile state is owned by the parent component)
@@ -543,7 +547,7 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
     const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // agent sender → avatar and name are clickable to open the profile panel
     return (
     <div className="msg" key={m.id}>
-      {ag ? <span className="msg-av clickable" onClick={() => onOpenProfile(m.senderId!)}><Avatar seed={m.senderName} size={32} /></span> : <Avatar seed={m.senderName} size={32} />}
+      {ag ? <span className="msg-av clickable" onClick={() => onOpenProfile(m.senderId!)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={32} /></span> : <Avatar seed={m.senderName} url={senderAvatar(m)} size={32} />}
       {/* content column reuses .msg-col (flex:1;min-width:0) like the main chat — without it a flex child defaults to min-width:auto and a long unbreakable token blows the message past this narrow thread panel */}
       <div className="msg-col">
         <div>{ag ? <span className="who clickable" onClick={() => onOpenProfile(m.senderId!)}>{m.senderName}</span> : <span className="who">{m.senderName}</span>}<span className="ts">{fmtTime(m.createdAt)}</span></div>
@@ -582,9 +586,11 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
 
 // Channel members modal: lists Agents (with online status) and Humans; allows adding or removing agents from the channel
 function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: string; channelName: string; onClose: () => void }) {
+  /* avatars: data.agents/humans come from /channels/:id/members (carry avatarUrl); resolve to signed/scheme via resolveAvatar */
   const { t } = useTranslation();
   useEscClose(onClose);
-  const { api, agents } = useStore();
+  const { api, agents, attachmentUrl } = useStore();
+  const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const [data, setData] = useState<{ agents: any[]; humans: any[] }>({ agents: [], humans: [] });
   const load = async () => { const d = await api("GET", `/api/channels/${channelId}/members`); setData({ agents: d?.agents || [], humans: d?.humans || [] }); };
   useEffect(() => { load(); }, [channelId]);
@@ -598,16 +604,16 @@ function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: s
         <h3># {channelName} · {t("chat.membersCount", { count: data.agents.length + data.humans.length })}</h3>
         <div className="sec">{t("common.agents")} <span className="cnt">{data.agents.length}</span></div>
         {data.agents.map((a) => (
-          <div key={a.id} className="item"><Avatar seed={a.name} size={22} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + (a.activity || a.status)} /><button className="joinbtn" onClick={() => remove(a.id)}>{t("chat.remove")}</button></div>
+          <div key={a.id} className="item"><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + (a.activity || a.status)} /><button className="joinbtn" onClick={() => remove(a.id)}>{t("chat.remove")}</button></div>
         ))}
         <div className="sec">{t("common.humans")} <span className="cnt">{data.humans.length}</span></div>
         {data.humans.map((u) => (
-          <div key={u.userId} className="item"><Avatar seed={u.name} size={22} /><span className="grow">{u.displayName || u.name}</span></div>
+          <div key={u.userId} className="item"><Avatar seed={u.name} url={avFor(u.avatarUrl)} size={22} /><span className="grow">{u.displayName || u.name}</span></div>
         ))}
         {addable.length > 0 && <>
           <div className="sec sec-sub">{t("chat.addAgent")}</div>
           {addable.map((a) => (
-            <div key={a.id} className="item ghost"><Avatar seed={a.name} size={22} /><span className="grow">{a.displayName || a.name}</span><button className="joinbtn" onClick={() => add(a.id)}>{t("chat.join")}</button></div>
+            <div key={a.id} className="item ghost"><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><button className="joinbtn" onClick={() => add(a.id)}>{t("chat.join")}</button></div>
           ))}
         </>}
         <div className="acts"><button className="cancel" onClick={onClose}>{t("chat.close")}</button></div>

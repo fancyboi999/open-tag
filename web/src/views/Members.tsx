@@ -8,7 +8,7 @@ import rehypeSanitize from "rehype-sanitize";
 import { useTranslation } from "react-i18next";
 import { useStore, fmtTime } from "../store.tsx";
 import { IconMonitor } from "../icons.tsx";
-import { Avatar } from "../Avatar.tsx";
+import { Avatar, AvatarPicker, resolveAvatar } from "../Avatar.tsx";
 import { Select } from "../Select.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 import i18n from "../i18n";
@@ -22,7 +22,8 @@ function statusOf(a: { activity?: string | null; status: string }): string {
 
 export function Members() {
   const { t } = useTranslation();
-  const { agents, humans, machines, slug, capabilities } = useStore();
+  const { agents, humans, machines, slug, capabilities, attachmentUrl } = useStore();
+  const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const { agentId, userId } = useParams();
   const nav = useNavigate();
   const [modal, setModal] = useState(false);
@@ -42,7 +43,7 @@ export function Members() {
             <div className="machine"><IconMonitor size={13} /> {k === "_none" ? t("members.unassigned") : mName(k)}</div>
             {byMachine[k].map((a) => (
               <button key={a.id} className={"item" + (a.id === agentId ? " active" : "")} onClick={() => nav(`/s/${slug}/agent/${a.id}`)}>
-                <Avatar seed={a.name} size={20} /><span className="grow">{a.name}</span><span className={"dot " + statusOf(a)} role="img" aria-label={t("members.statusLabel", { status: statusOf(a) })} title={statusOf(a)} />
+                <Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.name}</span><span className={"dot " + statusOf(a)} role="img" aria-label={t("members.statusLabel", { status: statusOf(a) })} title={statusOf(a)} />
               </button>
             ))}
           </div>
@@ -50,7 +51,7 @@ export function Members() {
         <div className="sec">{t("common.humans")} <span><span className="cnt">{humans.length}</span> {capabilities.manageMembers && <button className="addbtn" title={t("members.inviteMember")} onClick={() => setInviteModal(true)}>+</button>}</span></div>
         {humans.map((u) => (
           <button key={u.userId} className={"item" + (u.userId === userId ? " active" : "")} onClick={() => nav(`/s/${slug}/human/${u.userId}`)}>
-            <Avatar seed={u.name} size={20} /><span className="grow">{u.displayName || u.name}</span>
+            <Avatar seed={u.name} url={avFor(u.avatarUrl)} size={20} /><span className="grow">{u.displayName || u.name}</span>
           </button>
         ))}
       </aside>
@@ -95,6 +96,7 @@ function InviteHumanModal({ onClose }: { onClose: () => void }) {
 
 function Roster({ agents, onCreate, canCreate }: { agents: any[]; onCreate: () => void; canCreate?: boolean }) {
   const { t } = useTranslation();
+  const { attachmentUrl } = useStore();
   return (
     <>
       <div className="head"><h1>{t("nav.members")}</h1><small>{t("common.agentsCount", { count: agents.length })}</small></div>
@@ -102,7 +104,7 @@ function Roster({ agents, onCreate, canCreate }: { agents: any[]; onCreate: () =
         {agents.length === 0 ? <div className="empty">{t("members.rosterEmpty")}{canCreate && <> {t("members.rosterEmptyCreate")} <button className="addbtn" onClick={onCreate}>+</button></>}</div>
           : agents.map((a) => (
             <div className="card" key={a.id}>
-              <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={a.name} size={24} />{a.displayName || a.name} <small className="meta">@{a.name}</small></h3>
+              <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={a.name} url={resolveAvatar(a.avatarUrl, attachmentUrl)} size={24} />{a.displayName || a.name} <small className="meta">@{a.name}</small></h3>
               <div className="meta">{a.description || t("members.generalAgent")}</div>
               <div className="kv"><b>{t("common.runtime")}</b> {a.runtime} · {a.model || ""}</div>
               <div className="kv"><b>{t("common.status")}</b> {statusOf(a)}</div>
@@ -124,11 +126,11 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const [edit, setEdit] = useState(false); const [dn, setDn] = useState(""); const [ds, setDs] = useState(""); // profile edit state (displayName/description)
   const [showRestart, setShowRestart] = useState(false);
   const [avBusy, setAvBusy] = useState(false); const [avErr, setAvErr] = useState(""); const [signedAvatar, setSignedAvatar] = useState<string | null>(null);
-  const avFileRef = useRef<HTMLInputElement>(null);
-  const refetch = async () => { const data = await api("GET", "/api/agents/" + id); setA(data); setSignedAvatar(data?.avatarUrl ? attachmentUrl(data.avatarUrl.replace("/api/attachments/", "")) : null); };
+  const refetch = async () => { const data = await api("GET", "/api/agents/" + id); setA(data); setSignedAvatar(resolveAvatar(data?.avatarUrl, attachmentUrl)); };
   useEffect(() => { refetch(); }, [id]);
   useEffect(() => onEvent((e) => { if (e.type === "agent" && e.id === id) setA((p: any) => (p ? { ...p, status: e.status ?? p.status, activity: e.activity ?? p.activity } : p)); }), [id]);
-  const onPickAvatar = async (e: any) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; setAvBusy(true); setAvErr(""); try { const url = await uploadAgentAvatar(id, f); setSignedAvatar(url); await refetch(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
+  const onPickAvatar = async (f: File) => { setAvBusy(true); setAvErr(""); try { const url = await uploadAgentAvatar(id, f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
+  const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { await api("PATCH", "/api/agents/" + id, { avatarUrl: scheme }); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   if (!a) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
   const ctl = async (action: string) => { await api("POST", `/api/agents/${id}/${action}`); setTimeout(refetch, 400); };
   // Three restart modes: restart=keep session+workspace; reset=clear session, keep workspace; full=clear session+delete workspace. All modes end with a restart.
@@ -164,7 +166,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
           <button className="joinbtn pph-close" title={t("members.close")} onClick={onClose}><X size={14} /></button>
           {acts}
         </div>
-      ) : <div className="head head-agent"><Avatar seed={a.name} url={signedAvatar} size={48} /><div><h1>{a.displayName || a.name}</h1><small>@{a.name} <span className={"dot " + live} /></small></div>{acts}</div>}
+      ) : <div className="head head-agent"><AvatarPicker name={a.name} url={signedAvatar} size={48} editable={!!capabilities.manageAgents} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div><h1>{a.displayName || a.name}</h1><small>@{a.name} <span className={"dot " + live} />{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div>{acts}</div>}
       <div className="ptabs">
         {/* Tab order follows AgentDetailPanel spec: integrations (not apps) */}
         {([
@@ -190,12 +192,6 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
             <div className="card">
               {edit ? (
                 <div className="setform">
-                  <input type="file" ref={avFileRef} accept="image/*" style={{ display: "none" }} onChange={onPickAvatar} />
-                  <div className="avatar-edit">
-                    {signedAvatar ? <img className="avatar-edit-img" src={signedAvatar} alt="" /> : <Avatar seed={a.name} size={56} />}
-                    <div><button type="button" disabled={avBusy} onClick={() => avFileRef.current?.click()}>{avBusy ? t("misc.serverAvatarUploading") : signedAvatar ? t("misc.serverAvatarChange") : t("misc.serverAvatarUpload")}</button>
-                    {avErr && <div className="form-err" style={{ marginTop: 6 }}>{avErr}</div>}</div>
-                  </div>
                   <label>{t("members.displayName")}</label><input value={dn} onChange={(e) => setDn(e.target.value)} placeholder={a.name} />
                   <label>{t("members.agentDescriptionLabel")}</label><textarea value={ds} maxLength={3000} onChange={(e) => setDs(e.target.value)} placeholder={t("members.agentDescriptionPlaceholder")} />
                   <div className="ta-count">{ds.trim().length}/3000</div>
@@ -455,34 +451,27 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
 // Description is visible to other humans and agents in the server; agents fetch it via `open-tag server info` for collaboration context.
 function HumanProfile({ uid }: { uid: string }) {
   const { t } = useTranslation();
-  const { api, serverId, me, reload, slug, capabilities, uploadUserAvatar, attachmentUrl } = useStore();
+  const { api, serverId, me, reload, slug, capabilities, openDM, uploadUserAvatar, attachmentUrl } = useStore();
   const confirm = useConfirm();
   const nav = useNavigate();
   const [p, setP] = useState<any>(null);
   const [edit, setEdit] = useState(false); const [ds, setDs] = useState("");
   const [avBusy, setAvBusy] = useState(false); const [avErr, setAvErr] = useState(""); const [signedAvatar, setSignedAvatar] = useState<string | null>(null);
-  const avFileRef = useRef<HTMLInputElement>(null);
-  const refetch = async () => { const data = await api("GET", `/api/servers/${serverId}/members/${uid}/profile`); setP(data); setSignedAvatar(data?.avatarUrl ? attachmentUrl(data.avatarUrl.replace("/api/attachments/", "")) : null); };
+  const refetch = async () => { const data = await api("GET", `/api/servers/${serverId}/members/${uid}/profile`); setP(data); setSignedAvatar(resolveAvatar(data?.avatarUrl, attachmentUrl)); };
   useEffect(() => { setP(null); setSignedAvatar(null); refetch(); }, [uid, serverId]);
-  const onPickAvatar = async (e: any) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; setAvBusy(true); setAvErr(""); try { const url = await uploadUserAvatar(f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
+  const onPickAvatar = async (f: File) => { setAvBusy(true); setAvErr(""); try { const url = await uploadUserAvatar(f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
+  const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { await api("PATCH", "/api/auth/me", { avatarUrl: scheme }); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   if (!p) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
   const isMe = me?.id === uid;
   const save = async () => { await api("PATCH", "/api/auth/me", { description: ds.trim() }); setEdit(false); await refetch(); await reload(); };
+  const dmHuman = async () => { const cid = await openDM("user", uid); if (cid) nav(`/s/${slug}/channel/${cid}`); };
   return (
     <>
-      <div className="head"><h1 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={p.name} url={signedAvatar} size={26} />{p.displayName || p.name}</h1><small>@{p.name} · {p.role}</small></div>
-      <input type="file" ref={avFileRef} accept="image/*" style={{ display: "none" }} onChange={onPickAvatar} />
+      <div className="head head-agent"><AvatarPicker name={p.name} url={signedAvatar} size={48} editable={isMe} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div><h1>{p.displayName || p.name}</h1><small>@{p.name} · {p.role}{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div><div className="agent-acts">{!isMe && <button className="joinbtn" onClick={dmHuman}><MessageCircle size={13} style={{ verticalAlign: "-2px" }} /> {t("members.dm")}</button>}</div></div>
       <div className="scroll">
         <div className="card">
           {edit ? (
             <div className="setform">
-              {isMe && (
-                <div className="avatar-edit">
-                  {signedAvatar ? <img className="avatar-edit-img" src={signedAvatar} alt="" /> : <Avatar seed={p.name} size={56} />}
-                  <div><button type="button" disabled={avBusy} onClick={() => avFileRef.current?.click()}>{avBusy ? t("misc.serverAvatarUploading") : signedAvatar ? t("misc.serverAvatarChange") : t("misc.serverAvatarUpload")}</button>
-                  {avErr && <div className="form-err" style={{ marginTop: 6 }}>{avErr}</div>}</div>
-                </div>
-              )}
               <label>{t("members.humanDescriptionLabel")}</label>
               <textarea value={ds} maxLength={3000} onChange={(e) => setDs(e.target.value)} placeholder="Describe yourself for other humans and agents in this server" />
               <div className="ta-count">{ds.trim().length}/3000</div>
@@ -512,7 +501,7 @@ function HumanProfile({ uid }: { uid: string }) {
             <h3>Created Agents <small className="meta">· {p.createdAgents.length}</small></h3>
             {p.createdAgents.map((a: any) => (
               <button key={a.id} className="item" onClick={() => nav(`/s/${slug}/agent/${a.id}`)}>
-                <Avatar seed={a.name} size={20} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + a.status} role="img" aria-label={t("members.statusLabel", { status: a.status })} title={a.status} />
+                <Avatar seed={a.name} url={resolveAvatar(a.avatarUrl, attachmentUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + a.status} role="img" aria-label={t("members.statusLabel", { status: a.status })} title={a.status} />
               </button>
             ))}
           </div>

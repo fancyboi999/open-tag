@@ -3,14 +3,15 @@ import { Pin, Bookmark, Check } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../store.tsx";
-import { Avatar } from "../Avatar.tsx";
+import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { useEscClose } from "../ConfirmModal.tsx";
 
 // Shared chat sidebar (Saved/Channels/DMs share the same sidebar; persists unchanged when switching between the channel view and the Saved view).
 // Both the Chat view and the Saved view (misc.tsx) render this component so the channel list stays visible when navigating to Saved.
 export function ChatSidebar() {
   const { t } = useTranslation();
-  const { api, serverId, channels, dms, unread, agents, slug, savedIds, capabilities, createChannel, openDM, joinChannel } = useStore();
+  const { api, serverId, channels, dms, unread, agents, slug, savedIds, capabilities, createChannel, openDM, joinChannel, attachmentUrl } = useStore();
+  const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const { channelId } = useParams();
   const { pathname } = useLocation();
   const nav = useNavigate();
@@ -57,12 +58,12 @@ export function ChatSidebar() {
         ))}
       </>}
       <div className="sec">{t("common.directMessages")} <button className="addbtn" title={t("sidebar.newDmTitle")} onClick={() => { setDmPick((v) => !v); setMkChan(false); }}>+</button></div>
-      {dmPick && <div className="dm-pick">{agents.length ? agents.map((a) => <button key={a.id} className="item" onClick={() => doDM(a.id)}><Avatar seed={a.name} size={20} /><span className="grow">{a.displayName || a.name}</span></button>) : <div className="empty">{t("sidebar.dmPickEmpty")}</div>}</div>}
+      {dmPick && <div className="dm-pick">{agents.length ? agents.map((a) => <button key={a.id} className="item" onClick={() => doDM(a.id)}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span></button>) : <div className="empty">{t("sidebar.dmPickEmpty")}</div>}</div>}
       {dms.map((c) => {
         const a = c.peerType === "agent" ? agents.find((x) => x.id === c.peerId) : undefined; // agent DM → show real-time status dot
         return (
         <button key={c.id} className={"item" + (c.id === channelId ? " active" : "")} onClick={() => nav(`/s/${slug}/channel/${c.id}`)}>
-          <Avatar seed={c.peerDisplayName || c.peerName || c.peerId || c.id} size={20} /><span className="grow">{c.peerDisplayName || c.peerName || t("sidebar.unknownUser")}</span>
+          <Avatar seed={c.peerDisplayName || c.peerName || c.peerId || c.id} url={avFor(c.peerAvatarUrl)} size={20} /><span className="grow">{c.peerDisplayName || c.peerName || t("sidebar.unknownUser")}</span>
           {a?.activity && a.activity !== "offline" && <span className={"dot " + a.activity} title={a.activityDetail || a.activity} />}
           {!!unread[c.id] && <span className="badge">{unread[c.id]}</span>}
         </button>
@@ -78,7 +79,8 @@ export function ChatSidebar() {
 export function CreateChannelModal({ onCreate, onClose, prefill, submitLabel }: { onCreate: (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => void; onClose: () => void; prefill?: { name?: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }; submitLabel?: string }) {
   useEscClose(onClose);
   const { t } = useTranslation();
-  const { agents, humans, me } = useStore();
+  const { agents, humans, me, attachmentUrl } = useStore();
+  const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const [name, setName] = useState(prefill?.name ?? "");
   const [desc, setDesc] = useState(prefill?.description ?? "");
   const [visibility, setVisibility] = useState(prefill?.visibility ?? "public");
@@ -106,13 +108,13 @@ export function CreateChannelModal({ onCreate, onClose, prefill, submitLabel }: 
           {fAgents.length > 0 && <div className="sec sec-sub">{t("common.agents")}</div>}
           {fAgents.map((a) => (
             <button key={a.id} className={"item pickable" + (pickAgents.has(a.id) ? " picked" : "")} onClick={() => toggle(pickAgents, a.id, setPickAgents)}>
-              <Avatar seed={a.name} size={22} /><span className="grow">{a.displayName || a.name}</span>{pickAgents.has(a.id) && <Check size={14} className="ck-mark" />}
+              <Avatar seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span>{pickAgents.has(a.id) && <Check size={14} className="ck-mark" />}
             </button>
           ))}
           {fUsers.length > 0 && <div className="sec sec-sub">{t("sidebar.humanSection")}</div>}
           {fUsers.map((u) => (
             <button key={u.userId} className={"item pickable" + (pickUsers.has(u.userId) ? " picked" : "")} onClick={() => toggle(pickUsers, u.userId, setPickUsers)}>
-              <Avatar seed={u.name} size={22} /><span className="grow">{u.displayName || u.name}</span>{pickUsers.has(u.userId) && <Check size={14} className="ck-mark" />}
+              <Avatar seed={u.name} url={avFor(u.avatarUrl)} size={22} /><span className="grow">{u.displayName || u.name}</span>{pickUsers.has(u.userId) && <Check size={14} className="ck-mark" />}
             </button>
           ))}
           {fAgents.length === 0 && fUsers.length === 0 && <div className="empty">{t("sidebar.noMembers")}</div>}

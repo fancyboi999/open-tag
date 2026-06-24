@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Star, Bookmark, AlertTriangle, Lock, MessageCircle } from "lucide-react";
 import { useStore, fmtTime } from "../store.tsx";
-import { Avatar } from "../Avatar.tsx";
+import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { ChatSidebar } from "./ChatSidebar.tsx";
 import { IconMonitor } from "../icons.tsx";
 import { TaskBoard } from "../TaskBoard.tsx";
@@ -139,7 +139,7 @@ export function Inbox() {
 // Runtime name → display label mapping
 const RT_LABEL: Record<string, string> = { claude: "Claude Code", codex: "Codex CLI", opencode: "OpenCode", copilot: "Copilot CLI", cursor: "Cursor CLI", gemini: "Gemini CLI", kimi: "Kimi" };
 export function Computers() {
-  const { machines, agents, slug, api, serverId, reload } = useStore();
+  const { machines, agents, slug, api, serverId, reload, attachmentUrl } = useStore();
   const confirm = useConfirm();
   const { t } = useTranslation();
   const { machineId } = useParams();
@@ -191,7 +191,7 @@ export function Computers() {
               <div className="sec">{t("misc.computersAgentsSection")} <span className="cnt">{onMachine.length}</span></div>
               {onMachine.length ? onMachine.map((a) => (
                 <button key={a.id} className="item" onClick={() => nav(`/s/${slug}/agent/${a.id}`)}>
-                  <Avatar seed={a.name} size={20} /><span className="grow">{a.displayName || a.name}</span><span className="meta">{a.runtime}</span><span className={"dot " + (a.activity || a.status)} />
+                  <Avatar seed={a.name} url={resolveAvatar(a.avatarUrl, attachmentUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span><span className="meta">{a.runtime}</span><span className={"dot " + (a.activity || a.status)} />
                 </button>
               )) : <div className="empty">{t("misc.computersNoAgent")}</div>}
             </div>

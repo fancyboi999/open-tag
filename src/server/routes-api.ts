@@ -231,7 +231,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     const machineId = url.searchParams.get("machineId"); // computer page filters by machine
     let agents = await db.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), isNull(schema.agents.deletedAt)));
     if (machineId) agents = agents.filter((a) => a.machineId === machineId);
-    return (sendJson(res, 200, agents.map((a) => ({ id: a.id, name: a.name, displayName: a.displayName, description: a.description, status: a.status, activity: a.activity, model: a.model, runtime: a.runtime, machineId: a.machineId }))), true);
+    return (sendJson(res, 200, agents.map((a) => ({ id: a.id, name: a.name, displayName: a.displayName, description: a.description, status: a.status, activity: a.activity, model: a.model, runtime: a.runtime, machineId: a.machineId, avatarUrl: a.avatarUrl }))), true);
   }
   if (p === "/api/agents" && method === "POST") {
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
@@ -574,8 +574,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     const ags = aIds.length ? await db.select().from(schema.agents).where(inArray(schema.agents.id, aIds)) : [];
     const usrs = uIds.length ? await db.select().from(schema.users).where(inArray(schema.users.id, uIds)) : [];
     return (sendJson(res, 200, {
-      agents: ags.map((a) => ({ id: a.id, name: a.name, displayName: a.displayName, status: a.status, activity: a.activity })),
-      humans: usrs.map((u) => ({ userId: u.id, name: u.name, displayName: u.displayName })),
+      agents: ags.map((a) => ({ id: a.id, name: a.name, displayName: a.displayName, status: a.status, activity: a.activity, avatarUrl: a.avatarUrl })),
+      humans: usrs.map((u) => ({ userId: u.id, name: u.name, displayName: u.displayName, avatarUrl: u.avatarUrl })),
     }), true);
   }
   if (cmem && method === "POST") { // add agent/user to channel (public = direct join, private = invite)

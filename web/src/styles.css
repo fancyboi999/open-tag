@@ -72,6 +72,19 @@ button{font-family:inherit}
 .av.agent{background:radial-gradient(circle at 30% 28%,var(--g-mint),var(--g-lav) 70%,var(--g-sky))}
 .av.human{background:var(--surface-strong);color:var(--muted)}
 .av-img{border-radius:50%;flex:none;object-fit:cover;background:var(--surface-strong);vertical-align:middle}
+/* Avatar-as-change-control: hover reveals a camera overlay; the whole circle is the click target. */
+.av-editable{position:relative;display:inline-flex;flex:none;padding:0;border:0;background:none;border-radius:50%;cursor:pointer;line-height:0}
+.av-editable:disabled{cursor:default}
+.av-editable-ovl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--scrim);color:var(--on-ink);opacity:0;transition:opacity .15s}
+.av-editable:hover .av-editable-ovl,.av-editable:focus-visible .av-editable-ovl{opacity:1}
+/* Avatar picker modal: a set of generated faces to pick from, plus shuffle / upload-your-own. */
+.av-picker{width:min(420px,92vw);padding:18px}
+.av-picker-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.av-picker-head h3{margin:0;font-family:var(--serif);font-weight:400;font-size:18px;color:var(--ink)}
+.av-picker-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.av-picker-opt{padding:3px;border:2px solid transparent;border-radius:50%;background:none;cursor:pointer;line-height:0}
+.av-picker-opt:hover,.av-picker-opt:focus-visible{border-color:var(--ink)}
+.av-picker-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 mark{background:var(--g-peach);color:var(--ink);padding:0 2px;border-radius:4px}
 .setform{max-width:520px}
 .setform label{display:block;font-size:13px;color:var(--muted);margin:14px 0 5px}
