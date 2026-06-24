@@ -114,7 +114,7 @@ function ActionCardMsg({ m }: { m: Msg }) {
 
 export function Chat() {
   const { t } = useTranslation();
-  const { api, channels, dms, unread, agents, humans, machines, slug, me, myRole, capabilities, reload, onEvent, subscribeChannel, openDM, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg } = useStore();
+  const { api, channels, dms, unread, agents, humans, machines, traj, slug, me, myRole, capabilities, reload, onEvent, subscribeChannel, openDM, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg } = useStore();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   // A message's sender avatar: look the sender up in the loaded agents/humans lists (carry avatarUrl) — no message-schema change needed.
   const senderAvatar = (m: Msg) => avFor(m.senderType === "agent" ? agents.find((a) => a.id === m.senderId)?.avatarUrl : humans.find((h) => h.userId === m.senderId)?.avatarUrl);
@@ -128,7 +128,6 @@ export function Chat() {
   const [hoverAgent, setHoverAgent] = useState<{ id: string; x: number; y: number } | null>(null); // hovering over an agent shows a quick-info hover card
   const [ctxMenu, setCtxMenu] = useState<{ m: Msg; x: number; y: number } | null>(null); // right-clicking a message opens the context action menu
   const [msgs, setMsgs] = useState<Msg[]>([]);
-  const [traj, setTraj] = useState<{ name?: string; text: string; tool?: boolean }[]>([]);
   const [sub, setSub] = useState("");
   const [asTask, setAsTask] = useState(false);
   const [text, setText] = useState("");
@@ -157,7 +156,7 @@ export function Chat() {
 
   useEffect(() => { if (!channelId && cur) nav(`/s/${slug}/channel/${cur.id}`, { replace: true }); }, [channelId, cur, slug, nav]);
   useEffect(() => { if (!cur) return; setThread(null); subscribeChannel(cur.id); (async () => { // join the room while viewing so message:new arrives live (covers public non-member channels + channels relevant after connect)
-    const d = await api("GET", `/api/messages/channel/${cur.id}?limit=200`); const ms: Msg[] = d.messages || []; setMsgs(ms); setTraj([]); markRead(cur.id);
+    const d = await api("GET", `/api/messages/channel/${cur.id}?limit=200`); const ms: Msg[] = d.messages || []; setMsgs(ms); markRead(cur.id);
     const ids = ms.map((m) => m.id);
     if (ids.length) { try { setThreadMeta(await api("GET", `/api/channels/${cur.id}/threads?parentMessageIds=${ids.join(",")}`) || {}); } catch { setThreadMeta({}); } } else setThreadMeta({});
   })(); }, [cur?.id]);
@@ -168,8 +167,7 @@ export function Chat() {
       const prev = tm[e.parentMessageId]; const delta = prev ? Math.max(0, e.replyCount - prev.replyCount) : 0;
       return { ...tm, [e.parentMessageId]: { threadChannelId: e.threadChannelId, replyCount: e.replyCount, unreadCount: (prev?.unreadCount ?? 0) + delta } };
     });
-    else if (e.type === "trajectory") setTraj((t) => [...t, ...(e.entries || []).map((x: any) => ({ name: e.name, tool: !!x.toolName, text: x.text || (x.toolName ? `${x.toolName}${x.toolInput ? " — " + x.toolInput : ""}` : "") || x.detail || "" }))]);
-    else if (e.type === "agent") setSub(e.activity ? `${e.name} · ${e.activity}${e.detail ? " · " + e.detail : ""}` : "");
+    else if (e.type === "agent") setSub(e.activity ? `${e.name} · ${e.activity}${e.detail ? " · " + e.detail : ""}` : ""); // live-trace entries are accumulated globally in the store (see store.tsx agent:activity handler), so they persist across channel/DM switches
   }), [cur?.id]);
   useEffect(() => { const el = scrollRef.current; if (!el || msgParam) return; if (atBottomRef.current) el.scrollTop = el.scrollHeight; }, [msgs, msgParam]); // auto-scroll only when already pinned to the bottom
   useEffect(() => { atBottomRef.current = true; setShowJump(false); }, [cur?.id]); // reset bottom-pin state on channel switch

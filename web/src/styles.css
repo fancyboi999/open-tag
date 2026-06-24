@@ -311,10 +311,10 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .kv-v{display:inline-flex;align-items:center;gap:6px}
 .empty{color:var(--muted-soft);font-size:14px;padding:8px 4px}
 
-aside.traj-col{position:relative;background:var(--canvas);border-left:1px solid var(--hair);padding:22px 20px;overflow:auto}
+aside.traj-col{position:relative;background:var(--canvas);border-left:1px solid var(--hair);padding:22px 20px;overflow-y:auto;overflow-x:hidden}
 aside.traj-col::before{content:"";position:absolute;top:-60px;right:-80px;width:220px;height:220px;pointer-events:none;background:radial-gradient(circle,var(--g-peach),transparent 68%);opacity:.5;filter:blur(8px)}
 aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
-.traj{position:relative;font-size:15px;margin-bottom:10px;padding-left:12px;border-left:1px solid var(--hair-strong);color:var(--body)}
+.traj{position:relative;font-size:15px;margin-bottom:10px;padding-left:12px;border-left:1px solid var(--hair-strong);color:var(--body);overflow-wrap:anywhere;min-width:0}
 .traj.thinking{color:var(--muted);font-style:italic}
 .traj.tool{display:flex;align-items:flex-start;gap:6px;color:var(--muted)}
 .traj.tool svg{flex:none;margin-top:2px;color:var(--muted-soft)}

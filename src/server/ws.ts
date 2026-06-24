@@ -1,7 +1,7 @@
 // daemon control plane: WS /daemon/connect?key= (ServerToMachine / MachineToServer)
 import { WebSocketServer, type WebSocket } from "ws";
 import type { Server } from "node:http";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, notInArray } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { BOOTSTRAP_KEY, hashToken } from "./auth.js";
 import { registerDaemon, unregisterDaemon, resolveDaemonRequest } from "./daemonHub.js";
@@ -122,8 +122,21 @@ async function onAgentUpdate(serverId: string, msg: any): Promise<void> {
   if (msg.type === "agent:activity") await logActivity(serverId, msg.agentId, { kind: "status", activity: msg.activity, detail: msg.detail }); // status goes into the activity log
 }
 
+// Per-agent retention cap for the activity log. Agents stream trajectory entries continuously, so this
+// table would otherwise grow unbounded; we keep only the newest ACTIVITY_LOG_CAP rows per agent (pruned on
+// insert). The read endpoint (GET /api/agents/:id/activity-log) already caps at 200, so 500 leaves headroom.
+// Trade-off (high-frequency inserts → a prune per insert) tracked in docs/tech-debt-tracker.md.
+export const ACTIVITY_LOG_CAP = 500;
+
+// Delete all but the newest ACTIVITY_LOG_CAP rows (by ts) for one agent. Uses the (agentId, ts) index.
+export async function pruneAgentActivityLog(agentId: string): Promise<void> {
+  const keep = db.select({ id: schema.agentActivityLog.id }).from(schema.agentActivityLog)
+    .where(eq(schema.agentActivityLog.agentId, agentId)).orderBy(desc(schema.agentActivityLog.ts)).limit(ACTIVITY_LOG_CAP);
+  await db.delete(schema.agentActivityLog).where(and(eq(schema.agentActivityLog.agentId, agentId), notInArray(schema.agentActivityLog.id, keep)));
+}
+
 // Persist activity to the DB (daemon-pushed status/trajectory entries → agent_activity_log, feeds the activity facet history + timeline)
-async function logActivity(serverId: string, agentId: string, e: any): Promise<void> {
+export async function logActivity(serverId: string, agentId: string, e: any): Promise<void> {
   const kind = e.kind === "tool" ? "tool_start" : (e.kind || (e.toolName ? "tool_start" : "text"));
   try {
     await db.insert(schema.agentActivityLog).values({
@@ -131,5 +144,6 @@ async function logActivity(serverId: string, agentId: string, e: any): Promise<v
       activity: e.activity ?? null, detail: e.detail ?? null, text: e.text ?? null,
       toolName: e.toolName ?? null, toolInput: e.toolInput ?? null,
     });
+    await pruneAgentActivityLog(agentId); // keep the table bounded per agent (newest ACTIVITY_LOG_CAP)
   } catch { /* logging failure must not block */ }
 }

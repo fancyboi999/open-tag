@@ -1,6 +1,7 @@
 // Global state + API + socket.io event bus (React Context). Chat messages and traces are consumed by views via onEvent.
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
+import { appendCapped, type TrajItem } from "./trajBuffer.ts";
 
 export interface Channel { id: string; name: string; description?: string; type: string; joined?: boolean; lastMessageAt?: string; archivedAt?: string | null }
 export interface Dm { id: string; name: string; type: string; description?: string; lastMessageAt?: string; peerId?: string | null; peerName?: string | null; peerDisplayName?: string | null; peerType?: string | null; peerAvatarUrl?: string | null }
@@ -24,6 +25,7 @@ interface Store {
   createServer: (name: string, slug?: string) => Promise<void>;
   logout: () => void;
   channels: Channel[]; dms: Dm[]; unread: Record<string, number>; agents: Agent[]; machines: Machine[]; humans: Human[];
+  traj: TrajItem[];                                               // global Agent Live Trace ring buffer (newest TRAJ_CAP entries); survives channel/DM switch, fed by agent:activity
   api: (m: string, p: string, b?: unknown) => Promise<any>;
   reload: () => Promise<void>;
   onEvent: (cb: (e: Ev) => void) => () => void;
@@ -64,6 +66,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [humans, setHumans] = useState<Human[]>([]);
+  const [traj, setTraj] = useState<TrajItem[]>([]); // global live-trace feed: bounded ring buffer held here (not per Chat view) so it persists across channel/DM switches
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const tokenRef = useRef("");
   const sidRef = useRef("");
@@ -226,7 +229,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "message", channelId: msg.channelId, message: msg }); // normalize to internal event bus shape; views stay unchanged
       });
       sock.on("agent:activity", (p: any) => {
-        if (p?.entries) dispatch({ type: "trajectory", agentId: p.agentId, name: p.name, entries: p.entries });
+        if (p?.entries) {
+          dispatch({ type: "trajectory", agentId: p.agentId, name: p.name, entries: p.entries });
+          // Also accumulate into the global live-trace ring buffer (capped at TRAJ_CAP) so the panel keeps history across channel/DM switches. Mapping mirrors the panel's render shape.
+          setTraj((prev) => appendCapped(prev, (p.entries as any[]).map((x) => ({ name: p.name, tool: !!x.toolName, text: x.text || (x.toolName ? `${x.toolName}${x.toolInput ? " — " + x.toolInput : ""}` : "") || x.detail || "" }))));
+        }
         else {
           setAgents((as) => as.map((a) => (a.id === p.agentId ? { ...a, status: p.status ?? a.status, activity: p.activity ?? a.activity, activityDetail: p.detail ?? a.activityDetail } : a))); // real-time status dot + activity text used by header and sidebar
           dispatch({ type: "agent", id: p.agentId, name: p.name, activity: p.activity, status: p.status, detail: p.detail });
@@ -253,7 +260,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; sock?.close(); if (unreadTimer) clearTimeout(unreadTimer); };
   }, []);
 
-  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, humans, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, humans, traj, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
 }
 
 export const fmtTime = (iso?: string) => { try { return iso ? new Date(iso).toLocaleTimeString("zh-CN", { hour12: false }) : ""; } catch { return ""; } };
