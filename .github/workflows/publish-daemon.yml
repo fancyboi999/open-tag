@@ -1,16 +1,18 @@
 name: Publish @fancyboi999/open-tag-daemon
 
-# Publishes the compute-plane daemon to npm when a GitHub Release is published.
-# Prerequisite (one-time): add an `NPM_TOKEN` repo secret — an npm automation token with publish
-# rights for the package owner. Until then this workflow no-ops on release (the publish step needs
-# the secret). To cut a release: bump packages/daemon/package.json version, then publish a GitHub Release.
+# Publishes the compute-plane daemon to npm when a GitHub Release is published, via npm
+# Trusted Publishing (OIDC) — NO long-lived token. The job's id-token proves to npm that this
+# exact repo + workflow is publishing; npm signs provenance automatically.
+# Prerequisite (one-time): on npmjs.com → the package → Settings → Trusted Publisher → GitHub Actions,
+# register owner `fancyboi999`, repo `open-tag`, workflow `publish-daemon.yml`.
+# To cut a release: bump packages/daemon/package.json version, then publish a GitHub Release.
 on:
   release:
     types: [published]
 
 permissions:
   contents: read
-  id-token: write # npm provenance
+  id-token: write # OIDC for npm Trusted Publishing (also signs provenance)
 
 jobs:
   publish:
@@ -24,14 +26,15 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Upgrade npm (Trusted Publishing needs npm >= 11.5.1)
+        run: npm install -g npm@latest
+
       - name: Install root deps
         run: npm ci
 
       - name: Build daemon bundle
         run: npm run pkg:daemon:build
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
+      - name: Publish to npm (OIDC trusted publishing — no token)
+        run: npm publish --access public
         working-directory: packages/daemon
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
