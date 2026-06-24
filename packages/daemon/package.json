@@ -1,5 +1,5 @@
 {
-  "name": "@open-tag/daemon",
+  "name": "@fancyboi999/open-tag-daemon",
   "version": "0.1.0",
   "description": "open-tag compute-plane daemon — connect any machine to an open-tag server so its agents run there. No repo clone needed.",
   "license": "Apache-2.0",

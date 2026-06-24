@@ -62,14 +62,14 @@ Agent data plane   Agent process → HTTP /agent-api/*  (Bearer per-agent token 
 - `codexRuntime.ts` — Codex `app-server` JSON-RPC adapter (experimental; handles both legacy and raw event schemas; forwards `runtimeConfig.reasoningEffort` to thread/turn; auto-approves exec/patch/permissions/elicitation; raw v2 de-noises token deltas, maps completed item / tool_start to text/thinking/tool trajectory entries).
 - `prompt.ts` — Assembles agent system prompt: identity + runtime context + **full `open-tag` CLI command reference** + message format + task flow (`todo → in_progress → in_review → done`) + etiquette / credential hygiene + startup sequence + **MEMORY.md re-read & compaction self-rescue**.
 - `workspace.ts` — Workspace file tree / file read + list skills (reads `~/.claude/skills` + workspace `.claude/skills`).
-- `openTagBin.ts` — **Generates** the `~/.open-tag/bin/open-tag` wrapper script for daemon PATH injection. Two modes: **repo** (runs `src/cli/index.ts` via local `tsx`) and **bundled** (when a sibling `agent-cli.mjs` is found next to the running daemon — i.e. launched from the `@open-tag/daemon` npm package — runs that bundle via `node`).
+- `openTagBin.ts` — **Generates** the `~/.open-tag/bin/open-tag` wrapper script for daemon PATH injection. Two modes: **repo** (runs `src/cli/index.ts` via local `tsx`) and **bundled** (when a sibling `agent-cli.mjs` is found next to the running daemon — i.e. launched from the `@fancyboi999/open-tag-daemon` npm package — runs that bundle via `node`).
 
 ### Distributable daemon package (`packages/daemon/`, `scripts/build-daemon-pkg.mjs`)
 
-Lets any machine join a server without cloning the repo: `npx @open-tag/daemon --server-url <url> --api-key sk_machine_…`. The daemon talks to the server purely over WS (no DB), so it bundles cleanly.
+Lets any machine join a server without cloning the repo: `npx @fancyboi999/open-tag-daemon --server-url <url> --api-key sk_machine_…`. The daemon talks to the server purely over WS (no DB), so it bundles cleanly.
 
 - `scripts/build-daemon-pkg.mjs` — esbuild bundles **two** self-contained ESM files into `packages/daemon/dist/`: `cli.mjs` (the `open-tag-daemon` bin = `src/daemon/index.ts`) and `agent-cli.mjs` (the agent CLI = `src/cli/index.ts`, which `openTagBin.ts` injects in bundled mode). ESM output (so `import.meta.url` works) + a `createRequire` banner (so bundled CJS deps `ws`/`commander` and node builtins resolve); ws's optional native accelerators stay external. Run via `npm run pkg:daemon:build`.
-- `packages/daemon/package.json` — the publishable `@open-tag/daemon` (bin `open-tag-daemon`, `files: [dist, README.md]`, zero runtime deps — everything bundled). `dist/` is gitignored and rebuilt in CI before publish.
+- `packages/daemon/package.json` — the publishable `@fancyboi999/open-tag-daemon` (bin `open-tag-daemon`, `files: [dist, README.md]`, zero runtime deps — everything bundled). `dist/` is gitignored and rebuilt in CI before publish.
 - CI: `.github/workflows/ci.yml` builds the bundle on every PR; `.github/workflows/publish-daemon.yml` publishes to npm on GitHub Release (needs the `NPM_TOKEN` secret).
 
 ### Data / shared (`src/`)
@@ -107,7 +107,7 @@ npm run db:push      # push schema
 npm run seed         # seed data
 npm run server       # tsx watch src/server
 npm run daemon       # daemon process
-npm run pkg:daemon:build  # bundle the publishable @open-tag/daemon package → packages/daemon/dist
+npm run pkg:daemon:build  # bundle the publishable @fancyboi999/open-tag-daemon package → packages/daemon/dist
 cd web && npm run dev  # Vite HMR dev server
 ```
 

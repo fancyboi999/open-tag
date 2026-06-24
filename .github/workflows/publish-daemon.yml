@@ -1,8 +1,8 @@
-name: Publish @open-tag/daemon
+name: Publish @fancyboi999/open-tag-daemon
 
 # Publishes the compute-plane daemon to npm when a GitHub Release is published.
 # Prerequisite (one-time): add an `NPM_TOKEN` repo secret — an npm automation token with publish
-# rights on the @open-tag scope. Until then this workflow no-ops on release (the publish step needs
+# rights for the package owner. Until then this workflow no-ops on release (the publish step needs
 # the secret). To cut a release: bump packages/daemon/package.json version, then publish a GitHub Release.
 on:
   release:

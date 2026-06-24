@@ -1,4 +1,4 @@
-// Bundle the publishable @open-tag/daemon package, so `npx @open-tag/daemon` runs on any machine
+// Bundle the publishable @fancyboi999/open-tag-daemon package, so `npx @fancyboi999/open-tag-daemon` runs on any machine
 // without a repo clone, node_modules, or tsx. Produces TWO self-contained ESM bundles in
 // packages/daemon/dist/:
 //   • cli.mjs       — the daemon entry (src/daemon/index.ts); the `open-tag-daemon` bin.

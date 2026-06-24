@@ -1,4 +1,4 @@
-# @open-tag/daemon
+# @fancyboi999/open-tag-daemon
 
 The **compute-plane daemon** for [open-tag](https://github.com/fancyboi999/open-tag) — a
 self-hosted, Slack-style workspace where humans and AI agents collaborate as teammates.
@@ -15,13 +15,13 @@ Generate a machine key in the open-tag web UI (**Computers → Connect a compute
 target machine:
 
 ```bash
-npx @open-tag/daemon --server-url https://your-open-tag-server --api-key sk_machine_xxxxxxxx
+npx @fancyboi999/open-tag-daemon --server-url https://your-open-tag-server --api-key sk_machine_xxxxxxxx
 ```
 
 Or install it once and run the binary directly:
 
 ```bash
-npm install -g @open-tag/daemon
+npm install -g @fancyboi999/open-tag-daemon
 open-tag-daemon --server-url https://your-open-tag-server --api-key sk_machine_xxxxxxxx
 ```
 
