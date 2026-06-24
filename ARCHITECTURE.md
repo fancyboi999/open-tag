@@ -19,7 +19,7 @@ Agent data plane   Agent process → HTTP /agent-api/*  (Bearer per-agent token 
 ```
 
 **Agent lifecycle**: `start → active →(idle timeout) sleep (kill process) → start again (with archived sessionId) → resume`.
-- **No separate wake operation**: wake = server re-sends `agent:start` with the saved `sessionId`; the runtime resumes via `--resume` (claude) or `thread/resume` (codex).
+- **No separate wake operation**: wake = server re-sends `agent:start` with the saved `sessionId`; the runtime resumes via `--resume` (claude), `thread/resume` (codex), or `--session-id` (copilot, idempotent create-or-resume).
 - **Idle-sleep is implemented** in daemon `agentManager.ts`: `IDLE_MS` default 10 minutes, overridable via `OPEN_TAG_IDLE_MS`; every activity event calls `resetIdle`; timeout kills the process to stop token burn.
 - cwd = `~/.open-tag/agents/<agentId>/` (persistent workspace + `MEMORY.md`; after compaction the agent re-reads `MEMORY.md` to reconstruct context).
 - **Status is two-dimensional** (daemon `agentManager` emits; `ws.ts` writes `agents.status/activity` to DB):
@@ -57,9 +57,10 @@ Agent data plane   Agent process → HTTP /agent-api/*  (Bearer per-agent token 
 - `connection.ts` — Control-plane WS client (exponential backoff reconnect 1s→30s; ping/pong dispatched in `index.ts`, this class only manages reconnection).
 - `agentManager.ts` — **Agent lifecycle**: start / sleep / stop / reset / deliver; two-dimensional status `status(inactive/active/sleeping) × activity(online/working/thinking/sleeping/offline/error)` (non-zero exit → `sleeping/error`, see §I state machine). Wake = `start()` with archived sessionId. **Includes idle-sleep** (`IDLE_MS`). `onSession(sid)` immediately pushes `agent:session` to server for persistence. Deliver uses a 3s debounce to batch messages; accumulates first/latest msgShort + targets and assembles inbox-notice text (`prompt.ts inboxNotice`, with `· task` / `· dm` / `changed target` suffixes).
 - `runtime.ts` — Runtime adapter **interface** (pure types: `Runtime{start()}` / `RuntimeSession{deliver,stop}` / `RuntimeCallbacks` / `StartOpts` [includes `runtimeConfig`] / `TrajectoryEntry`).
-- `runtimes.ts` — Runtime **registry** (`REG` / `getRuntime()`) + `detectRuntimes()` probes which runtimes are installed locally (`claude` / `codex` / `kimi` / `gemini` / `opencode`).
+- `runtimes.ts` — Runtime **registry** (`REG` / `getRuntime()`) + `detectRuntimes()` probes which runtimes are installed locally (`claude` / `codex` / `copilot` / `kimi` / `gemini` / `opencode`). NB: `REG` implements `claude`, `codex`, `copilot`; `detectRuntimes()` still *advertises* `kimi`/`gemini`/`opencode` which have no adapter yet (selecting them → `no runtime` offline — see `docs/tech-debt-tracker.md`).
 - `claudeRuntime.ts` — Claude `-p stream-json` adapter: writes `.claude-system-prompt.md` on spawn via `--append-system-prompt-file`; parses `thinking` / `text` / `tool_use` blocks into trajectory entries. **No MCP**; the agent communicates via the `open-tag` CLI.
 - `codexRuntime.ts` — Codex `app-server` JSON-RPC adapter (experimental; handles both legacy and raw event schemas; forwards `runtimeConfig.reasoningEffort` to thread/turn; auto-approves exec/patch/permissions/elicitation; raw v2 de-noises token deltas, maps completed item / tool_start to text/thinking/tool trajectory entries).
+- `copilotRuntime.ts` — Copilot CLI adapter (experimental; **one-shot per turn**, unlike the persistent claude/codex processes). Each turn spawns `copilot -p --output-format json --allow-all --no-ask-user --session-id <uuid>` and parses the JSONL event stream (`assistant.message`/`reasoning`/`turn_start` → text/thinking/tool trajectory; `result` → sessionId). Multi-turn + wake-resume chain via a **self-assigned `--session-id`** (idempotent create-or-resume). System prompt is injected via `{cwd}/AGENTS.md` (Copilot reads it natively — no system-prompt flag). Model/launch errors are surfaced from **stderr** on non-zero exit (they are not JSON events). `forwards runtimeConfig.reasoningEffort` via `--effort`. Verified against Copilot CLI 1.0.61.
 - `prompt.ts` — Assembles agent system prompt: identity + runtime context + **full `open-tag` CLI command reference** + message format + task flow (`todo → in_progress → in_review → done`) + etiquette / credential hygiene + startup sequence + **MEMORY.md re-read & compaction self-rescue**.
 - `workspace.ts` — Workspace file tree / file read + list skills (reads `~/.claude/skills` + workspace `.claude/skills`).
 - `openTagBin.ts` — **Generates** the `~/.open-tag/bin/open-tag` wrapper script pointing at `src/cli`, then returns the bin directory for daemon PATH injection.
@@ -123,7 +124,7 @@ cd web && npm run dev  # Vite HMR dev server
 - `/api` (human) ↔ `/agent-api` (agent) ↔ `/daemon` WS (control) — three independent entry points demultiplexed in order in `index.ts`.
 - `realtime.publish()` — the **sole fan-out point** for all human-side real-time events.
 - `storage.saveObject/readObject` — the **sole boundary** for all object I/O.
-- `runtime.ts` interface — all differences between claude and codex are contained behind adapters; the upper-layer `agentManager` is runtime-agnostic.
+- `runtime.ts` interface — all differences between claude / codex / copilot (incl. persistent-process vs one-shot-per-turn lifecycles) are contained behind adapters; the upper-layer `agentManager` is runtime-agnostic.
 - Daemon ↔ server protocol (message `type`) — D→S defined in `ws.ts`; S→D defined in `core.ts` / `daemonHub`. This is the control-plane contract.
 
 ## V. Cross-cutting concerns

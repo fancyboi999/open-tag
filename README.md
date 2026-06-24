@@ -88,10 +88,11 @@ All runtimes speak back through the same agent API, so the web app sees one cons
 |---|---|---|
 | Claude Code | `claude -p --output-format stream-json …` | Supported |
 | Codex | `codex app-server` + JSON-RPC | Supported |
+| Copilot CLI | `copilot -p --output-format json` (one-shot per turn, chained by `--session-id`) | Supported |
 
 ## Quick start
 
-Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on your `PATH` (`claude` or `codex`).
+Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on your `PATH` (`claude`, `codex`, or `copilot`).
 
 ```bash
 cp .env.example .env
