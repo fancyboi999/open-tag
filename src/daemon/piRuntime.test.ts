@@ -53,3 +53,8 @@ test("user echo and non-message events produce no trajectory (no double-count wi
   assert.equal(handlePiEvent({ type: "agent_end", messages: [{ role: "assistant", content: [{ type: "text", text: "PONG" }] }] }).trajectory.length, 0);
   assert.equal(handlePiEvent({ type: "turn_start" }).trajectory.length, 0);
 });
+
+test("a model error in the message (stopReason=error, pi still exits 0) is surfaced, not swallowed", () => {
+  const emit = handlePiEvent({ type: "message_end", message: { role: "assistant", content: [], stopReason: "error", errorMessage: "400 litellm.BadRequestError: bad model" } });
+  assert.match(emit.error ?? "", /BadRequestError/);
+});

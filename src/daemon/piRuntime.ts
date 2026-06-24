@@ -25,20 +25,26 @@ function summarizeToolArgs(args: any): string {
 export interface PiEmit {
   trajectory: TrajectoryEntry[];
   sessionId?: string;
+  error?: string; // a model/turn error Pi reports IN the message (it still exits 0) — must be surfaced loudly
 }
 
 // handlePiEvent maps one parsed `pi -p --mode json` event to open-tag callbacks. Verified vs pi 0.73.1:
 // a `session` event carries `.id`; `message_end` carries `.message` (role + content[] blocks of
-// {type:"text",text} and {type:"toolCall",name,arguments}). We read message_end only — `agent_end`
-// repeats the final assistant message, so parsing both would double-count.
+// {type:"text",text} and {type:"toolCall",name,arguments}, plus stopReason/errorMessage). We read
+// message_end only — `agent_end` repeats the final assistant message, so parsing both would double-count.
 export function handlePiEvent(evt: any): PiEmit {
   const out: PiEmit = { trajectory: [] };
   if (evt?.type === "session" && typeof evt.id === "string") { out.sessionId = evt.id; return out; }
-  if (evt?.type === "message_end" && evt.message?.role === "assistant" && Array.isArray(evt.message.content)) {
-    for (const b of evt.message.content) {
-      if (b?.type === "text" && b.text) out.trajectory.push({ kind: "text", text: clip(b.text) });
-      else if (b?.type === "toolCall") out.trajectory.push({ kind: "tool", toolName: String(b.name ?? "tool"), toolInput: summarizeToolArgs(b.arguments) });
-    }
+  if (evt?.type === "message_end" && evt.message?.role === "assistant") {
+    const m = evt.message;
+    if (Array.isArray(m.content))
+      for (const b of m.content) {
+        if (b?.type === "text" && b.text) out.trajectory.push({ kind: "text", text: clip(b.text) });
+        else if (b?.type === "toolCall") out.trajectory.push({ kind: "tool", toolName: String(b.name ?? "tool"), toolInput: summarizeToolArgs(b.arguments) });
+      }
+    // Pi exits 0 even when the model call fails — the failure is in stopReason/errorMessage, not the exit
+    // code. Surface it so a bad model/key/provider doesn't silently no-op (e.g. a litellm 400 from the gateway).
+    if (m.stopReason === "error" && m.errorMessage) out.error = String(m.errorMessage);
   }
   return out;
 }
@@ -95,6 +101,10 @@ class PiRun {
         const emit = handlePiEvent(evt);
         if (emit.sessionId && emit.sessionId !== this.sessionId) { this.sessionId = emit.sessionId; this.cb.onSession(emit.sessionId); }
         if (emit.trajectory.length) this.cb.onTrajectory(emit.trajectory);
+        if (emit.error) { // model/turn error reported in-message (pi still exits 0) — surface it, don't silently no-op
+          this.cb.onTrajectory([{ kind: "text", text: "[pi error] " + clip(emit.error).slice(0, 500) }]);
+          this.cb.onActivity("error", emit.error.slice(0, 200));
+        }
       }
     });
     proc.stderr?.on("data", (c: Buffer) => {
