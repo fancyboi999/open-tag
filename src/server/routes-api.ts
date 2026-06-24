@@ -3,7 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { and, eq, gt, ne, or, inArray, asc, desc, count, isNotNull, isNull, ilike } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, serverIdHeader } from "./util.js";
-import { verifyUser, signUser, hashPassword, verifyPassword, newKey, hashToken } from "./auth.js";
+import { verifyUser, signUser, hashPassword, verifyPassword, newKey, hashToken, devLoginEnabled, setupToken, safeEqual, isValidEmail, passwordError } from "./auth.js";
+import { rateLimit, clientIp } from "./ratelimit.js";
 import { createMessage, getOrCreateDM, getOrCreateThread, convertMessageToTask, claimTask, unclaimTask, setTaskStatus, deleteTask, TASK_STATUSES, startAgent, stopAgent, resetAgent, syncAgentProfile, addReaction, removeReaction, aggregateReactions, saveMessage, unsaveMessage, checkSaved, listSaved, descTooLong, DESC_TOO_LONG, invalidAgentName, INVALID_AGENT_NAME, createServer } from "./core.js";
 import { publish } from "./realtime.js";
 import { requestDaemon } from "./daemonHub.js";
@@ -37,8 +38,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   if (!p.startsWith("/api/")) return false;
 
   // ---- auth ----
+  // Dev-login: public username→JWT shortcut for local development ONLY. Gated behind ALLOW_DEV_LOGIN (default off),
+  // so production never exposes it. When disabled it 404s — indistinguishable from a non-existent route (no endpoint leak).
   if (p === "/api/auth/dev-login" && method === "POST") {
-    const { name = "you" } = await readJson(req);
+    if (!devLoginEnabled()) return (sendErr(res, 404, "not found"), true);
+    const b = await readJson(req);
+    const name = String(b.name ?? "you").trim();
+    if (!name || name.length > 64) return (sendErr(res, 400, "invalid name"), true);
     let u = (await db.select().from(schema.users).where(eq(schema.users.name, name)))[0];
     if (!u) [u] = await db.insert(schema.users).values({ name, displayName: name, email: `${name}@dev.local` }).returning();
     // Multi-tenant: each user has isolated data — ensure the user has their own server (creates an empty one if absent, zero channels/agents; "you" owns the seeded default workspace)
@@ -47,19 +53,60 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     if (!u) return (sendErr(res, 500, "dev-login failed"), true);
     return (sendJson(res, 200, { token: signUser(u!.id), user: { id: u!.id, name: u!.name, displayName: u!.displayName } }), true);
   }
-  if (p === "/api/auth/register" && method === "POST") {
+  // First-deploy admin setup: one-time, token-gated. Disabled (404) unless ADMIN_SETUP_TOKEN is configured.
+  // First-run guard: only initializes the seeded default-workspace owner while it still has no password — so it
+  // self-closes (410) once an admin password exists. This unblocks the seeded "you" admin after dev-login is turned off,
+  // without ever hard-coding a default password. Placed BEFORE the auth gate (the operator has no JWT yet).
+  if (p === "/api/auth/setup" && method === "POST") {
+    const tok = setupToken();
+    if (!tok) return (sendErr(res, 404, "not found"), true);
+    const rl = rateLimit("auth:setup", clientIp(req), 5);
+    if (!rl.ok) return (sendErr(res, 429, "too many requests", { retryAfter: rl.retryAfter }), true);
     const b = await readJson(req);
-    if (!b.name || !b.email || !b.password) return (sendErr(res, 400, "name/email/password required"), true);
-    const dup = (await db.select().from(schema.users).where(or(eq(schema.users.email, b.email), eq(schema.users.name, b.name))))[0];
+    if (!safeEqual(String(b.token ?? ""), tok)) return (sendErr(res, 403, "invalid setup token"), true);
+    const ws = (await db.select().from(schema.servers).where(eq(schema.servers.slug, "open-tag")))[0];
+    if (!ws) return (sendErr(res, 409, "no default workspace; run seed first"), true);
+    const admin = (await db.select().from(schema.users).where(eq(schema.users.id, ws.ownerId)))[0];
+    if (!admin) return (sendErr(res, 409, "default workspace owner missing"), true);
+    if (admin.passwordHash) return (sendErr(res, 410, "already initialized"), true);
+    const pwErr = passwordError(b.password);
+    if (pwErr) return (sendErr(res, 400, pwErr), true);
+    const patch: Record<string, unknown> = { passwordHash: hashPassword(String(b.password)) };
+    if (b.email !== undefined) {
+      if (!isValidEmail(b.email)) return (sendErr(res, 400, "invalid email"), true);
+      if (b.email !== admin.email) {
+        const dup = (await db.select().from(schema.users).where(eq(schema.users.email, b.email)))[0];
+        if (dup) return (sendErr(res, 409, "email already in use"), true);
+        patch.email = b.email;
+      }
+    }
+    if (typeof b.displayName === "string" && b.displayName.trim()) patch.displayName = b.displayName.trim();
+    await db.update(schema.users).set(patch).where(eq(schema.users.id, admin.id));
+    return (sendJson(res, 200, { token: signUser(admin.id), user: { id: admin.id, name: admin.name, email: (patch.email as string) ?? admin.email } }), true);
+  }
+  if (p === "/api/auth/register" && method === "POST") {
+    const rl = rateLimit("auth:register", clientIp(req));
+    if (!rl.ok) return (sendErr(res, 429, "too many requests", { retryAfter: rl.retryAfter }), true);
+    const b = await readJson(req);
+    const name = typeof b.name === "string" ? b.name.trim() : "";
+    if (!name || name.length > 64) return (sendErr(res, 400, "invalid name"), true);
+    if (!isValidEmail(b.email)) return (sendErr(res, 400, "invalid email"), true);
+    const pwErr = passwordError(b.password);
+    if (pwErr) return (sendErr(res, 400, pwErr), true);
+    const dup = (await db.select().from(schema.users).where(or(eq(schema.users.email, b.email), eq(schema.users.name, name))))[0];
     if (dup) return (sendErr(res, 409, dup.email === b.email ? "email already registered" : "username already taken"), true);
-    const [u] = await db.insert(schema.users).values({ name: b.name, displayName: b.displayName ?? b.name, email: b.email, passwordHash: hashPassword(b.password) }).returning();
-    await createServer(`${b.name}'s workspace`, `u-${u!.id.slice(0, 8)}`, u!.id); // Create personal workspace on registration (aligned with dev-login; without it, entering the app with no server causes bootstrap to crash)
+    const [u] = await db.insert(schema.users).values({ name, displayName: typeof b.displayName === "string" && b.displayName.trim() ? b.displayName.trim() : name, email: b.email, passwordHash: hashPassword(String(b.password)) }).returning();
+    await createServer(`${name}'s workspace`, `u-${u!.id.slice(0, 8)}`, u!.id); // Create personal workspace on registration (aligned with dev-login; without it, entering the app with no server causes bootstrap to crash)
     return (sendJson(res, 200, { token: signUser(u!.id), user: { id: u!.id, name: u!.name } }), true);
   }
+  // Login: generic 401 on any failure (no user enumeration — same response whether the email is unknown or the password is wrong).
   if (p === "/api/auth/login" && method === "POST") {
+    const rl = rateLimit("auth:login", clientIp(req));
+    if (!rl.ok) return (sendErr(res, 429, "too many requests", { retryAfter: rl.retryAfter }), true);
     const b = await readJson(req);
-    const u = (await db.select().from(schema.users).where(eq(schema.users.email, b.email ?? "")))[0];
-    if (!u || !verifyPassword(b.password ?? "", u.passwordHash)) return (sendErr(res, 401, "bad credentials"), true);
+    if (typeof b.email !== "string" || typeof b.password !== "string") return (sendErr(res, 400, "email and password required"), true);
+    const u = (await db.select().from(schema.users).where(eq(schema.users.email, b.email)))[0];
+    if (!u || !verifyPassword(b.password, u.passwordHash)) return (sendErr(res, 401, "bad credentials"), true);
     return (sendJson(res, 200, { token: signUser(u.id), user: { id: u.id, name: u.name } }), true);
   }
   // Invite info (public, no auth required): the /join/:token landing page uses this to display "X invited you to join workspace Y"

@@ -12,6 +12,38 @@ export function verifyUser(token: string | null): string | null {
   try { return (jwt.verify(token, SECRET) as { uid?: string }).uid ?? null; } catch { return null; }
 }
 
+/** dev-login gate: a public username→JWT shortcut for local dev. Disabled by default so production never ships it open.
+ *  Read at call-time (not module load) so the value is honored even if the env is mutated after import (e.g. tests). */
+export const devLoginEnabled = (): boolean => process.env.ALLOW_DEV_LOGIN === "true";
+
+/** First-deploy admin setup token (`POST /api/auth/setup`). When unset, the setup endpoint is disabled entirely (404). */
+export const setupToken = (): string | null => {
+  const t = process.env.ADMIN_SETUP_TOKEN;
+  return t && t.length > 0 ? t : null;
+};
+
+/** Constant-time string compare for secrets (token/key) — avoids leaking length-prefix matches via timing.
+ *  Length mismatch short-circuits to false but only after a fixed-length compare to keep timing uniform. */
+export function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) { crypto.timingSafeEqual(ab, ab); return false; }
+  return crypto.timingSafeEqual(ab, bb);
+}
+
+// ── Input validation (shared by register / login / setup) ──
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const isValidEmail = (email: unknown): email is string =>
+  typeof email === "string" && email.length <= 254 && EMAIL_RE.test(email);
+
+/** Password policy. Returns null when valid, otherwise a human-readable reason (used as the unified error message). */
+export function passwordError(pw: unknown): string | null {
+  if (typeof pw !== "string") return "password required";
+  if (pw.length < 8) return "password must be at least 8 characters";
+  if (pw.length > 200) return "password too long";
+  return null;
+}
+
 export function hashPassword(pw: string): string {
   const salt = crypto.randomBytes(16).toString("hex");
   return `${salt}:${crypto.scryptSync(pw, salt, 32).toString("hex")}`;

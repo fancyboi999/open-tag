@@ -12,23 +12,22 @@ import { Landing } from "./views/Landing.tsx";
 import "./i18n";
 import "./styles.css";
 
-// Capture ?as=<devuser> as early as possible: must run before React/Router mounts, otherwise the wildcard route's Navigate replace clears the query string before dev-login can read it.
-const _as = new URLSearchParams(window.location.search).get("as");
-if (_as) localStorage.setItem("open-tag.devuser", _as);
-
-// Root / unmatched path → wait for bootstrap, then redirect to the current user's own workspace.
+// Root / unmatched path → wait for bootstrap, then redirect to the current user's own workspace (or /login if anonymous).
 function RootRedirect() {
-  const { slug, ready } = useStore();
-  if (!ready) return null; // wait for bootstrap to set slug before redirecting
+  const { slug, ready, authState } = useStore();
+  if (!ready) return null; // wait for bootstrap to resolve auth + slug before redirecting
+  if (authState !== "authed") return <Navigate to="/login" replace />;
   return <Navigate to={`/s/${slug}/channel`} replace />;
 }
 
-// Canonicalize stale or invalid workspace slugs while preserving the current nested route.
+// Auth guard + slug canonicalization for /s/:server/*. The auth check runs BEFORE <Layout/> renders, so an
+// unauthenticated visitor is redirected to /login without the workspace ever painting (no flash of protected UI).
 function WorkspaceRoute() {
-  const { slug, ready } = useStore();
+  const { slug, ready, authState } = useStore();
   const { server } = useParams();
   const loc = useLocation();
-  if (!ready) return null;
+  if (!ready) return null; // bootstrap in flight: render nothing (not the workspace)
+  if (authState !== "authed") return <Navigate to="/login" replace />; // hard auth gate
   if (server !== slug) {
     const pathname = loc.pathname.replace(/^\/s\/[^/]+/, `/s/${slug}`);
     return <Navigate to={`${pathname}${loc.search}${loc.hash}`} replace />;

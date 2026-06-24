@@ -140,3 +140,21 @@ Completing code ≠ completing the task. Verification layers (use every applicab
 
 "Migration succeeded / tests passed / feature OK" is not trusted on its own;
 it must be accompanied by the above checklist.
+
+## Human auth & first deploy
+
+Three separate auth planes — do not conflate them (`src/server/auth.ts`):
+- **human** → JWT (`signUser`/`verifyUser`), endpoints under `/api/auth/*`.
+- **agent** → per-agent token (`Bearer sk_agent_*` + `x-agent-id`), `resolveAgent`, `/agent-api/*`.
+- **daemon** → bootstrap/machine key over WS `/daemon/connect?key=` (`ws.ts`).
+
+Human-auth env flags (`.env` / `.env.prod`):
+- `ALLOW_DEV_LOGIN` — when `true`, `POST /api/auth/dev-login` mints a username→JWT with no
+  password. **Development only; leave unset in production** (the endpoint 404s when off). The
+  frontend never silently falls back to dev-login; an anonymous visitor to `/s/*` is redirected
+  to `/login` by the route guard in `web/src/main.tsx`.
+- `ADMIN_SETUP_TOKEN` — one-time first-deploy admin bootstrap. The seeded owner has no password,
+  so after `npm run seed` set this to a long random value and call once:
+  `curl -X POST $URL/api/auth/setup -d '{"token":"<token>","email":"admin@you","password":"<≥8>"}'`.
+  It sets the owner's password and self-closes (`410 already initialized`) once a password exists.
+  Disabled (`404`) when the token is unset.

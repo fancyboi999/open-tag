@@ -16,7 +16,7 @@ export interface Msg { id: string; seq: number; channelId: string; senderType: s
 type Ev = { type: string; [k: string]: any };
 
 interface Store {
-  ready: boolean; serverId: string; slug: string; me: Me | null; myRole: string; serverAvatar: string | null;
+  ready: boolean; authState: "loading" | "authed" | "anon"; serverId: string; slug: string; me: Me | null; myRole: string; serverAvatar: string | null;
   servers: ServerInfo[]; capabilities: Record<string, boolean>;
   uploadServerAvatar: (file: File) => Promise<void>;
   uploadAgentAvatar: (agentId: string, file: File) => Promise<string>;
@@ -50,6 +50,7 @@ export const useStore = () => useContext(Ctx);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [authState, setAuthState] = useState<"loading" | "authed" | "anon">("loading"); // human-auth gate: drives the /s/* route guard (no dev-login fallback)
   const [serverId, setServerId] = useState("");
   const [slug, setSlug] = useState("open-tag");
   const [servers, setServers] = useState<ServerInfo[]>([]);          // all servers the user belongs to (used by server switcher)
@@ -158,24 +159,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let unreadTimer: ReturnType<typeof setTimeout> | null = null;
     const syncUnread = () => { if (unreadTimer) clearTimeout(unreadTimer); unreadTimer = setTimeout(async () => { try { setUnread((await api("GET", "/api/channels/unread")) || {}); } catch { /* keep stale value on error */ } }, 400); };
     (async () => {
+      // Resolve a session token. Precedence: explicit ?as= dev-login (dev only) > stored JWT. NO silent fallback —
+      // an anonymous visitor never auto-logs-in; the /s/* route guard sends them to /login (see main.tsx).
       const asParam = new URLSearchParams(window.location.search).get("as");
-      const storedToken = localStorage.getItem("open-tag.token"); // JWT persisted after real register/login; not set in dev (?as=) flow
-      const isAuthRoute = /^\/(login|register|join)\b/.test(window.location.pathname);
-      if (isAuthRoute && !storedToken && !asParam) { setReady(true); return; } // auth page without a token: let AuthPage/JoinPage handle its own fetch
-      let login: any = null;
-      if (storedToken && !asParam) { // real auth token: use stored JWT, fall back to dev-login if expired
-        tokenRef.current = storedToken;
-        const meRes = await (await fetch("/api/auth/me", { headers: { authorization: "Bearer " + storedToken } })).json().catch(() => null);
-        if (meRes?.id) { setMe(meRes); login = { token: storedToken, user: meRes }; } else localStorage.removeItem("open-tag.token");
+      let token: string | null = null;
+      let user: Me | null = null;
+      if (asParam) { // explicit developer action: dev-login only succeeds when the backend has ALLOW_DEV_LOGIN=true; on success persist the JWT as a normal session
+        const r = await fetch("/api/auth/dev-login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: asParam }) });
+        if (r.ok) { const d = await r.json().catch(() => null); if (d?.token) { token = d.token; user = d.user ?? null; localStorage.setItem("open-tag.token", d.token); } }
       }
-      if (!login) { // dev-login (?as= user switch or default "you")
-        const asUser = asParam || localStorage.getItem("open-tag.devuser") || "you";
-        if (asParam) localStorage.setItem("open-tag.devuser", asUser);
-        login = await (await fetch("/api/auth/dev-login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: asUser }) })).json();
-        tokenRef.current = login.token;
-        if (login.user) setMe(login.user);
+      if (!token) {
+        const storedToken = localStorage.getItem("open-tag.token"); // JWT persisted after real register/login (or dev-login above)
+        if (storedToken) {
+          const meRes = await (await fetch("/api/auth/me", { headers: { authorization: "Bearer " + storedToken } })).json().catch(() => null);
+          if (meRes?.id) { token = storedToken; user = meRes; }
+          else localStorage.removeItem("open-tag.token"); // expired / invalid / 401 → drop it so the guard redirects to /login
+        }
       }
-      const myId = login.user?.id;
+      if (!token) { setAuthState("anon"); setReady(true); return; } // unauthenticated: auth pages & landing render; protected routes redirect to /login
+      tokenRef.current = token;
+      setMe(user);
+      setAuthState("authed");
+      const myId = user?.id;
       const serverList: ServerInfo[] = await (await fetch("/api/servers", { headers: { authorization: "Bearer " + tokenRef.current } })).json();
       setServers(serverList);
       const urlSlug = location.pathname.match(/\/s\/([^/]+)/)?.[1]; // resolve workspace from URL /s/:slug (multi-workspace support); fall back to first
@@ -248,7 +253,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; sock?.close(); if (unreadTimer) clearTimeout(unreadTimer); };
   }, []);
 
-  return <Ctx.Provider value={{ ready, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, humans, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, humans, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
 }
 
 export const fmtTime = (iso?: string) => { try { return iso ? new Date(iso).toLocaleTimeString("zh-CN", { hour12: false }) : ""; } catch { return ""; } };
