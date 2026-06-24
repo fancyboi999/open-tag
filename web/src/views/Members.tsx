@@ -178,7 +178,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
           ["integrations", t("members.tabIntegrations")],
           ["activity", t("members.tabActivity")],
         ] as [string, string][]).map(([k, label]) => (
-          <button key={k} className={tab === k ? "on" : ""} onClick={() => setSp({ agentTab: k })}>{label}</button>
+          <button key={k} className={tab === k ? "on" : ""} onClick={() => setSp((prev) => { const n = new URLSearchParams(prev); n.set("agentTab", k); return n; })}>{label}</button>
         ))}
       </div>
       {tab === "workspace" ? <WorkspaceTab id={id} />
@@ -449,7 +449,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
 
 // Human member profile (HumanDetailPanel): shows info/role/Created Agents; the member themselves can edit their own description (max 3000 chars).
 // Description is visible to other humans and agents in the server; agents fetch it via `open-tag server info` for collaboration context.
-function HumanProfile({ uid }: { uid: string }) {
+export function HumanProfile({ uid, onClose, onMessage }: { uid: string; onClose?: () => void; onMessage?: () => void }) {
   const { t } = useTranslation();
   const { api, serverId, me, reload, slug, capabilities, openDM, uploadUserAvatar, attachmentUrl } = useStore();
   const confirm = useConfirm();
@@ -465,9 +465,17 @@ function HumanProfile({ uid }: { uid: string }) {
   const isMe = me?.id === uid;
   const save = async () => { await api("PATCH", "/api/auth/me", { description: ds.trim() }); setEdit(false); await refetch(); await reload(); };
   const dmHuman = async () => { const cid = await openDM("user", uid); if (cid) nav(`/s/${slug}/channel/${cid}`); };
+  const dmBtn = !isMe ? <button className="joinbtn" onClick={onMessage ?? dmHuman}><MessageCircle size={13} style={{ verticalAlign: "-2px" }} /> {t("members.dm")}</button> : null;
   return (
     <>
-      <div className="head head-agent"><AvatarPicker name={p.name} url={signedAvatar} size={48} editable={isMe} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div><h1>{p.displayName || p.name}</h1><small>@{p.name} · {p.role}{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div><div className="agent-acts">{!isMe && <button className="joinbtn" onClick={dmHuman}><MessageCircle size={13} style={{ verticalAlign: "-2px" }} /> {t("members.dm")}</button>}</div></div>
+      {onClose ? ( // panel mode (embedded in chat right column: click avatar / name / @mention → profile overlay), mirrors AgentProfile
+        <div className="profile-panel-head">
+          <Avatar seed={p.name} url={signedAvatar} size={28} />
+          <div className="pph-id"><span className="pph-name">{p.displayName || p.name}</span><span className="pph-handle">@{p.name} · {p.role}</span></div>
+          <button className="joinbtn pph-close" title={t("members.close")} onClick={onClose}><X size={14} /></button>
+          {dmBtn && <div className="agent-acts">{dmBtn}</div>}
+        </div>
+      ) : <div className="head head-agent"><AvatarPicker name={p.name} url={signedAvatar} size={48} editable={isMe} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div><h1>{p.displayName || p.name}</h1><small>@{p.name} · {p.role}{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div><div className="agent-acts">{dmBtn}</div></div>}
       <div className="scroll">
         <div className="card">
           {edit ? (
@@ -493,7 +501,7 @@ function HumanProfile({ uid }: { uid: string }) {
                 <option value="owner">owner</option><option value="admin">admin</option><option value="member">member</option>
               </select></div>
             )}
-            {capabilities.manageMembers && <button className="joinbtn" style={{ color: "var(--error)", marginTop: 12 }} onClick={async () => { if (!(await confirm({ title: t("members.removeMemberTitle", { name: p.name }), message: t("members.removeMemberMessage"), confirmLabel: t("members.remove"), danger: true }))) return; const r = await api("DELETE", `/api/servers/${serverId}/members/${uid}`); if (r?.error) { alert(r.error); return; } await reload(); nav(`/s/${slug}/agent`); }}>{t("members.removeMember")}</button>}
+            {capabilities.manageMembers && <button className="joinbtn" style={{ color: "var(--error)", marginTop: 12 }} onClick={async () => { if (!(await confirm({ title: t("members.removeMemberTitle", { name: p.name }), message: t("members.removeMemberMessage"), confirmLabel: t("members.remove"), danger: true }))) return; const r = await api("DELETE", `/api/servers/${serverId}/members/${uid}`); if (r?.error) { alert(r.error); return; } await reload(); if (onClose) onClose(); else nav(`/s/${slug}/agent`); }}>{t("members.removeMember")}</button>}
           </div>
         )}
         {p.createdAgents?.length > 0 && (

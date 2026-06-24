@@ -10,7 +10,7 @@ const TASK_ICON: Record<string, typeof Circle> = { todo: Circle, in_progress: Pl
 import { IconWrench, IconFile, IconExternalLink, IconDownload } from "../icons.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { TaskBoard, ynOptions, ST_LABEL } from "../TaskBoard.tsx";
-import { AgentProfile, CreateAgentModal } from "./Members.tsx";
+import { AgentProfile, HumanProfile, CreateAgentModal } from "./Members.tsx";
 import { ChatSidebar, CreateChannelModal } from "./ChatSidebar.tsx";
 import { AddComputerModal } from "./misc.tsx";
 import { Composer } from "./Composer.tsx";
@@ -125,7 +125,7 @@ export function Chat() {
   const manageServer = myRole === "owner" || myRole === "admin"; // server admins get the full task-status dropdown (matches TaskBoard permission model)
   const { channelId } = useParams();
   const nav = useNavigate();
-  const [profileAgentId, setProfileAgentId] = useState<string | null>(null); // clicking an agent avatar opens the profile panel in the right column
+  const [profile, setProfile] = useState<{ type: "agent" | "human"; id: string } | null>(null); // right-column profile overlay: clicking an avatar / name / @mention (agent, human, or yourself) opens it ON TOP of the thread/trajectory ("click X → show X"); closing it reveals the layer underneath
   const [taskMenu, setTaskMenu] = useState<string | null>(null); // task badge status menu: id of the currently open message (clicking the badge changes status, does not open thread)
   const [hoverAgent, setHoverAgent] = useState<{ id: string; x: number; y: number } | null>(null); // hovering over an agent shows a quick-info hover card
   const [ctxMenu, setCtxMenu] = useState<{ m: Msg; x: number; y: number } | null>(null); // right-clicking a message opens the context action menu
@@ -147,7 +147,7 @@ export function Chat() {
   const threadParam = sp.get("thread"); // auto-open a thread panel (from inbox, in-message thread link, or cross-page link); value is the parent message id (full or 8-char short) or channelId:shortid
 
   useEffect(() => { if (!channelId && cur) nav(`/s/${slug}/channel/${cur.id}`, { replace: true }); }, [channelId, cur, slug, nav]);
-  useEffect(() => { if (!cur) return; setThread(null); subscribeChannel(cur.id); (async () => { // join the room while viewing so message:new arrives live (covers public non-member channels + channels relevant after connect)
+  useEffect(() => { if (!cur) return; setThread(null); setProfile(null); subscribeChannel(cur.id); (async () => { // switching channels closes any open thread + profile overlay from the previous channel (the live trace itself persists — accumulated in the store, see store.tsx); join the room while viewing so message:new arrives live (covers public non-member channels + channels relevant after connect)
     const d = await api("GET", `/api/messages/channel/${cur.id}?limit=200`); const ms: Msg[] = d.messages || []; setMsgs(ms); markRead(cur.id);
     const ids = ms.map((m) => m.id);
     if (ids.length) { try { setThreadMeta(await api("GET", `/api/channels/${cur.id}/threads?parentMessageIds=${ids.join(",")}`) || {}); } catch { setThreadMeta({}); } } else setThreadMeta({});
@@ -181,15 +181,17 @@ export function Chat() {
 
   const setTab = (t: string) => { const n = new URLSearchParams(sp); if (t === "chat") n.delete("chatTab"); else n.set("chatTab", t); setSp(n, { replace: true }); };
   const doDM = async (agentId: string) => { const id = await openDM("agent", agentId); if (id) nav(`/s/${slug}/channel/${id}`); }; // used by AgentProfile onMessage callback
-  const startThread = async (m: Msg) => { if (!cur) return; const tid = threadMeta[m.id]?.threadChannelId || await openThread(cur.id, m.id); if (tid) { setThread({ channelId: tid, parent: m }); setThreadMeta((tm) => (tm[m.id] ? { ...tm, [m.id]: { ...tm[m.id]!, unreadCount: 0 } } : tm)); markRead(tid); } }; // opening a thread clears the unread count optimistically and marks the thread channel as read
+  const doDMHuman = async (uid: string) => { const id = await openDM("user", uid); if (id) nav(`/s/${slug}/channel/${id}`); }; // used by HumanProfile onMessage callback
+  // Opening a thread is an explicit "show me this thread" action → it becomes the right-column base layer and clears any profile overlay on top of it (otherwise the just-opened thread would stay hidden behind a stale profile).
+  const startThread = async (m: Msg) => { if (!cur) return; const tid = threadMeta[m.id]?.threadChannelId || await openThread(cur.id, m.id); if (tid) { setProfile(null); setThread({ channelId: tid, parent: m }); setThreadMeta((tm) => (tm[m.id] ? { ...tm, [m.id]: { ...tm[m.id]!, unreadCount: 0 } } : tm)); markRead(tid); } }; // opening a thread clears the unread count optimistically and marks the thread channel as read
   // Returns the display name of the task assignee, used by the task pill
   const taskAssignee = (m: Msg) => { if (!m.taskAssigneeId) return ""; const a = agents.find((x) => x.id === m.taskAssigneeId); if (a) return " @" + (a.displayName || a.name); const h = humans.find((x) => x.userId === m.taskAssigneeId); return h ? " @" + (h.displayName || h.name) : ""; };
   // Handles task status change / claim from the task badge; socket message:updated event refreshes the message automatically
   const doTask = async (m: Msg, action: string, body?: unknown) => { try { await api("PATCH", `/api/tasks/${m.id}/${action}`, body); } catch { /* will self-correct on next reload */ } };
   // Routes inline token clicks (@mention / #channel / thread / task #N) inside MessageContent
   const navToken = async (type: string, args: string[]) => {
-    if (type === "agent") return setProfileAgentId(args[0]);
-    if (type === "human") return nav(`/s/${slug}/human/${args[0]}`); // @human click → member profile page
+    if (type === "agent") return setProfile({ type: "agent", id: args[0]! });
+    if (type === "human") return setProfile({ type: "human", id: args[0]! }); // @human click → profile panel (same overlay as agents, not a full-page route)
     if (type === "channel") return nav(`/s/${slug}/channel/${args[0]}`);
     if (type === "thread") return nav(`/s/${slug}/channel/${args[0]}?thread=${args[0]}:${args[1]}`);
     if (type === "task") {
@@ -236,17 +238,21 @@ export function Chat() {
                     <button title={t("chat.more")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCtxMenu({ m, x: r.right - 212, y: r.bottom + 4 }); }}><MoreHorizontal size={15} /></button>
                   </div>
                   {ag
-                    ? <span className="msg-av clickable" onClick={() => setProfileAgentId(m.senderId!)}
+                    ? <span className="msg-av clickable" onClick={() => setProfile({ type: "agent", id: m.senderId! })}
                         onMouseEnter={(e) => setHoverAgent({ id: m.senderId!, x: e.currentTarget.getBoundingClientRect().right + 8, y: e.currentTarget.getBoundingClientRect().top })}
                         onMouseLeave={() => setHoverAgent(null)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={36} />{ag.activity && ag.activity !== "offline" && <span className={"av-status " + ag.activity} />}</span>
-                    : <Avatar seed={m.senderName} url={senderAvatar(m)} size={36} />}
+                    : m.senderId
+                      ? <span className="msg-av clickable" onClick={() => setProfile({ type: "human", id: m.senderId! })}><Avatar seed={m.senderName} url={senderAvatar(m)} size={36} /></span>
+                      : <Avatar seed={m.senderName} url={senderAvatar(m)} size={36} />}
                   <div className="msg-col">
                     <div className="msg-head">
                       {ag
-                        ? <span className="who clickable" onClick={() => setProfileAgentId(m.senderId!)}
+                        ? <span className="who clickable" onClick={() => setProfile({ type: "agent", id: m.senderId! })}
                             onMouseEnter={(e) => setHoverAgent({ id: m.senderId!, x: e.currentTarget.getBoundingClientRect().left, y: e.currentTarget.getBoundingClientRect().bottom + 6 })}
                             onMouseLeave={() => setHoverAgent(null)}>{m.senderName}</span>
-                        : <span className="who">{m.senderName}</span>}
+                        : m.senderId
+                          ? <span className="who clickable" onClick={() => setProfile({ type: "human", id: m.senderId! })}>{m.senderName}</span>
+                          : <span className="who">{m.senderName}</span>}
                       {ag?.description ? <span className="msg-role">{ag.description}</span> : isMember ? <span className="member-badge">member</span> : null}
                       <span className="ts">{fmtTime(m.createdAt)}</span></div>
                     {!!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
@@ -296,17 +302,20 @@ export function Chat() {
             />
           </>}
       </main>
-      {thread
-        ? <ThreadPanel channelId={thread.channelId} parent={thread.parent} onClose={() => setThread(null)} onOpenProfile={setProfileAgentId} />
+      {/* Right column = one base layer (thread, else trajectory) with a profile overlay on top. Priority: profile > thread > trajectory, so a profile opened from anywhere ("click X → show X") covers the thread; closing it reveals the thread again. */}
+      {profile
+        ? <aside className="traj-col profile-mode">
+            {profile.type === "agent"
+              ? <AgentProfile id={profile.id} onDeleted={() => setProfile(null)} onClose={() => setProfile(null)} onMessage={() => { const id = profile.id; setProfile(null); doDM(id); }} />
+              : <HumanProfile uid={profile.id} onClose={() => setProfile(null)} onMessage={() => { const id = profile.id; setProfile(null); doDMHuman(id); }} />}
+          </aside>
+        : thread
+        ? <ThreadPanel channelId={thread.channelId} parent={thread.parent} onClose={() => setThread(null)} onOpenProfile={(type, id) => setProfile({ type, id })} />
         : <aside className="traj-col">
-        {profileAgentId
-          ? <AgentProfile id={profileAgentId} onDeleted={() => setProfileAgentId(null)} onClose={() => setProfileAgentId(null)} onMessage={() => { const a = profileAgentId; setProfileAgentId(null); doDM(a); }} />
-          : <>
               <h2>{t("chat.agentLiveTrace")}</h2>
               {traj.length === 0
                 ? <div className="hint">{t("chat.agentTraceHint")}</div>
                 : traj.map((t, i) => <div className={"traj" + (t.tool ? " tool" : "")} key={i}>{t.tool && <IconWrench size={12} />}{t.name ? "@" + t.name + " · " : ""}{t.text}</div>)}
-            </>}
       </aside>}
       <AddComputerModal />
       {showMembers && cur && <ChannelMembersModal channelId={cur.id} channelName={cur.name} onClose={() => setShowMembers(false)} />}
@@ -410,14 +419,14 @@ function EditChannelModal({ channel, onClose, onDone, onDeleted }: { channel: an
 }
 
 // Thread panel: right-side overlay showing the parent message, its replies, and a reply composer.
-function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId: string; parent: Msg; onClose: () => void; onOpenProfile: (id: string) => void }) {
+function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId: string; parent: Msg; onClose: () => void; onOpenProfile: (type: "agent" | "human", id: string) => void }) {
   const { t } = useTranslation();
   const { api, onEvent, subscribeChannel, attachmentUrl, me, react, agents, humans, channels, slug } = useStore();
   const senderAvatar = (m: Msg) => resolveAvatar(m.senderType === "agent" ? agents.find((a) => a.id === m.senderId)?.avatarUrl : humans.find((h) => h.userId === m.senderId)?.avatarUrl, attachmentUrl);
   const nav = useNavigate();
   const navToken = async (type: string, args: string[]) => {
-    if (type === "agent") return onOpenProfile(args[0]!); // @agent click inside a thread also opens the profile panel (profile state is owned by the parent component)
-    if (type === "human") return nav(`/s/${slug}/human/${args[0]}`); // @human click → member profile page
+    if (type === "agent") return onOpenProfile("agent", args[0]!); // @agent click inside a thread opens the profile overlay (profile state is owned by the parent component)
+    if (type === "human") return onOpenProfile("human", args[0]!); // @human click → profile overlay too (parent renders it on top of the thread)
     if (type === "channel") return nav(`/s/${slug}/channel/${args[0]}`);
     if (type === "thread") return nav(`/s/${slug}/channel/${args[0]}?thread=${args[0]}:${args[1]}`);
     if (type === "task") { try { const r = await api("GET", "/api/tasks/server"); const tk = (r?.tasks ?? r ?? []).find((x: any) => x.taskNumber === Number(args[0])); if (tk) nav(`/s/${slug}/channel/${tk.channelId}?msg=${tk.id}`); } catch { /* */ } }
@@ -435,10 +444,14 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
     const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // agent sender → avatar and name are clickable to open the profile panel
     return (
     <div className="msg" key={m.id}>
-      {ag ? <span className="msg-av clickable" onClick={() => onOpenProfile(m.senderId!)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={32} /></span> : <Avatar seed={m.senderName} url={senderAvatar(m)} size={32} />}
+      {ag ? <span className="msg-av clickable" onClick={() => onOpenProfile("agent", m.senderId!)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={32} /></span>
+        : m.senderId ? <span className="msg-av clickable" onClick={() => onOpenProfile("human", m.senderId!)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={32} /></span>
+        : <Avatar seed={m.senderName} url={senderAvatar(m)} size={32} />}
       {/* content column reuses .msg-col (flex:1;min-width:0) like the main chat — without it a flex child defaults to min-width:auto and a long unbreakable token blows the message past this narrow thread panel */}
       <div className="msg-col">
-        <div>{ag ? <span className="who clickable" onClick={() => onOpenProfile(m.senderId!)}>{m.senderName}</span> : <span className="who">{m.senderName}</span>}<span className="ts">{fmtTime(m.createdAt)}</span></div>
+        <div>{ag ? <span className="who clickable" onClick={() => onOpenProfile("agent", m.senderId!)}>{m.senderName}</span>
+          : m.senderId ? <span className="who clickable" onClick={() => onOpenProfile("human", m.senderId!)}>{m.senderName}</span>
+          : <span className="who">{m.senderName}</span>}<span className="ts">{fmtTime(m.createdAt)}</span></div>
         {!!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
         {!!m.attachments?.length && <div className="msg-atts">{m.attachments.map((a) => <AttCard key={a.id} a={a} url={attachmentUrl(a.id)} />)}</div>}
         <Reactions m={m} mine={me?.id ?? ""} onReact={(emoji, remove) => react(m.id, emoji, remove)} />

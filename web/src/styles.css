@@ -622,7 +622,8 @@ aside.traj-col .scroll{padding:0;margin:0 -20px;padding:0 20px}
   .mobile-burger{display:inline-flex;align-items:center;justify-content:center;position:fixed;top:9px;left:9px;z-index:64;width:38px;height:38px;border:1px solid var(--hair-strong);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer}
   .head{padding-left:54px}  /* make room for hamburger */
   /* thread/profile right panel → fullscreen overlay */
-  .thread-panel{position:fixed;inset:0;z-index:70;width:100%}
+  .thread-panel,.traj-col.profile-mode{position:fixed;inset:0;z-index:70;width:100%}  /* a profile opened in the right column gets the same fullscreen treatment as a thread (otherwise .traj-col is display:none below and the profile would be invisible on mobile) */
+  .traj-col.profile-mode{display:block;overflow:auto}
   .traj-col{display:none}  /* agent trajectory sidebar: no horizontal space on mobile, hidden (otherwise pushed into implicit grid row and squashes main chat) */
   .resizer{display:none}
   /* Modal → full-width bottom sheet */
