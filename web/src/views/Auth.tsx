@@ -3,11 +3,22 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-// On successful login/register: persist token, clear dev user, and redirect to target (defaults to root → RootRedirect to own workspace).
+// On successful login/register: persist token, clear dev user, and redirect to target. The caller resolves the
+// user's workspace (see workspaceHome); "/" is only a defensive fallback (it renders the marketing Landing, NOT a redirect).
 function finishAuth(token: string, to = "/") {
   localStorage.setItem("open-tag.token", token);
   localStorage.removeItem("open-tag.devuser"); // clear dev user so dev-login doesn't override the real account
   window.location.assign(to);
+}
+
+// Where to land after auth: the user's first workspace, resolved from the SAME source bootstrap uses
+// (GET /api/servers → serverList[0]) so the target always matches RootRedirect. Falls back to "/" if none.
+async function workspaceHome(token: string): Promise<string> {
+  try {
+    const servers = await (await fetch("/api/servers", { headers: { authorization: "Bearer " + token } })).json();
+    const slug = Array.isArray(servers) ? servers[0]?.slug : null;
+    return slug ? `/s/${slug}/channel` : "/";
+  } catch { return "/"; }
 }
 
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
@@ -25,7 +36,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
       const r = await fetch(`/api/auth/${mode}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const d = await r.json();
       if (!r.ok || !d.token) throw new Error(d.error || t("auth.opFailed"));
-      finishAuth(d.token);
+      finishAuth(d.token, await workspaceHome(d.token));
     } catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
   return (

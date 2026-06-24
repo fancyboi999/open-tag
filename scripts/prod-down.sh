@@ -6,7 +6,7 @@ set -euo pipefail
 [ -f .env.prod ] || { echo "✗ no .env.prod in $(pwd)"; exit 1; }
 PORT=$(grep -E "^PORT=" .env.prod | head -1 | cut -d= -f2- || true); PORT="${PORT:-7788}"
 
-echo "→ stopping server listener on :$PORT…"
+echo "→ stopping server listener on :${PORT}…"
 lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true
 
 echo "→ stopping open-tag prod daemon…"
