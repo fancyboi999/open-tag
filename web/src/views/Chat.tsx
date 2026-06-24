@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent as RClipboardEvent, type DragEvent as RDragEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import { useStore, fmtTime, type Msg, type Att } from "../store.tsx";
 import { MessageContent } from "../messageRender.tsx";
-import { Smile, X, ExternalLink, CheckCircle2, MessageCircle, MoreHorizontal, ImagePlus, Paperclip, Send, Link2, Clipboard, Bookmark, CheckSquare, Circle, Play, Eye, Ban, ArrowDown, BellOff, Moon, Power, Lock, Globe, Archive, Trash2 } from "lucide-react";
+import { Smile, X, ExternalLink, CheckCircle2, MessageCircle, MoreHorizontal, Link2, Clipboard, Bookmark, CheckSquare, Circle, Play, Eye, Ban, ArrowDown, BellOff, Moon, Power, Lock, Globe, Archive, Trash2 } from "lucide-react";
 // Task badge per message row: icon changes with task status; color tokens from DESIGN.md (see .task-pill.st-* styles)
 const TASK_ICON: Record<string, typeof Circle> = { todo: Circle, in_progress: Play, in_review: Eye, done: CheckCircle2, closed: Ban };
 import { IconWrench, IconFile, IconExternalLink, IconDownload } from "../icons.tsx";
@@ -13,6 +13,7 @@ import { TaskBoard, ynOptions, ST_LABEL } from "../TaskBoard.tsx";
 import { AgentProfile, CreateAgentModal } from "./Members.tsx";
 import { ChatSidebar, CreateChannelModal } from "./ChatSidebar.tsx";
 import { AddComputerModal } from "./misc.tsx";
+import { Composer } from "./Composer.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 
 const fmtSize = (n?: number) => (!n ? "" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB");
@@ -131,19 +132,9 @@ export function Chat() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [traj, setTraj] = useState<{ name?: string; text: string; tool?: boolean }[]>([]);
   const [sub, setSub] = useState("");
-  const [asTask, setAsTask] = useState(false);
-  const [text, setText] = useState("");
-  const [atQuery, setAtQuery] = useState<string | null>(null); // @ mention autocomplete: null = hidden
-  const [atSel, setAtSel] = useState(0); // highlighted candidate index for ↑/↓ keyboard navigation in the @ menu
   const [showMembers, setShowMembers] = useState(false);
-  const [pendingAtts, setPendingAtts] = useState<any[]>([]); // attachments that have been uploaded and are queued to be sent with the next message
-  const [uploading, setUploading] = useState(false);
   const [thread, setThread] = useState<{ channelId: string; parent: Msg } | null>(null); // currently open thread panel
   const [threadMeta, setThreadMeta] = useState<Record<string, { threadChannelId: string; replyCount: number; unreadCount?: number }>>({}); // parent message id → thread metadata (reply count, unread count)
-  const atPosRef = useRef(0);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const imgRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true); // tracks whether the scroll position is at the bottom; new messages auto-scroll only when already at the bottom, preserving history browsing
   const [showJump, setShowJump] = useState(false); // when not at the bottom, show the "Back to bottom" jump button
@@ -176,7 +167,6 @@ export function Chat() {
   useEffect(() => { atBottomRef.current = true; setShowJump(false); }, [cur?.id]); // reset bottom-pin state on channel switch
   const toBottom = () => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; atBottomRef.current = true; setShowJump(false); };
   const onScroll = () => { const el = scrollRef.current; if (!el) return; const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120; atBottomRef.current = near; setShowJump(!near); };
-  useEffect(() => { const el = inputRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }, [text]); // composer textarea auto-grows up to 160px max height
   useEffect(() => { // scroll to and highlight the target message for 2s when msgParam is set
     if (!msgParam || chatTab !== "chat") return;
     const el = document.getElementById("m-" + msgParam);
@@ -191,29 +181,6 @@ export function Chat() {
     // eslint-disable-next-line
   }, [threadParam, msgs]);
 
-  const send = async (forceTask?: boolean) => {
-    const v = text.trim(); if ((!v && !pendingAtts.length) || !cur) return;
-    const t = forceTask ?? asTask; // ⌘/Ctrl+Shift+Enter forces the message to be sent as a task, independent of the checkbox state
-    setText(""); setAtQuery(null); setAsTask(false);
-    const ids = pendingAtts.filter((a) => a.status === "done" || !a.status).map((a) => a.id); setPendingAtts([]); // only include fully uploaded attachments
-    await api("POST", "/api/messages", { channelId: cur.id, content: v, asTask: t, attachmentIds: ids });
-  };
-  const onPickFiles = (e: ChangeEvent<HTMLInputElement>) => { if (e.target.files?.length) addFiles(Array.from(e.target.files)); e.target.value = ""; };
-  // Upload with progress state: each file is first pushed as a placeholder (images get a localUrl preview + "uploading" status) → uploadOne updates progress in real time → on success, the placeholder is replaced with the real attachment (thumbnail + checkmark); on failure, status is set to "error". Paste accepts only images; drag-and-drop accepts all file types.
-  const addFiles = async (files: FileList | File[]) => {
-    const arr = Array.from(files); if (!arr.length || !cur) return;
-    for (const f of arr) {
-      const tmpId = "tmp-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
-      const localUrl = f.type.startsWith("image/") ? URL.createObjectURL(f) : "";
-      setPendingAtts((p) => [...p, { id: tmpId, filename: f.name, mimeType: f.type, localUrl, status: "uploading", progress: 0 }]);
-      try {
-        const att = await uploadOne(cur.id, f, (pct) => setPendingAtts((p) => p.map((x) => (x.id === tmpId ? { ...x, progress: pct } : x))));
-        setPendingAtts((p) => p.map((x) => (x.id === tmpId ? { ...x, ...att, localUrl, status: "done", progress: 100 } : x)));
-      } catch { setPendingAtts((p) => p.map((x) => (x.id === tmpId ? { ...x, status: "error" } : x))); }
-    }
-  };
-  const onPaste = (e: RClipboardEvent) => { const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith("image/")).map((f, i) => new File([f], `pasted-${Date.now()}${i ? "-" + i : ""}.${f.type.split("/")[1] || "png"}`, { type: f.type })); if (imgs.length) { e.preventDefault(); addFiles(imgs); } };
-  const onDrop = (e: RDragEvent) => { const fs = Array.from(e.dataTransfer?.files ?? []); if (fs.length) { e.preventDefault(); addFiles(fs); } };
   const setTab = (t: string) => { const n = new URLSearchParams(sp); if (t === "chat") n.delete("chatTab"); else n.set("chatTab", t); setSp(n, { replace: true }); };
   const doDM = async (agentId: string) => { const id = await openDM("agent", agentId); if (id) nav(`/s/${slug}/channel/${id}`); }; // used by AgentProfile onMessage callback
   const startThread = async (m: Msg) => { if (!cur) return; const tid = threadMeta[m.id]?.threadChannelId || await openThread(cur.id, m.id); if (tid) { setThread({ channelId: tid, parent: m }); setThreadMeta((tm) => (tm[m.id] ? { ...tm, [m.id]: { ...tm[m.id]!, unreadCount: 0 } } : tm)); markRead(tid); } }; // opening a thread clears the unread count optimistically and marks the thread channel as read
@@ -235,25 +202,6 @@ export function Chat() {
     }
   };
 
-  // @ mention autocomplete: candidates are all workspace agents + humans (not just current channel members) —
-  // in a public channel, @-ing a non-member pulls them in (server-side auto-join), so suggesting them is intended.
-  const onInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    const v = e.target.value; setText(v);
-    const pos = e.target.selectionStart ?? v.length;
-    const m = /@([\p{L}\p{N}_-]*)$/u.exec(v.slice(0, pos)); // same Unicode character class as the messageRender side (\p{L}), supports CJK and diacritic names
-    if (m) { setAtQuery(m[1]); atPosRef.current = pos - m[0].length; } else setAtQuery(null);
-    setAtSel(0); // typing narrows the list → restart highlight at the top
-  };
-  const cands = atQuery === null ? [] : [
-    ...agents.map((a) => ({ name: a.name, label: a.displayName || a.name, kind: "agent", avatarUrl: a.avatarUrl })),
-    ...humans.map((h) => ({ name: h.name, label: h.displayName || h.name, kind: "human", avatarUrl: h.avatarUrl })),
-  ].filter((c) => c.name && c.name.toLowerCase().includes((atQuery || "").toLowerCase())).slice(0, 8);
-  const pick = (c: { name: string }) => {
-    const start = atPosRef.current;
-    const after = text.slice(start + 1 + (atQuery?.length ?? 0));
-    setText(text.slice(0, start) + "@" + c.name + " " + after);
-    setAtQuery(null); setTimeout(() => inputRef.current?.focus(), 0);
-  };
 
   return (
     <>
@@ -333,9 +281,12 @@ export function Chat() {
               })}
             </div>
             {showJump && <button className="jump-bottom" onClick={toBottom}><ArrowDown size={14} /> {t("chat.backToBottom")}</button>}
-            <div className="composer">
-              {isDm && dmAgent && (() => {
-                // Wake-state hint: sending a message to a sleeping agent causes the backend to wake it up (resuming the previous session), but the user should be informed; if the machine is offline the wake-up has no effect and the message is queued.
+            <Composer
+              channelId={cur?.id ?? ""}
+              placeholder={isDm ? t("chat.dmPlaceholder", { name: cur?.name }) : t("chat.channelPlaceholder")}
+              allowAsTask
+              topSlot={isDm && dmAgent ? (() => {
+                // Wake-state hint: messaging a sleeping agent wakes it (backend resumes the prior session); if its machine is offline the wake-up is a no-op and the message is queued.
                 const mc = machines.find((m) => m.id === dmAgent.machineId);
                 const offline = !dmAgent.machineId || mc?.status !== "online";
                 const st = dmAgent.activity || dmAgent.status;
@@ -343,61 +294,8 @@ export function Chat() {
                 if (offline) return <div className="wake-hint wh-off"><Power size={13} /> {t("chat.machineOffline", { name: nm })}</div>;
                 if (st === "sleeping" || st === "inactive" || st === "offline") return <div className="wake-hint"><Moon size={13} /> {t("chat.agentSleeping", { name: nm })}</div>;
                 return null;
-              })()}
-              {atQuery !== null && cands.length > 0 && (
-                <div className="mention-menu">
-                  {cands.map((c, i) => (
-                    <button key={c.kind + c.name} className={"mention-opt" + (i === atSel ? " sel" : "")} aria-selected={i === atSel}
-                      onMouseEnter={() => setAtSel(i)} onMouseDown={(e) => { e.preventDefault(); pick(c); }}>
-                      <Avatar seed={c.name} url={avFor(c.avatarUrl)} size={22} />
-                      <span className="grow">{c.label} <span className="mk-name">@{c.name}</span></span>
-                      <span className="mk">{c.kind === "agent" ? "agent" : t("chat.memberKind")}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {pendingAtts.length > 0 && <div className="pending-atts">{pendingAtts.map((a) => {
-                const img = isImage(a.mimeType);
-                const src = a.localUrl || (a.status !== "uploading" ? attachmentUrl(a.id) : "");
-                return <span key={a.id} className={"patt" + (img ? " patt-img" : "") + (a.status ? " st-" + a.status : "")} title={a.filename}>
-                  {img && src ? <img src={src} alt={a.filename} /> : <><IconFile size={13} />{!img && a.filename}</>}
-                  {a.status === "uploading" && <span className="patt-prog" style={{ ["--pct" as string]: (a.progress || 0) + "%" } as React.CSSProperties}>{a.progress || 0}%</span>}
-                  {a.status === "done" && <span className="patt-ok"><CheckCircle2 size={13} /></span>}
-                  {a.status === "error" && <span className="patt-err">!</span>}
-                  <button onClick={() => setPendingAtts((p) => p.filter((x) => x.id !== a.id))}>×</button>
-                </span>;
-              })}</div>}
-              <input type="file" ref={imgRef} accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
-              <input type="file" ref={fileRef} multiple style={{ display: "none" }} onChange={onPickFiles} />
-              <div className="composer-box" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
-                <textarea className="composer-input" ref={inputRef} rows={1} value={text} onChange={onInput} onPaste={onPaste}
-                  placeholder={asTask ? t("chat.taskPlaceholder") : isDm ? t("chat.dmPlaceholder", { name: cur?.name }) : t("chat.channelPlaceholder")}
-                  onKeyDown={(e) => {
-                    if (e.nativeEvent.isComposing) return; // IME composition in progress (CJK input): Enter is for candidate selection, not send
-                    if (atQuery !== null && cands.length) { // @ menu open: ↑/↓ move the highlight, Enter/Tab pick it, Esc closes
-                      if (e.key === "ArrowDown") { e.preventDefault(); setAtSel((i) => Math.min(i + 1, cands.length - 1)); return; }
-                      if (e.key === "ArrowUp") { e.preventDefault(); setAtSel((i) => Math.max(i - 1, 0)); return; }
-                      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(cands[Math.min(atSel, cands.length - 1)]!); return; }
-                      if (e.key === "Escape") { e.preventDefault(); setAtQuery(null); return; }
-                    }
-                    if (e.key === "Enter") {
-                      if ((e.metaKey || e.ctrlKey) && e.shiftKey) { e.preventDefault(); send(true); return; } // ⌘/Ctrl+Shift+Enter sends as a task
-                      if (e.shiftKey) return; // Shift+Enter inserts a line break
-                      e.preventDefault(); send(); // Enter sends
-                    }
-                  }} />
-                <div className="composer-bar">
-                  <div className="cb-left">
-                    <button className="cb-icon" title={t("chat.uploadImage")} disabled={uploading} onClick={() => imgRef.current?.click()}><ImagePlus size={16} /></button>
-                    <button className="cb-icon" title={t("chat.uploadFile")} disabled={uploading} onClick={() => fileRef.current?.click()}><Paperclip size={16} /></button>
-                  </div>
-                  <div className="cb-right">
-                    <label className={"astask" + (asTask ? " on" : "")} title={t("chat.sendAsTaskTitle")}><input type="checkbox" checked={asTask} onChange={(e) => setAsTask(e.target.checked)} />{t("chat.asTask")}</label>
-                    <button className="send-btn" title={t("chat.sendTitle")} disabled={!text.trim() && !pendingAtts.length} onClick={() => send()}><Send size={15} /></button>
-                  </div>
-                </div>
-              </div>
-            </div>
+              })() : null}
+            />
           </>}
       </main>
       {thread
@@ -527,17 +425,13 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
     if (type === "task") { try { const r = await api("GET", "/api/tasks/server"); const tk = (r?.tasks ?? r ?? []).find((x: any) => x.taskNumber === Number(args[0])); if (tk) nav(`/s/${slug}/channel/${tk.channelId}?msg=${tk.id}`); } catch { /* */ } }
   };
   const [msgs, setMsgs] = useState<Msg[]>([]);
-  const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const taRef = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }, [text]); // thread reply textarea auto-grows
   useEffect(() => { subscribeChannel(channelId); (async () => { const d = await api("GET", `/api/messages/channel/${channelId}?limit=200`); setMsgs(d.messages || []); })(); }, [channelId]); // join the thread room so replies arrive live (openThread/startThread do not make the socket a room member on their own)
   useEffect(() => onEvent((e) => {
     if (e.type === "message" && e.channelId === channelId) setMsgs((m) => [...m, e.message]);
     else if (e.type === "message:updated" && e.message?.channelId === channelId) setMsgs((m) => m.map((x) => (x.id === e.message.id ? { ...x, ...e.message } : x)));
   }), [channelId]);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [msgs]);
-  const send = async () => { const v = text.trim(); if (!v) return; setText(""); await api("POST", "/api/messages", { channelId, content: v }); };
   const row = (m: Msg) => {
     if (m.senderType === "system") return <div className="msg-sys" id={"m-" + m.id} key={m.id}>{m.content}</div>; // system messages render as a banner with no avatar
     const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // agent sender → avatar and name are clickable to open the profile panel
@@ -566,16 +460,7 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
         <div className="thread-sep">{t("chat.replyCount", { count: msgs.length })}</div>
         {msgs.map(row)}
       </div>
-      <div className="composer thread-composer">
-        <div className="composer-box">
-          <textarea className="composer-input" ref={taRef} rows={1} value={text} onChange={(e) => setText(e.target.value)} placeholder={t("chat.threadReplyPlaceholder")}
-            onKeyDown={(e) => { if (e.nativeEvent.isComposing) return; if (e.key === "Enter") { if (e.shiftKey) return; e.preventDefault(); send(); } }} />
-          <div className="composer-bar">
-            <span className="grow" />
-            <button className="send-btn" title={t("chat.sendTitle")} disabled={!text.trim()} onClick={send}><Send size={15} /></button>
-          </div>
-        </div>
-      </div>
+      <Composer channelId={channelId} placeholder={t("chat.threadReplyPlaceholder")} className="thread-composer" />
     </aside>
   );
 }
