@@ -53,3 +53,21 @@ test("membersToAutoJoin stays consistent with parseMentions (no matching drift)"
   const toAdd = membersToAutoJoin(content, workspace, [alice]);
   assert.deepEqual(names(toAdd), names(recorded)); // none are current members → all referenced get added
 });
+
+// The `pool` argument is the @-reach of the space (mentionAutoJoinPool): the whole workspace for a public
+// channel / a thread under a public channel, but only the *current members* for private / DM channels and the
+// threads under them. These two tests pin the security boundary of the thread @-wake fix: a public thread pulls
+// any teammate in, a private/DM space never pulls an outsider in (no leak).
+test("public space (channel or thread under a public channel) auto-joins any @-ed teammate", () => {
+  // pool = whole workspace → a teammate who never spoke in the thread is still pulled in + woken
+  const toAdd = membersToAutoJoin("@ghost can you take this thread?", workspace, [alice]);
+  assert.deepEqual(names(toAdd), ["ghost"]);
+});
+
+test("members-only space (private / DM, and threads under them) never pulls in an outsider", () => {
+  // pool = current members only [alice, bob] → @ghost (outside the space) resolves to nobody, so a private
+  // thread can't leak by @-mentioning a non-member; bob is already in, so he's not re-added either.
+  const membersOnly = [alice, bob];
+  const toAdd = membersToAutoJoin("@ghost get in here, @bob you too", membersOnly, [alice, bob]);
+  assert.deepEqual(names(toAdd), []);
+});

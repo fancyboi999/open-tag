@@ -94,10 +94,26 @@ export function membersToAutoJoin(content: string, workspace: Member[], current:
   return parseMentions(content, workspace).filter((r) => !have.has(r.type + ":" + r.id));
 }
 
-/** Add @-mentioned workspace non-members to a channel (caller gates on channel type); returns those added.
- *  Idempotent via onConflictDoNothing; broadcasts a membership update so every client refreshes. */
-async function autoJoinMentioned(serverId: string, channelId: string, content: string, current: Member[]): Promise<Member[]> {
-  const toAdd = membersToAutoJoin(content, await workspaceMembers(serverId), current);
+/** The member set an @-mention in this channel may pull in (auto-join) — who already has access to the space,
+ *  so adding them leaks nothing. A thread inherits its PARENT channel's reach, the same parent-channel
+ *  inheritance `canReadChannel` (socketio.ts) uses for read access: a public channel's thread reaches the
+ *  whole workspace, a private channel's thread only its parent's members, a DM's thread only the two parties.
+ *  A top-level public `channel` reaches the workspace; `private`/`dm` reach only their current members, so an
+ *  @ to a non-member there stays a no-op (unchanged behaviour). */
+async function mentionAutoJoinPool(serverId: string, ch: typeof schema.channels.$inferSelect): Promise<Member[]> {
+  let target = ch;
+  if (ch.type === "thread" && ch.parentMessageId) {
+    const parent = (await db.select().from(schema.messages).where(eq(schema.messages.id, ch.parentMessageId)))[0];
+    const pch = parent ? (await db.select().from(schema.channels).where(eq(schema.channels.id, parent.channelId)))[0] : undefined;
+    if (pch) target = pch; // depth 1: a parent channel is never itself a thread
+  }
+  return target.type === "channel" ? await workspaceMembers(serverId) : await channelMembers(target.id);
+}
+
+/** Add @-mentioned non-members to a channel, drawn from `pool` (its @-reach — see mentionAutoJoinPool); returns
+ *  those added. Idempotent via onConflictDoNothing; broadcasts a membership update so every client refreshes. */
+async function autoJoinMentioned(serverId: string, channelId: string, content: string, current: Member[], pool: Member[]): Promise<Member[]> {
+  const toAdd = membersToAutoJoin(content, pool, current);
   if (!toAdd.length) return [];
   await db.insert(schema.channelMembers).values(toAdd.map((m) => ({ channelId, memberType: m.type, memberId: m.id }))).onConflictDoNothing();
   await publish(serverId, { type: "channel:members-updated", channelId });
@@ -276,13 +292,13 @@ export async function createMessage(opts: {
   }
 
   let members = await channelMembers(opts.channelId);
-  // Slack-style mention auto-join: @-mentioning a workspace member who isn't in this channel pulls them in,
-  // so the mention is recorded + delivered (wake / inbox) instead of being silently dropped. Scoped to public
-  // `channel` only — private/dm/thread are intentionally excluded: auto-adding to a private channel would leak
-  // member-only history (see channel-list visibility in routes-api), and a DM is a fixed two-party conversation.
-  // In those, an @ to a non-member stays a no-op, exactly as before.
-  if (ch?.type === "channel" && opts.senderType !== "system") {
-    const joined = await autoJoinMentioned(opts.serverId, opts.channelId, opts.content, members);
+  // Slack-style mention auto-join: @-mentioning someone who isn't in this channel yet pulls them in, so the
+  // mention is recorded + delivered (wake / inbox) instead of being silently dropped. A thread inherits its
+  // parent channel's @-reach (mentionAutoJoinPool — the same parent-channel inheritance canReadChannel uses),
+  // so @-ing a teammate who hasn't replied in the thread yet still wakes them. Public channel → whole
+  // workspace; private/dm (and their threads) → existing members only, so an @ to a non-member stays a no-op.
+  if (ch && opts.senderType !== "system" && opts.content.includes("@")) {
+    const joined = await autoJoinMentioned(opts.serverId, opts.channelId, opts.content, members, await mentionAutoJoinPool(opts.serverId, ch));
     if (joined.length) members = [...members, ...joined];
   }
   const mentions = parseMentions(opts.content, members);
