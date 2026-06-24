@@ -212,16 +212,31 @@ git commit -m "feat(seed): seed:dev — idempotent claude/sonnet dev-bot fixture
 
 ---
 
-## Task 3: wt:add / wt:rm per-worktree data-dir isolation + teardown
+## Task 3: wt:add / wt:rm — PR-clean base + per-worktree data-dir isolation + teardown
 
 **Files:**
-- Modify: `scripts/wt-add.sh` (the `.env` heredoc)
+- Modify: `scripts/wt-add.sh` (branch base + the `.env` heredoc)
 - Modify: `scripts/wt-rm.sh` (teardown)
 
 **Interfaces:**
-- Produces: each worktree `.env` now carries `OPEN_TAG_HOME=$HOME/.open-tag-<safe>` and `ALLOW_DEV_LOGIN=true`; `wt:rm` removes that data dir and drops the DB.
+- Produces: `wt:add` branches each new worktree from the latest `origin/main` (not the current HEAD), so PR diffs never inherit whatever branch you happened to be on; each worktree `.env` carries `OPEN_TAG_HOME=$HOME/.open-tag-<safe>` and `ALLOW_DEV_LOGIN=true`; `wt:rm` removes that data dir and drops the DB.
 
-- [ ] **Step 1: Extend the `wt-add.sh` `.env` heredoc**
+- [ ] **Step 1: Branch from `origin/main`, not the current HEAD (PR-clean base)**
+
+`wt-add.sh` currently runs `git worktree add "$WT" -b "feature/$NAME"` with **no base**, so the
+worktree branches from whatever HEAD you're on (e.g. `feat/docker-control-plane`), and any PR
+made from it would inherit that branch's content. Fetch and branch from the canonical main
+instead (with an opt-out for the rare "stack on current branch" case):
+
+```bash
+# replace:  git worktree add "$WT" -b "feature/$NAME"
+BASE="${WT_BASE:-origin/main}"
+git fetch origin main --quiet
+git worktree add "$WT" -b "feature/$NAME" "$BASE"
+echo "  (branched from $BASE — set WT_BASE=HEAD to stack on the current branch instead)"
+```
+
+- [ ] **Step 2: Extend the `wt-add.sh` `.env` heredoc**
 
 Add two lines to the generated `.env` (after `DAEMON_BOOTSTRAP_KEY=poc-secret-key`):
 ```bash
@@ -230,7 +245,7 @@ ALLOW_DEV_LOGIN=true
 ```
 (`$SAFE` is already computed in the script as the sanitized name.)
 
-- [ ] **Step 2: Extend `wt-rm.sh` teardown**
+- [ ] **Step 3: Extend `wt-rm.sh` teardown**
 
 After `git worktree remove "$WT" --force`, add (replacing the "kept / to clean up" notice with real cleanup):
 ```bash
@@ -240,17 +255,18 @@ docker compose exec -T postgres dropdb -U opentag "opentag_$SAFE" 2>/dev/null &&
 echo "  branch feature/$NAME kept — remove with: git branch -D feature/$NAME"
 ```
 
-- [ ] **Step 3: Verify**
+- [ ] **Step 4: Verify**
 
 ```bash
 npm run wt:add -- e2etmp
+git -C ../open-tag-e2etmp merge-base --is-ancestor origin/main HEAD && echo "branched from origin/main ✓"  # base is current main
 grep -E "OPEN_TAG_HOME|ALLOW_DEV_LOGIN" ../open-tag-e2etmp/.env   # both present
 npm run wt:rm -- e2etmp                                            # removes worktree + data dir + db
 ls -d ~/.open-tag-e2etmp 2>/dev/null || echo "data dir gone ✓"
 ```
-Expected: `.env` has both lines; after `wt:rm`, the worktree, `~/.open-tag-e2etmp`, and `opentag_e2etmp` are gone.
+Expected: worktree branched from `origin/main`; `.env` has both lines; after `wt:rm`, the worktree, `~/.open-tag-e2etmp`, and `opentag_e2etmp` are gone.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add scripts/wt-add.sh scripts/wt-rm.sh

@@ -65,8 +65,12 @@ points already load `.env`, so setting `OPEN_TAG_HOME` in a worktree `.env` is s
 
 ### Component 2 — wt:add / wt:rm extension
 
-- `wt-add.sh`: add `OPEN_TAG_HOME=$HOME/.open-tag-<name>` and `ALLOW_DEV_LOGIN=true` to the
-  generated `.env`. Now each worktree is fully isolated: DB + ports + redis + **data dir**.
+- `wt-add.sh`: **branch from the latest `origin/main`, not the current HEAD.** Today it runs
+  `git worktree add -b feature/<name>` with no base, so a worktree inherits whatever branch
+  you're on (e.g. `feat/docker-control-plane`) and any PR from it would carry that branch's
+  content. Fetch + branch from `origin/main` (env `WT_BASE` opt-out for stacking).
+- `wt-add.sh`: also add `OPEN_TAG_HOME=$HOME/.open-tag-<name>` and `ALLOW_DEV_LOGIN=true` to
+  the generated `.env`. Now each worktree is fully isolated: DB + ports + redis + **data dir**.
 - `wt-rm.sh`: on removal, also `rm -rf $HOME/.open-tag-<name>` and drop the `opentag_<name>`
   database (verify current wt-rm behavior and extend as needed). No orphans.
 
