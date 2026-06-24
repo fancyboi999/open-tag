@@ -407,9 +407,11 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
   useEffect(() => { (async () => { try { const d = await api("GET", `/api/servers/${serverId}/machines/${machineId || "none"}/runtime-models/${runtime}`); const ms = d.models || []; setModels(ms); setModel(ms[0]?.id || ""); } catch { setModels([]); } })(); }, [runtime, machineId]);
   const create = async () => {
-    if (!name.trim()) { setErr(t("members.nameRequired")); return; }
+    const nm = name.trim();
+    if (!nm) { setErr(t("members.nameRequired")); return; }
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(nm)) { setErr(t("members.nameInvalid")); return; } // @mention handle must be machine-safe; see server core.invalidAgentName
     setBusy(true); setErr("");
-    try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: name.trim(), description: desc.trim() || null, runtime, model: model || null, reasoning: runtime === "codex" ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) onCreated?.({ id: r.id, name: r.name ?? name.trim() }); onClose(); }
+    try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model || null, reasoning: runtime === "codex" ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) onCreated?.({ id: r.id, name: r.name ?? nm }); onClose(); }
     catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
   const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "gemini", label: "Gemini" }, { value: "opencode", label: "OpenCode" }];

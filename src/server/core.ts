@@ -19,6 +19,14 @@ export const MAX_DESCRIPTION = 3000;
 export const DESC_TOO_LONG = `Description must be at most ${MAX_DESCRIPTION} characters`;
 export const descTooLong = (s: unknown): boolean => typeof s === "string" && s.length > MAX_DESCRIPTION;
 
+// Agent name is the @mention handle: used directly as @<name> (parseMentions re, CLI, web) and as the
+// dm:@<name> lookup key (resolveTarget). It must be a machine-safe identifier — spaces / punctuation /
+// emoji / leading digits break mention parsing and DM target resolution. Display-friendly text (Chinese,
+// spaces, emoji) belongs in displayName, which is unconstrained and drives all human-facing rendering.
+export const AGENT_NAME_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
+export const INVALID_AGENT_NAME = "Agent name must start with a letter and can only contain letters, numbers, hyphens, and underscores";
+export const invalidAgentName = (s: unknown): boolean => typeof s !== "string" || !AGENT_NAME_RE.test(s);
+
 /** Create a workspace (server/community): create server + creator as owner + default #all channel + add owner to channel. Shared by dev-login / POST /api/servers / seed. */
 export async function createServer(name: string, slug: string, ownerId: string) {
   const [srv] = await db.insert(schema.servers).values({ name, slug, ownerId, plan: "free" }).returning();

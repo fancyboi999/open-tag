@@ -108,6 +108,7 @@
     "workspaceEmpty": "Workspace is empty",
     "workspaceHint": "Click a file on the left to view its contents",
     "nameRequired": "Name is required",
+    "nameInvalid": "Name must start with a letter and can only contain letters, numbers, hyphens, and underscores",
     "machineOnline": "online",
     "machineOffline": "offline",
     "createAgentTitle": "Create Agent",

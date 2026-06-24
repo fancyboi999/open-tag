@@ -4,7 +4,7 @@ import { and, eq, gt, ne, or, inArray, asc, desc, count, isNotNull, isNull, ilik
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, serverIdHeader } from "./util.js";
 import { verifyUser, signUser, hashPassword, verifyPassword, newKey, hashToken } from "./auth.js";
-import { createMessage, getOrCreateDM, getOrCreateThread, convertMessageToTask, claimTask, unclaimTask, setTaskStatus, deleteTask, TASK_STATUSES, startAgent, stopAgent, resetAgent, syncAgentProfile, addReaction, removeReaction, aggregateReactions, saveMessage, unsaveMessage, checkSaved, listSaved, descTooLong, DESC_TOO_LONG, createServer } from "./core.js";
+import { createMessage, getOrCreateDM, getOrCreateThread, convertMessageToTask, claimTask, unclaimTask, setTaskStatus, deleteTask, TASK_STATUSES, startAgent, stopAgent, resetAgent, syncAgentProfile, addReaction, removeReaction, aggregateReactions, saveMessage, unsaveMessage, checkSaved, listSaved, descTooLong, DESC_TOO_LONG, invalidAgentName, INVALID_AGENT_NAME, createServer } from "./core.js";
 import { publish } from "./realtime.js";
 import { requestDaemon } from "./daemonHub.js";
 import { parseUpload } from "./attachments.js";
@@ -190,6 +190,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
     const b = await readJson(req);
     if (!b.name) return (sendErr(res, 400, "name required"), true);
+    if (invalidAgentName(b.name)) return (sendErr(res, 400, INVALID_AGENT_NAME), true);
     if (descTooLong(b.description)) return (sendErr(res, 400, DESC_TOO_LONG), true);
     const [agent] = await db.insert(schema.agents).values({
       serverId, name: b.name, displayName: b.displayName || b.name, description: b.description ?? null,
