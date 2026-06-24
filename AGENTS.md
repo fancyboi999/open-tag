@@ -171,9 +171,11 @@ Three separate auth planes — do not conflate them (`src/server/auth.ts`):
 
 Human-auth env flags (`.env` / `.env.prod`):
 - `ALLOW_DEV_LOGIN` — when `true`, `POST /api/auth/dev-login` mints a username→JWT with no
-  password. **Development only; leave unset in production** (the endpoint 404s when off). The
-  frontend never silently falls back to dev-login; an anonymous visitor to `/s/*` is redirected
-  to `/login` by the route guard in `web/src/main.tsx`.
+  password. **Development only; leave unset in production** (the endpoint 404s when off). Defense in
+  depth: `NODE_ENV=production` (set by the Dockerfile runtime stage) force-disables dev-login even if
+  the flag is mistakenly set, so the env flag is not the only line of defense. The frontend never
+  silently falls back to dev-login; an anonymous visitor to `/s/*` is redirected to `/login` by the
+  route guard in `web/src/main.tsx`.
 - `ADMIN_SETUP_TOKEN` — one-time first-deploy admin bootstrap. The seeded owner has no password,
   so after `npm run seed` set this to a long random value and call once:
   `curl -X POST $URL/api/auth/setup -d '{"token":"<token>","email":"admin@you","password":"<≥8>"}'`.
