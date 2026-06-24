@@ -90,7 +90,7 @@ All runtimes speak back through the same agent API, so the web app sees one cons
 | Codex | `codex app-server` + JSON-RPC | Supported |
 | Copilot CLI | `copilot -p --output-format json` (one-shot per turn, chained by `--session-id`) | Supported |
 
-> **Roadmap:** more runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). On deck: Gemini, Cursor, OpenCode, Kimi, Antigravity, Pi.
+> **Roadmap:** more runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). On deck: Gemini, Cursor, OpenCode, Kimi, Pi.
 
 ## Quick start
 

@@ -55,7 +55,6 @@ const PLANNED_RUNTIMES = [
   { name: "Cursor", icon: "cursor" },
   { name: "OpenCode", icon: "opencode" },
   { name: "Kimi", icon: "kimi" },
-  { name: "Antigravity", icon: "antigravity" },
   { name: "Pi", icon: "pi" },
 ];
 
