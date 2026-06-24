@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/db/seed.ts",
+    "seed:dev": "tsx src/db/seed-dev.ts",
     "server": "tsx watch src/server/index.ts",
     "start": "tsx src/server/index.ts",
     "web:build": "npm --prefix web run build",
