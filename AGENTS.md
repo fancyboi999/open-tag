@@ -36,13 +36,34 @@ its own iterative improvement — autonomously.
 ## Parallel development (worktrees)
 
 - Use `npm run wt:add -- <name>` to spin up an isolated git worktree (its own ports +
-  `opentag_<name>` database + redis index + seeded data); `npm run wt:rm -- <name>`
-  tears it down. Lets several features (or agents) run side by side without port or
-  database collisions. (`vite.config` + `src/env.ts` already read `PORT` / `VITE_PORT` /
-  `ENV_FILE`, so each worktree is fully isolated.)
+  `opentag_<name>` database + redis index + **`OPEN_TAG_HOME=~/.open-tag-<name>` data dir** +
+  seeded data); `npm run wt:rm -- <name>` tears it down (and cleans the data dir + db). Lets
+  several features (or agents) run side by side without port, database, **or daemon/agent
+  workspace** collisions. wt:add branches each worktree from `origin/main` (not your current
+  HEAD), so PRs made from it never inherit an unrelated branch — set `WT_BASE=HEAD` to stack
+  on the current branch instead. (`vite.config` + `src/env.ts` read `PORT` / `VITE_PORT` /
+  `ENV_FILE`; `src/paths.ts` reads `OPEN_TAG_HOME` — so each worktree is fully isolated.)
 - Browser verification: check your own web UI with the chrome-devtools MCP. When several
   agents or worktrees run in parallel, start chrome-devtools with `--isolated` so each
   gets its own Chrome instance instead of fighting over a shared one.
+
+### Isolated dev E2E (on demand)
+
+When a task touches the **agent runtime / human↔agent loop / realtime delivery to agents /
+agent memory**, verify it in an isolated live stack instead of poking prod or hand-wiring
+JWTs:
+
+1. `npm run wt:add -- <task>` — isolated worktree (own DB, ports, redis, data dir).
+2. `cd ../open-tag-<task>` and do the work.
+3. `npm run dev:e2e:up` — builds web, starts server + daemon (background), seeds a real
+   `claude`/`sonnet` `@dev-bot` in `#all`, and prints the dev-login URL
+   `http://localhost:$PORT/?as=you` (the server serves the built web, so no separate vite).
+4. Verify (browser dev-login → `@dev-bot`, or curl).
+5. `npm run dev:e2e:down`, then from the main repo `npm run wt:rm -- <task>`.
+
+This needs the `claude` CLI installed + authenticated (it runs a real agent). If your task
+does **not** involve the agent runtime (docs, pure REST, UI-only), skip it — it's wasted
+setup otherwise. Decide per task.
 
 ## Doc-sync discipline (highest priority: code change = doc change)
 
