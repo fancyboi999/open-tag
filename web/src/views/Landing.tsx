@@ -39,13 +39,23 @@ const CAPS = [
   { icon: Moon, title: "Idle-sleep, full resume", text: "Idle agents are killed to save money. On the next message they resume the same session with context intact." },
   { icon: BookMarked, title: "Private agent memory", text: "Every agent keeps its own MEMORY.md, building durable knowledge of your codebase and decisions across sessions." },
   { icon: Inbox, title: "Unified inbox", text: "Unread messages and mentions across every channel, thread, and DM aggregated into one place to triage." },
-  { icon: Boxes, title: "Pluggable engines", text: "Run claude and codex side by side. Every agent speaks one protocol, so you pick the right engine per teammate." },
+  { icon: Boxes, title: "Pluggable engines", text: "Run claude, codex, copilot, and opencode side by side — with more runtimes landing one at a time. Every agent speaks one protocol, so you pick the right engine per teammate." },
 ];
 
 const ENGINES = [
-  { name: "claude", desc: "Anthropic's CLI, driven over streaming JSON for live thinking and tool calls.", tag: null },
-  { name: "codex", desc: "OpenAI's app-server, driven over JSON-RPC turns.", tag: null },
+  { name: "claude", icon: "claude", desc: "Anthropic's CLI, driven over streaming JSON for live thinking and tool calls.", tag: null },
+  { name: "codex", icon: "codex", desc: "OpenAI's app-server, driven over JSON-RPC turns.", tag: null },
+  { name: "copilot", icon: "copilot", desc: "GitHub Copilot CLI — one-shot turns chained by session id, prompt injected via AGENTS.md.", tag: null },
+  { name: "opencode", icon: "opencode", desc: "OpenCode — one-shot runs over JSON events, resumed by session id; any model via its provider config.", tag: null },
+  { name: "kimi", icon: "kimi", desc: "Kimi Code — one-shot stream-json turns, resumed by session id; provider configured in ~/.kimi-code/config.toml.", tag: null },
+  { name: "pi", icon: "pi", desc: "Pi Coding Agent — one-shot JSON-event turns, resumed by session id; any provider/model from its own config.", tag: null },
+  { name: "cursor", icon: "cursor", desc: "Cursor Agent — one-shot Claude-style stream-json turns, resumed by session id; runs on your Cursor account.", tag: null },
 ];
+
+// Runtimes on the roadmap. We add them one at a time, each verified on real hardware before it ships
+// (see docs/MISSION.md). Empty for now — the listed runtimes are all implemented; the strip below is
+// hidden when this is empty rather than showing an empty "coming soon" header.
+const PLANNED_RUNTIMES: { name: string; icon: string }[] = [];
 
 export function Landing() {
   const { me, slug } = useStore();
@@ -274,11 +284,28 @@ export function Landing() {
             {ENGINES.map((e) => (
               <div className="lp-engine" key={e.name}>
                 {e.tag && <span className="lp-engine__tag">{e.tag}</span>}
-                <div className="lp-engine__name">{e.name}</div>
+                <div className="lp-engine__head">
+                  <img className="lp-engine__icon" src={`/agent-icons/${e.icon}.svg`} alt="" aria-hidden="true" width={24} height={24} loading="lazy" />
+                  <span className="lp-engine__name">{e.name}</span>
+                </div>
                 <p className="lp-engine__desc">{e.desc}</p>
               </div>
             ))}
           </div>
+          {PLANNED_RUNTIMES.length > 0 && (
+            <div className="lp-runtimes-more">
+              <span className="lp-runtimes-more__label">More runtimes, landing one at a time</span>
+              <ul className="lp-chips" aria-label="Planned runtimes">
+                {PLANNED_RUNTIMES.map((r) => (
+                  <li className="lp-chip" key={r.name}>
+                    <img className="lp-chip__icon" src={`/agent-icons/${r.icon}.svg`} alt="" aria-hidden="true" width={18} height={18} loading="lazy" />
+                    <span className="lp-chip__name">{r.name}</span>
+                    <span className="lp-chip__soon">soon</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </section>
 

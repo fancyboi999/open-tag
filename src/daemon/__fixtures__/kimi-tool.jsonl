@@ -1,0 +1,4 @@
+{"role":"assistant","tool_calls":[{"type":"function","id":"Bash_0","function":{"name":"Bash","arguments":"{\"command\":\"echo hi\"}"}}]}
+{"role":"tool","tool_call_id":"Bash_0","content":"hi\n"}
+{"role":"assistant","content":"Done."}
+{"role":"meta","type":"session.resume_hint","session_id":"session_95a5f994-f739-4ee6-b580-a34a783c3df3","command":"kimi -r session_95a5f994-f739-4ee6-b580-a34a783c3df3","content":"To resume this session: kimi -r session_95a5f994-f739-4ee6-b580-a34a783c3df3"}
