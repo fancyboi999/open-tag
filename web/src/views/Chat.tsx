@@ -114,7 +114,7 @@ function ActionCardMsg({ m }: { m: Msg }) {
 
 export function Chat() {
   const { t } = useTranslation();
-  const { api, channels, dms, unread, agents, humans, machines, slug, me, myRole, capabilities, reload, onEvent, openDM, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg } = useStore();
+  const { api, channels, dms, unread, agents, humans, machines, slug, me, myRole, capabilities, reload, onEvent, subscribeChannel, openDM, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg } = useStore();
   const confirm = useConfirm();
   const [chMenu, setChMenu] = useState(false);
   const manageServer = myRole === "owner" || myRole === "admin"; // server admins get the full task-status dropdown (matches TaskBoard permission model)
@@ -152,7 +152,7 @@ export function Chat() {
   const threadParam = sp.get("thread"); // auto-open a thread panel (from inbox, in-message thread link, or cross-page link); value is the parent message id (full or 8-char short) or channelId:shortid
 
   useEffect(() => { if (!channelId && cur) nav(`/s/${slug}/channel/${cur.id}`, { replace: true }); }, [channelId, cur, slug, nav]);
-  useEffect(() => { if (!cur) return; setThread(null); (async () => {
+  useEffect(() => { if (!cur) return; setThread(null); subscribeChannel(cur.id); (async () => { // join the room while viewing so message:new arrives live (covers public non-member channels + channels relevant after connect)
     const d = await api("GET", `/api/messages/channel/${cur.id}?limit=200`); const ms: Msg[] = d.messages || []; setMsgs(ms); setTraj([]); markRead(cur.id);
     const ids = ms.map((m) => m.id);
     if (ids.length) { try { setThreadMeta(await api("GET", `/api/channels/${cur.id}/threads?parentMessageIds=${ids.join(",")}`) || {}); } catch { setThreadMeta({}); } } else setThreadMeta({});
@@ -456,7 +456,7 @@ export function Chat() {
 // Thread panel: right-side overlay showing the parent message, its replies, and a reply composer.
 function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId: string; parent: Msg; onClose: () => void; onOpenProfile: (id: string) => void }) {
   const { t } = useTranslation();
-  const { api, onEvent, attachmentUrl, me, react, agents, humans, channels, slug } = useStore();
+  const { api, onEvent, subscribeChannel, attachmentUrl, me, react, agents, humans, channels, slug } = useStore();
   const nav = useNavigate();
   const navToken = async (type: string, args: string[]) => {
     if (type === "agent") return onOpenProfile(args[0]!); // @agent click inside a thread also opens the profile panel (profile state is owned by the parent component)
@@ -470,7 +470,7 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }, [text]); // thread reply textarea auto-grows
-  useEffect(() => { (async () => { const d = await api("GET", `/api/messages/channel/${channelId}?limit=200`); setMsgs(d.messages || []); })(); }, [channelId]);
+  useEffect(() => { subscribeChannel(channelId); (async () => { const d = await api("GET", `/api/messages/channel/${channelId}?limit=200`); setMsgs(d.messages || []); })(); }, [channelId]); // join the thread room so replies arrive live (openThread/startThread do not make the socket a room member on their own)
   useEffect(() => onEvent((e) => {
     if (e.type === "message" && e.channelId === channelId) setMsgs((m) => [...m, e.message]);
     else if (e.type === "message:updated" && e.message?.channelId === channelId) setMsgs((m) => m.map((x) => (x.id === e.message.id ? { ...x, ...e.message } : x)));

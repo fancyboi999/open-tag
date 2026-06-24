@@ -30,16 +30,32 @@ export function attachSocketIO(server: Server): void {
     for (const c of myChans) socket.join(`channel:${c.channelId}`);
     socket.emit("rooms:joined");
     log.debug("socket connected", { uid, serverId, channels: myChans.length });
-    // Mid-session join / new channel: client emits join:channel → server checks membership then joins the room (leave:channel likewise).
+    // Mid-session join: client emits join:channel when it opens a channel/thread → server joins the room IFF the
+    // user can read it (member / public channel / thread of a readable channel), so realtime tracks what you view.
     socket.on("join:channel", async (channelId: string) => {
       if (!channelId || typeof channelId !== "string") return;
-      const m = (await db.select().from(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, channelId), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, uid))))[0];
-      if (m) socket.join(`channel:${channelId}`); // members only (prevents eavesdropping on private channels)
+      if (await canReadChannel(uid, serverId, channelId)) socket.join(`channel:${channelId}`); // refuses private/DM non-members (no content leak)
     });
     socket.on("leave:channel", (channelId: string) => { if (typeof channelId === "string") socket.leave(`channel:${channelId}`); });
     socket.on("disconnect", (reason) => log.debug("socket disconnected", { uid, reason }));
   });
   log.info("socket.io attached", { path: "/socket.io/" });
+}
+
+// May this user READ this channel (and thus join its realtime room)? Read access = channel member, OR a public
+// channel in the user's server, OR a thread whose parent channel is readable. Private/DM channels the user is not a
+// member of are refused → content stays isolated. The socket already verified server membership at connect time.
+async function canReadChannel(uid: string, serverId: string, channelId: string): Promise<boolean> {
+  const member = (await db.select().from(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, channelId), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, uid))))[0];
+  if (member) return true;
+  const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, channelId)))[0];
+  if (!ch || ch.serverId !== serverId || ch.deletedAt) return false;
+  if (ch.type === "channel") return true;                                   // public channel: any server member may read
+  if (ch.parentMessageId) {                                                 // thread: visibility follows its parent message's channel
+    const parent = (await db.select().from(schema.messages).where(eq(schema.messages.id, ch.parentMessageId)))[0];
+    if (parent) return canReadChannel(uid, serverId, parent.channelId);     // depth 1 (a parent channel is never itself a thread)
+  }
+  return false;                                                             // private / DM the user is not a member of
 }
 
 // Internal event object → named realtime events. Content-bearing events (message/task) only fan out to channel:<channelId> rooms (members only),
