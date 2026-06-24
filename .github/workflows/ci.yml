@@ -29,3 +29,6 @@ jobs:
 
       - name: Build web
         run: npm run build --prefix web
+
+      - name: Build daemon package (@open-tag/daemon bundle)
+        run: npm run pkg:daemon:build

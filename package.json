@@ -25,6 +25,7 @@
     "prod:down": "bash scripts/prod-down.sh",
     "daemon": "tsx src/daemon/index.ts --api-key poc-secret-key",
     "cli": "tsx src/cli/index.ts",
+    "pkg:daemon:build": "node scripts/build-daemon-pkg.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
     "wt:add": "bash scripts/wt-add.sh",
     "wt:rm": "bash scripts/wt-rm.sh",
@@ -49,6 +50,7 @@
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.12",
     "drizzle-kit": "^0.31.10",
+    "esbuild": "^0.28.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   },

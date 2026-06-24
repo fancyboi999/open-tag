@@ -1,0 +1,33 @@
+{
+  "name": "@open-tag/daemon",
+  "version": "0.1.0",
+  "description": "open-tag compute-plane daemon — connect any machine to an open-tag server so its agents run there. No repo clone needed.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "open-tag-daemon": "dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "open-tag",
+    "ai-agents",
+    "daemon",
+    "self-hosted"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fancyboi999/open-tag.git",
+    "directory": "packages/daemon"
+  },
+  "homepage": "https://github.com/fancyboi999/open-tag#readme",
+  "bugs": "https://github.com/fancyboi999/open-tag/issues",
+  "publishConfig": {
+    "access": "public"
+  }
+}
