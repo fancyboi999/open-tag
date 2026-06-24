@@ -368,7 +368,10 @@ export async function resolveTarget(serverId: string, target: string, selfAgentI
   // 2) No thread suffix → base channel; has suffix → find parent message (short id prefix) → thread channel of that parent message
   if (!threadShort) return { channelId: baseChannelId, threadId: null };
   const parent = (await db.select().from(schema.messages).where(and(eq(schema.messages.serverId, serverId), eq(schema.messages.channelId, baseChannelId), like(sql`${schema.messages.id}::text`, threadShort.toLowerCase() + "%"))))[0];
-  if (!parent) return null;
+  // System messages ("X created task / claimed / moved …") are not real conversation anchors and have no
+  // "open thread" affordance in the UI — threading onto one buries the reply where no one can reach it.
+  // Reject so the caller surfaces a clear error instead of silently creating an unreachable thread.
+  if (!parent || parent.senderType === "system") return null;
   const th = await getOrCreateThread(serverId, parent.id, { type: "agent", id: selfAgentId });
   return { channelId: th.id, threadId: null };
 }
