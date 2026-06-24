@@ -243,7 +243,7 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .card.task:hover{transform:translateY(-1px);border-color:var(--hair-strong)}
 .tk-del{position:absolute;top:8px;right:8px;border:0;background:transparent;color:var(--muted-soft);cursor:pointer;padding:2px;border-radius:6px;opacity:0;transition:opacity .12s}
 .card.task:hover .tk-del{opacity:1} .tk-del:hover{color:var(--error);background:var(--surface-strong)}
-.tk-chan{font-size:12px;color:var(--muted)} .tk-num{font-size:11px;color:var(--muted-soft);letter-spacing:.3px}
+.tk-chan{font-size:12px;color:var(--muted)} .tk-chan-dm{color:var(--ink);font-weight:500} .tk-num{font-size:11px;color:var(--muted-soft);letter-spacing:.3px}
 .tk-title{font-size:14px;font-weight:600;color:var(--ink);line-height:1.35;margin:3px 24px 8px 0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .tk-foot{display:flex;justify-content:flex-end}
 .st-pill-wrap{position:relative} .st-pill-btn{border:0;background:transparent;padding:0;cursor:pointer}
@@ -255,7 +255,7 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .st-pill.st-closed{color:var(--muted);border-color:var(--hair-strong)}
 .claim-pill{font-size:11px;font-weight:600;color:var(--on-ink);background:var(--ink-2);border:0;border-radius:9999px;padding:2px 11px;cursor:pointer}
 .claim-pill:hover{background:var(--ink)}
-.st-menu{position:absolute;right:0;top:100%;margin-top:4px;z-index:30;background:var(--surface);border:1px solid var(--hair-strong);border-radius:8px;box-shadow:0 8px 28px rgba(12,10,9,.14);padding:4px;min-width:124px}
+.st-menu{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--hair-strong);border-radius:8px;box-shadow:0 8px 28px rgba(12,10,9,.14);padding:4px;min-width:124px}
 .st-menu button{display:flex;align-items:center;gap:7px;width:100%;border:0;background:transparent;font-size:13px;color:var(--body);padding:6px 9px;border-radius:6px;cursor:pointer;text-align:left}
 .st-menu button:hover{background:var(--surface-strong)} .st-menu button.on{font-weight:600;color:var(--ink)}
 .st-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--muted-soft)}

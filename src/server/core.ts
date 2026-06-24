@@ -250,7 +250,9 @@ export async function createMessage(opts: {
   actionMetadata?: unknown; // action-card and other platform action payloads (slice09)
 }) {
   const seq = await nextSeq(opts.serverId);
-  const taskNumber = opts.asTask ? await nextTaskNumber(opts.serverId) : null;
+  // Channel row fetched once; its type drives task-number scope (per-DM vs per-server), thread auto-follow, mention auto-join, and wake routing below.
+  const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, opts.channelId)))[0];
+  const taskNumber = opts.asTask ? await nextTaskNumber(opts.serverId, ch) : null;
   const [msg] = await db.insert(schema.messages).values({
     seq, serverId: opts.serverId, channelId: opts.channelId,
     senderType: opts.senderType, senderId: opts.senderId, senderName: opts.senderName,
@@ -259,9 +261,6 @@ export async function createMessage(opts: {
     threadId: opts.threadId ?? null, searchText: opts.content,
     taskStatus: opts.asTask ? "todo" : null, taskNumber,
   }).returning();
-
-  // Channel row fetched once; its type drives thread auto-follow, mention auto-join, and wake routing below.
-  const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, opts.channelId)))[0];
 
   // auto-follow: reply to thread → sender auto-joins; replying after done clears done and brings thread back to inbox
   if (opts.senderId && opts.senderType !== "system" && ch?.type === "thread") {
@@ -444,8 +443,9 @@ export async function convertMessageToTask(serverId: string, messageId: string, 
   const [claimed] = await db.update(schema.messages).set({ taskStatus: "todo", updatedAt: new Date() })
     .where(and(eq(schema.messages.id, messageId), eq(schema.messages.serverId, serverId), isNull(schema.messages.taskStatus))).returning();
   if (!claimed) return (await db.select().from(schema.messages).where(eq(schema.messages.id, messageId)))[0] ?? null;
-  // Winner gets task number (no waste, no gaps) + creates thread (tasks always have a thread)
-  const taskNumber = await nextTaskNumber(serverId);
+  // Winner gets a task number scoped to the channel (per-DM for DMs, per-server otherwise) + creates thread (tasks always have a thread)
+  const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, m.channelId)))[0];
+  const taskNumber = await nextTaskNumber(serverId, ch);
   const th = await getOrCreateThread(serverId, messageId);
   const [upd] = await db.update(schema.messages).set({ taskNumber, threadId: th.id }).where(eq(schema.messages.id, messageId)).returning();
   await publish(serverId, { type: "task", op: "created", task: serializeMsg(upd!, await taskMentions(messageId)) });
@@ -484,6 +484,7 @@ export async function claimTask(serverId: string, messageId: string, assigneeTyp
     .where(and(
       eq(schema.messages.id, messageId),
       eq(schema.messages.serverId, serverId),
+      isNotNull(schema.messages.taskStatus), // invariant guard: a status mutator only touches an existing task — never promotes a plain message (which would mint a task with no number). Callers convert first.
       or(isNull(schema.messages.taskAssigneeId), eq(schema.messages.taskAssigneeId, assigneeId)),
     )).returning();
   if (!upd) return null; // 0 rows = already claimed by another (or task does not exist) → claim failed, caller should back off
@@ -495,7 +496,7 @@ export async function claimTask(serverId: string, messageId: string, assigneeTyp
 export async function unclaimTask(serverId: string, messageId: string, by?: { type: "user" | "agent"; id: string }) {
   const [upd] = await db.update(schema.messages)
     .set({ taskStatus: "todo", taskAssigneeType: null, taskAssigneeId: null, taskClaimedAt: null, updatedAt: new Date() })
-    .where(and(eq(schema.messages.id, messageId), eq(schema.messages.serverId, serverId))).returning();
+    .where(and(eq(schema.messages.id, messageId), eq(schema.messages.serverId, serverId), isNotNull(schema.messages.taskStatus))).returning();
   if (!upd) return null;
   await emitTaskUpdated(serverId, upd);
   await sysTaskMsg(serverId, upd.channelId, `${by ? await actorName(by.type, by.id) : "Someone"} released #${upd.taskNumber} "${taskTitle(upd.content)}"`);
@@ -511,7 +512,7 @@ export async function setTaskStatus(serverId: string, messageId: string, status:
   // Note: thread is already created at task creation/conversion time (findings §8.1 verified: all tasks have a thread, created before done); no need to create it here
   const [upd] = await db.update(schema.messages)
     .set({ taskStatus: status, taskCompletedAt: finished ? new Date() : null, updatedAt: new Date() })
-    .where(and(eq(schema.messages.id, messageId), eq(schema.messages.serverId, serverId))).returning();
+    .where(and(eq(schema.messages.id, messageId), eq(schema.messages.serverId, serverId), isNotNull(schema.messages.taskStatus))).returning();
   if (!upd) return null;
   await emitTaskUpdated(serverId, upd); // task message itself updated (taskStatus) → lands in CHANNEL, updates badge + board in channel (verified: message:updated and task:updated both land in the channel)
   // "moved" system message for status change → lands in the task's THREAD, not channel (message:new channelId=task.threadId).
