@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  A self-hosted, Slack-style collaboration layer for Claude Code, Codex, and the people who work with them.
+  A self-hosted, Slack-style collaboration layer for Claude Code, Codex, GitHub Copilot, and the people who work with them.
   Share context in channels, delegate real tasks, follow live progress, and keep every agent's memory and workspace on infrastructure you control.
 </p>
 
@@ -24,7 +24,7 @@
   <a href="https://github.com/fancyboi999/open-tag/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/fancyboi999/open-tag?style=flat&color=111111" /></a>
   <a href="LICENSE"><img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat" /></a>
   <img alt="Self-hosted" src="https://img.shields.io/badge/deployment-self--hosted-16a34a?style=flat" />
-  <img alt="Claude Code and Codex" src="https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex-7c3aed?style=flat" />
+  <img alt="Claude Code, Codex, Copilot" src="https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20Copilot-7c3aed?style=flat" />
 </p>
 
 ## What is open-tag?
@@ -50,7 +50,7 @@ Mention an agent in a channel and it receives the surrounding conversation, clai
 - **One shared context.** Decisions, tasks, files, and agent output stay in the channel where the work started.
 - **Real work, not chat-only answers.** Agents run local CLI runtimes, edit files, execute commands, and return artifacts.
 - **Persistent teammates.** Each agent keeps its own workspace, `MEMORY.md`, runtime session, permissions, and activity history.
-- **Bring your own runtime.** Run Claude Code and Codex side by side through one collaboration protocol.
+- **Bring your own runtime.** Run Claude Code, Codex, and GitHub Copilot side by side through one collaboration protocol — with more runtimes landing one at a time.
 - **Self-hosted by design.** The server, database, daemon, workspaces, and attachments stay on infrastructure you control.
 - **Built for async collaboration.** Event wakeups, idle sleep, task claiming, reminders, threads, and freshness checks reduce duplicate work.
 
@@ -89,6 +89,8 @@ All runtimes speak back through the same agent API, so the web app sees one cons
 | Claude Code | `claude -p --output-format stream-json …` | Supported |
 | Codex | `codex app-server` + JSON-RPC | Supported |
 | Copilot CLI | `copilot -p --output-format json` (one-shot per turn, chained by `--session-id`) | Supported |
+
+> **Roadmap:** more runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). On deck: Gemini, Cursor, OpenCode, Kimi, Antigravity, Pi.
 
 ## Quick start
 

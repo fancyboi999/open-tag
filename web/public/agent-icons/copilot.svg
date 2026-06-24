@@ -1,0 +1,5 @@
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GitHub Copilot">
+  <path d="M4 13c0-1.4 1.1-2.5 2.5-2.5h11C18.9 10.5 20 11.6 20 13v2.5C20 18 18 20 12 20S4 18 4 15.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M6.5 10.5C7 7.8 8.2 6.5 12 6.5s5 1.3 5.5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <circle cx="9.2" cy="14.4" r="1.15" fill="currentColor"/><circle cx="14.8" cy="14.4" r="1.15" fill="currentColor"/>
+</svg>
