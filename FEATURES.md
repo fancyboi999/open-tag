@@ -8,7 +8,7 @@
 - [x] Database schema (`src/db/schema.ts`: users/servers/serverMembers/machines/agents/channels/channelMembers/messages/messageMentions/reactions/attachments/reminders/knowledge)
 - [x] DB client (drizzle + postgres.js) `src/db/index.ts`; `db:push` migrations (13 tables created)
 - [x] Redis client + helpers: `seq:{serverId}` INCR, SSE pub/sub `src/redis.ts`
-- [x] Seed script: default `open-tag` workspace + you + #all + ada (executed)
+- [x] Bootstrap seed: default `open-tag` workspace + owner + #all only; machines and agents are created explicitly through onboarding
 
 ## P1 Control Plane (server ↔ daemon) — Verified end-to-end
 - [x] WS `/daemon/connect?key=` TS implementation + machine registration/heartbeat persistence + push to frontend (machine ready verified)

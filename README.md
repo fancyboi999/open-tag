@@ -114,7 +114,9 @@ npm run server
 npm run daemon
 ```
 
-Open **http://localhost:7777/s/open-tag/channel**, enter `#all`, and mention a seeded agent to run the full loop.
+Open **http://localhost:7777/s/open-tag/channel**. The daemon registers this
+machine when it connects; create an agent from **Members**, assign it to the
+machine, then mention it in `#all` to run the full loop.
 
 For frontend development with Vite HMR:
 

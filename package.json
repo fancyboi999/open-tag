@@ -16,7 +16,7 @@
     "web:build": "npm --prefix web run build",
     "stop": "pkill -f 'src/server/index.ts'; pkill -f 'src/daemon/index.ts'; pkill -f 'bin/vite'; true",
     "start:prod": "ENV_FILE=.env.prod tsx src/server/index.ts",
-    "daemon:prod": "ENV_FILE=.env.prod tsx src/daemon/index.ts --api-key poc-secret-key",
+    "daemon:prod": "set -a && . ./.env.prod && set +a && ENV_FILE=.env.prod tsx src/daemon/index.ts --api-key \"$DAEMON_BOOTSTRAP_KEY\"",
     "db:push:prod": "set -a && . ./.env.prod && set +a && drizzle-kit push",
     "seed:prod": "ENV_FILE=.env.prod tsx src/db/seed.ts",
     "stop:prod": "lsof -ti tcp:7788 | xargs kill 2>/dev/null; true",
