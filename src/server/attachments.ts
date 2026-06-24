@@ -13,13 +13,24 @@ export function parseUpload(req: IncomingMessage): Promise<{ fields: Record<stri
     const fields: Record<string, string> = {};
     const files: UploadedFile[] = [];
     const pending: Promise<void>[] = [];
+    let firstError: unknown = null;
     bb.on("field", (name, val) => { fields[name] = val; });
     bb.on("file", (_name, stream, info) => {
-      pending.push(saveObject(info.filename || "file", stream).then(({ key, size }) => {
-        files.push({ filename: info.filename || "file", mimeType: info.mimeType || "application/octet-stream", size, storageKey: key });
-      }));
+      // Each per-file task self-catches: a save that fails (especially before the stream is
+      // consumed, e.g. s3Config() validation) must still drain the stream so busboy emits
+      // "close", and must never surface as an unhandledRejection (which crashes the process
+      // on Node ≥15). The error is remembered and surfaced once, after close.
+      pending.push((async () => {
+        try {
+          const { key, size } = await saveObject(info.filename || "file", stream);
+          files.push({ filename: info.filename || "file", mimeType: info.mimeType || "application/octet-stream", size, storageKey: key });
+        } catch (e) {
+          stream.resume(); // drain any unconsumed bytes so busboy can finish and emit "close"
+          firstError ??= e;
+        }
+      })());
     });
-    bb.on("close", () => { Promise.all(pending).then(() => resolve({ fields, files })).catch(reject); });
+    bb.on("close", () => { Promise.all(pending).then(() => { firstError ? reject(firstError) : resolve({ fields, files }); }).catch(reject); });
     bb.on("error", reject);
     req.pipe(bb);
   });
