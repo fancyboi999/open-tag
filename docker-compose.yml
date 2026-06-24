@@ -27,6 +27,20 @@ services:
       timeout: 3s
       retries: 10
 
+  # Control plane (API + web). Opt-in via `--profile app` so `npm run infra` (no profile) still brings up
+  # only postgres+redis for host-run development. The daemon is NOT here — run it on your host (see docs/docker.md).
+  app:
+    build: { context: ., dockerfile: Dockerfile }
+    image: open-tag-app:latest
+    container_name: open-tag-app
+    profiles: ["app"]
+    env_file: [.env.docker]            # copy .env.docker.example → .env.docker and fill the secrets first
+    ports: ["${APP_PORT:-7788}:7788"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+
 volumes:
   pgdata: {}
   redisdata: {}
