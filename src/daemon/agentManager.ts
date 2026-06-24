@@ -8,8 +8,9 @@ import { ensureOpenTagBin } from "./openTagBin.js";
 import { getRuntime } from "./runtimes.js";
 import type { RuntimeSession, RuntimeCallbacks } from "./runtime.js";
 import { createLogger } from "../log.js";
+import { agentsDir } from "../paths.js";
 
-const DATA_DIR = path.join(os.homedir(), ".open-tag", "agents");
+const DATA_DIR = agentsDir();
 const IDLE_MS = Number(process.env.OPEN_TAG_IDLE_MS ?? 10 * 60 * 1000); // how long before idle sleep (kills process to save memory; next wake uses --resume)
 const DELIVER_DEBOUNCE_MS = Number(process.env.OPEN_TAG_DELIVER_DEBOUNCE_MS ?? 3000); // batching window for deliveries while agent is busy (saves tokens, reduces interruptions)
 

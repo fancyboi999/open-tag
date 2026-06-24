@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/db/seed.ts",
+    "seed:dev": "tsx src/db/seed-dev.ts",
     "server": "tsx watch src/server/index.ts",
     "start": "tsx src/server/index.ts",
     "web:build": "npm --prefix web run build",
@@ -24,7 +25,9 @@
     "cli": "tsx src/cli/index.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
     "wt:add": "bash scripts/wt-add.sh",
-    "wt:rm": "bash scripts/wt-rm.sh"
+    "wt:rm": "bash scripts/wt-rm.sh",
+    "dev:e2e:up": "bash scripts/dev-e2e-up.sh",
+    "dev:e2e:down": "bash scripts/dev-e2e-down.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

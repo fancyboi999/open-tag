@@ -16,8 +16,12 @@ VPORT=$(free_port 5301)
 RDB=$(( (SPORT - 7799) % 14 + 2 ))      # redis DB index 2..15 (avoids dev/0, prod/1)
 DB="opentag_$SAFE"
 
-echo "→ worktree=$WT  server=$SPORT  vite=$VPORT  db=$DB  redis=/$RDB"
-git worktree add "$WT" -b "feature/$NAME"
+# Branch from the canonical main, NOT the current HEAD — otherwise a PR made from this
+# worktree would inherit whatever branch you happened to be on. WT_BASE=HEAD to opt out (stacking).
+BASE="${WT_BASE:-origin/main}"
+echo "→ worktree=$WT  server=$SPORT  vite=$VPORT  db=$DB  redis=/$RDB  base=$BASE"
+git fetch origin main --quiet 2>/dev/null || true
+git worktree add "$WT" -b "feature/$NAME" "$BASE"
 docker compose exec -T postgres createdb -U opentag "$DB" 2>/dev/null || echo "  (db $DB already exists, reusing)"
 
 cat > "$WT/.env" <<EOF
@@ -27,6 +31,8 @@ DATABASE_URL=postgres://opentag:opentag@localhost:5433/$DB
 REDIS_URL=redis://localhost:6380/$RDB
 JWT_SECRET=dev-secret-change-me
 DAEMON_BOOTSTRAP_KEY=poc-secret-key
+OPEN_TAG_HOME=$HOME/.open-tag-$SAFE
+ALLOW_DEV_LOGIN=true
 EOF
 
 echo "→ Installing deps + pushing schema + seeding (please wait)…"

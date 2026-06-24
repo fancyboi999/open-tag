@@ -4,8 +4,9 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { agentsDir } from "../paths.js";
 
-const DATA_DIR = path.join(os.homedir(), ".open-tag", "agents");
+const DATA_DIR = agentsDir();
 const MAX_FILE = 256 * 1024;
 const SKIP = new Set(["node_modules", ".git"]);
 
