@@ -368,6 +368,14 @@
     "confirm": "确认",
     "cancel": "取消"
   },
+  "liveBar": {
+    "idle": "暂无 agent 在运行",
+    "working": "运行中",
+    "thinking": "思考中",
+    "viewActivity": "查看 {{name}} 的活动",
+    "moreActive": "另有 {{count}} 个 agent 在运行",
+    "activeTitle": "运行中的 agent"
+  },
   "sidebar": {
     "pinChannel": "置顶",
     "unpinChannel": "取消置顶",

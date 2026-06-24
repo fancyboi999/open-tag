@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useStore } from "../store.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { useEscClose } from "../ConfirmModal.tsx";
+import { LiveAgentBar } from "./LiveAgentBar.tsx";
 
 // Shared chat sidebar (Saved/Channels/DMs share the same sidebar; persists unchanged when switching between the channel view and the Saved view).
 // Both the Chat view and the Saved view (misc.tsx) render this component so the channel list stays visible when navigating to Saved.
@@ -43,6 +44,7 @@ export function ChatSidebar() {
 
   return (
     <aside className="sidebar">
+      <div className="sb-scroll">
       <div className="sb-title">{t("nav.channel")}</div>
       <div className={"item nav-row" + (onSaved ? " active" : "")} onClick={() => nav(`/s/${slug}/saved`)}>
         <span className="grow"><Bookmark size={14} style={{ verticalAlign: "-2px" }} /> {t("common.saved")}</span>
@@ -70,6 +72,8 @@ export function ChatSidebar() {
         );
       })}
       {mkChan && <CreateChannelModal onCreate={doCreate} onClose={() => setMkChan(false)} />}
+      </div>
+      <LiveAgentBar />
     </aside>
   );
 }

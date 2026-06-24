@@ -116,7 +116,7 @@ function ActionCardMsg({ m }: { m: Msg }) {
 
 export function Chat() {
   const { t } = useTranslation();
-  const { api, channels, dms, unread, agents, humans, machines, traj, slug, me, myRole, capabilities, reload, onEvent, subscribeChannel, openDM, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg } = useStore();
+  const { api, channels, dms, unread, agents, humans, machines, traj, slug, me, myRole, capabilities, reload, onEvent, subscribeChannel, openDM, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, agentPanelReq, clearAgentPanelReq } = useStore();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   // A message's sender avatar: look the sender up in the loaded agents/humans lists (carry avatarUrl) — no message-schema change needed.
   const senderAvatar = (m: Msg) => avFor(m.senderType === "agent" ? agents.find((a) => a.id === m.senderId)?.avatarUrl : humans.find((h) => h.userId === m.senderId)?.avatarUrl);
@@ -146,12 +146,28 @@ export function Chat() {
   const msgParam = sp.get("msg"); // when present, scroll to and highlight the specified message id
   const threadParam = sp.get("thread"); // auto-open a thread panel (from inbox, in-message thread link, or cross-page link); value is the parent message id (full or 8-char short) or channelId:shortid
 
+  // Closing the agent panel clears the Activity-tab deep-link so the next avatar-open defaults to Overview
+  // (the live bar deep-links to Activity via ?agentTab=activity; without this it would stick across opens).
+  const closeProfile = () => { setProfile(null); setSp((prev) => { const n = new URLSearchParams(prev); n.delete("agentTab"); return n; }, { replace: true }); };
+
   useEffect(() => { if (!channelId && cur) nav(`/s/${slug}/channel/${cur.id}`, { replace: true }); }, [channelId, cur, slug, nav]);
   useEffect(() => { if (!cur) return; setThread(null); setProfile(null); subscribeChannel(cur.id); (async () => { // switching channels closes any open thread + profile overlay from the previous channel (the live trace itself persists — accumulated in the store, see store.tsx); join the room while viewing so message:new arrives live (covers public non-member channels + channels relevant after connect)
     const d = await api("GET", `/api/messages/channel/${cur.id}?limit=200`); const ms: Msg[] = d.messages || []; setMsgs(ms); markRead(cur.id);
     const ids = ms.map((m) => m.id);
     if (ids.length) { try { setThreadMeta(await api("GET", `/api/channels/${cur.id}/threads?parentMessageIds=${ids.join(",")}`) || {}); } catch { setThreadMeta({}); } } else setThreadMeta({});
   })(); }, [cur?.id]);
+  // LiveAgentBar (sidebar) → open this agent's profile panel on the Activity tab in the right column,
+  // reusing the existing avatar-click overlay (setProfile). Consumed once and cleared. MUST be declared
+  // after the channel-switch effect above: when the click navigates here from a non-channel view (Saved),
+  // both effects fire on mount and the channel-switch one resets setProfile(null) — declaring this later
+  // makes its setProfile win. In-channel clicks only re-run this effect (cur.id unchanged), so order is moot there.
+  useEffect(() => {
+    if (!agentPanelReq) return;
+    setProfile({ type: "agent", id: agentPanelReq });
+    setSp((prev) => { const n = new URLSearchParams(prev); n.set("agentTab", "activity"); return n; }, { replace: true });
+    clearAgentPanelReq();
+    // eslint-disable-next-line
+  }, [agentPanelReq]);
   useEffect(() => onEvent((e) => {
     if (e.type === "message" && e.channelId === cur?.id) { setMsgs((m) => [...m, e.message]); markRead(cur.id); }
     else if (e.type === "message:updated" && e.message) setMsgs((m) => m.map((x) => (x.id === e.message.id ? { ...x, ...e.message } : x))); // sync reactions and task fields
@@ -306,7 +322,7 @@ export function Chat() {
       {profile
         ? <aside className="traj-col profile-mode">
             {profile.type === "agent"
-              ? <AgentProfile id={profile.id} onDeleted={() => setProfile(null)} onClose={() => setProfile(null)} onMessage={() => { const id = profile.id; setProfile(null); doDM(id); }} />
+              ? <AgentProfile id={profile.id} onDeleted={closeProfile} onClose={closeProfile} onMessage={() => { const id = profile.id; closeProfile(); doDM(id); }} />
               : <HumanProfile uid={profile.id} onClose={() => setProfile(null)} onMessage={() => { const id = profile.id; setProfile(null); doDMHuman(id); }} />}
           </aside>
         : thread

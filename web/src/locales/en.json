@@ -368,6 +368,14 @@
     "confirm": "Confirm",
     "cancel": "Cancel"
   },
+  "liveBar": {
+    "idle": "No agents running",
+    "working": "Working",
+    "thinking": "Thinking",
+    "viewActivity": "View {{name}}'s activity",
+    "moreActive": "{{count}} more running",
+    "activeTitle": "Active agents"
+  },
   "sidebar": {
     "pinChannel": "Pin",
     "unpinChannel": "Unpin",

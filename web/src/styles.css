@@ -23,7 +23,7 @@ button{font-family:inherit}
 .resizer-sb{left:calc(56px + var(--sb-w,248px) - 3px)}
 .resizer-traj{right:calc(var(--traj-w,320px) - 3px)}
 
-.rail{background:var(--canvas-soft);box-shadow:1px 0 0 var(--hair);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:6px}
+.rail{background:var(--canvas-soft);box-shadow:1px 0 0 var(--hair-strong);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:6px}
 .rail .brand{width:36px;height:36px;border-radius:8px;background:var(--ink);color:var(--canvas);font-family:var(--serif);font-size:20px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;position:relative}
 .rail .brand .dot{position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:var(--g-peach);border:1px solid var(--canvas-soft)}
 .rail .brand .brand-img{width:100%;height:100%;border-radius:8px;object-fit:cover;display:block}
@@ -48,7 +48,9 @@ button{font-family:inherit}
 .rail a.t.active{background:var(--surface);border-color:var(--hair-strong);color:var(--ink);box-shadow:0 1px 2px var(--shadow-1)}
 .rail .spacer{flex:1}
 
-.sidebar{background:var(--canvas-soft);border-right:1px solid var(--hair);padding:18px 14px;overflow:auto}
+/* sidebar = flex column: .sb-scroll (scrolls) above a pinned .live-bar footer. Height comes from the .app grid cell (desktop) or the fixed drawer's top/bottom:0 (mobile @820), so .sb-scroll needs no own height. */
+.sidebar{background:var(--canvas-soft);border-right:1px solid var(--hair);display:flex;flex-direction:column;min-height:0}
+.sb-scroll{flex:1;min-height:0;overflow:auto;padding:18px 14px}
 .sb-title{font-family:var(--serif);font-size:22px;letter-spacing:-.3px;color:var(--ink);margin:0 0 16px}
 .sec{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);margin:18px 4px 6px}
 .sec .cnt{color:var(--muted-soft);font-weight:500;margin-left:4px}
@@ -602,6 +604,34 @@ aside.traj-col .scroll{padding:0;margin:0 -20px;padding:0 20px}
 .msg:hover .msg-toolbar{opacity:1;pointer-events:auto}
 .msg-toolbar button{border:0;background:transparent;font-size:15px;line-height:1;padding:5px 7px;border-radius:6px;cursor:pointer}
 .msg-toolbar button:hover{background:var(--surface-strong)}
+
+/* ── Live agent activity bar: pinned to sidebar bottom, workspace-wide "who's doing something now" pulse (LiveAgentBar.tsx). Editorial skin: hairline divider, calm canvas, reuses .dot colors ── */
+.live-bar{position:relative;flex:none;display:flex;align-items:center;gap:6px;padding:7px 8px;min-height:50px;border-top:1px solid var(--hair);background:var(--canvas-soft)}
+.live-bar--idle{padding-left:14px}
+.live-bar--idle .dot{width:7px;height:7px;background:var(--muted-soft)}
+.live-bar__idle{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.live-bar__main{flex:1;min-width:0;display:flex;align-items:center;gap:9px;border:0;background:transparent;cursor:pointer;padding:4px 6px;border-radius:8px;text-align:left;font:inherit;color:var(--body)}
+.live-bar__main:hover{background:var(--surface-strong)}
+.live-bar__main:focus-visible{outline:2px solid var(--g-sky);outline-offset:1px}
+.live-bar__ava{position:relative;flex:none;line-height:0}
+.live-bar__pip{position:absolute;right:-2px;bottom:-2px;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--canvas-soft);box-sizing:content-box}
+.live-bar__pip::after{content:"";position:absolute;inset:0;border-radius:50%;background-color:inherit;animation:lb-ping 1.9s cubic-bezier(0,0,.2,1) infinite}
+.live-bar__text{display:flex;flex-direction:column;min-width:0;gap:1px}
+.live-bar__name{font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.live-bar__detail{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.live-bar__more{flex:none;border:1px solid var(--hair-strong);background:var(--surface);color:var(--muted);border-radius:9999px;font-size:11px;font-weight:600;line-height:1.4;padding:2px 8px;cursor:pointer}
+.live-bar__more:hover{background:var(--surface-strong);color:var(--ink)}
+.live-bar__more:focus-visible{outline:2px solid var(--g-sky);outline-offset:1px}
+.live-bar__backdrop{position:fixed;inset:0;z-index:40}
+.live-bar__pop{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);z-index:41;background:var(--canvas);border:1px solid var(--hair-strong);border-radius:8px;box-shadow:0 8px 28px var(--shadow-3);padding:6px;max-height:280px;overflow:auto}
+.live-bar__pop-title{font-size:10px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:4px 8px 6px}
+.live-bar__pop-item{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;cursor:pointer;padding:7px 8px;border-radius:8px;text-align:left;font:inherit;color:var(--body)}
+.live-bar__pop-item:hover{background:var(--surface-strong)}
+.live-bar__pop-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.live-bar__pop-name{font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.live-bar__pop-detail{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@keyframes lb-ping{0%{transform:scale(1);opacity:.55}70%,100%{transform:scale(2.4);opacity:0}}
+@media (prefers-reduced-motion:reduce){.live-bar__pip::after{animation:none;opacity:0}}
 
 /* ───────── Mobile adaptation (≤820px): three columns → single column, rail moves to bottom tab bar, sidebar becomes drawer, thread/profile goes fullscreen, modal becomes bottom sheet ───────── */
 .mobile-burger,.mobile-scrim{display:none}  /* hidden on desktop by default: if scrim is not hidden it occupies the first grid column and shifts rail/sidebar/content out of place */

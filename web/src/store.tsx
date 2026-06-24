@@ -42,6 +42,9 @@ interface Store {
   attachmentUrl: (id: string) => string;
   react: (messageId: string, emoji: string, remove?: boolean) => Promise<void>;
   openThread: (parentChannelId: string, parentMessageId: string) => Promise<string | null>;
+  openAgentPanel: (agentId: string) => void;                      // request the agent profile panel (Activity tab) to open in the chat right column; consumed once by the Chat view
+  agentPanelReq: string | null;                                   // pending open-agent-panel request (agent id); null when none
+  clearAgentPanelReq: () => void;                                 // clear the pending request after the Chat view has consumed it
   savedIds: Set<string>;                                          // saved message ids known in this session (bookmark state + Saved count source)
   saveMsg: (messageId: string) => Promise<void>;
   unsaveMsg: (messageId: string) => Promise<void>;
@@ -68,6 +71,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [humans, setHumans] = useState<Human[]>([]);
   const [traj, setTraj] = useState<TrajItem[]>([]); // global live-trace feed: bounded ring buffer held here (not per Chat view) so it persists across channel/DM switches
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [agentPanelReq, setAgentPanelReq] = useState<string | null>(null); // cross-component signal: LiveAgentBar (sidebar) → Chat view opens the agent profile panel
   const tokenRef = useRef("");
   const sidRef = useRef("");
   const sockRef = useRef<Socket | null>(null); // active socket connection; emits join:channel when joining/creating a channel mid-session for room isolation
@@ -145,6 +149,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
   const react = async (messageId: string, emoji: string, remove = false) => { await api(remove ? "DELETE" : "POST", `/api/messages/${messageId}/reactions`, { emoji }); };
   const openThread = async (parentChannelId: string, parentMessageId: string) => { const r = await api("POST", `/api/channels/${parentChannelId}/threads`, { parentMessageId }); return r?.threadChannelId ?? null; };
+  const openAgentPanel = (agentId: string) => setAgentPanelReq(agentId); // LiveAgentBar → Chat: open the agent profile panel (Activity tab); Chat consumes & clears
+  const clearAgentPanelReq = () => setAgentPanelReq(null);
   // Saved messages: private bookmarks, optimistically update savedIds.
   const saveMsg = async (messageId: string) => { setSavedIds((s) => new Set(s).add(messageId)); await api("POST", "/api/channels/saved", { messageId }); };
   const unsaveMsg = async (messageId: string) => { setSavedIds((s) => { const n = new Set(s); n.delete(messageId); return n; }); await api("DELETE", `/api/channels/saved/${messageId}`); };
@@ -260,7 +266,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; sock?.close(); if (unreadTimer) clearTimeout(unreadTimer); };
   }, []);
 
-  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, humans, traj, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, humans, traj, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
 }
 
 export const fmtTime = (iso?: string) => { try { return iso ? new Date(iso).toLocaleTimeString("zh-CN", { hour12: false }) : ""; } catch { return ""; } };
