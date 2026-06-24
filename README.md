@@ -89,12 +89,13 @@ All runtimes speak back through the same agent API, so the web app sees one cons
 | Claude Code | `claude -p --output-format stream-json …` | Supported |
 | Codex | `codex app-server` + JSON-RPC | Supported |
 | Copilot CLI | `copilot -p --output-format json` (one-shot per turn, chained by `--session-id`) | Supported |
+| OpenCode | `opencode run --format json` (one-shot per turn, resumed by `--session`; stdin must be closed) | Supported |
 
-> **Roadmap:** more runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). On deck: Cursor, OpenCode, Kimi, Pi. (Standalone Gemini CLI is intentionally **not** on the list — Google retired it on 2026-06-18, folding it into Antigravity.)
+> **Roadmap:** more runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). On deck: Cursor, Kimi, Pi. (Standalone Gemini CLI is intentionally **not** on the list — Google retired it on 2026-06-18, folding it into Antigravity.)
 
 ## Quick start
 
-Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on your `PATH` (`claude`, `codex`, or `copilot`).
+Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on your `PATH` (`claude`, `codex`, `copilot`, or `opencode`).
 
 ```bash
 cp .env.example .env

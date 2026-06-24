@@ -21,7 +21,7 @@
 - [x] Subcommands: message check/send (stdin heredoc)/read, server info, channel join, task list/claim/update
 - [ ] Subcommands pending: thread, mention, reminder, react, profile, attachment, knowledge, search
 - [x] Daemon spawns agent with injected system prompt (Current Runtime Context + open-tag CLI spec) + PATH-injected open-tag wrapper (verified)
-- [x] **Runtime adapters (unified Runtime interface)**: claude (stream-json) + codex (app-server JSON-RPC, resume fallback) + copilot (one-shot-per-turn pipe JSONL, `--session-id` resume, `{cwd}/AGENTS.md` prompt inject, stderr-surfaced model errors) — **all verified on real hardware** (copilot vs CLI 1.0.61: reply / multi-turn resume / trajectory / bad-model loud failure, dev:e2e)
+- [x] **Runtime adapters (unified Runtime interface)**: claude (stream-json) + codex (app-server JSON-RPC, resume fallback) + copilot (one-shot pipe JSONL, `--session-id` resume) + opencode (one-shot `run --format json`, `--session` resume, stdin-closed + `NODE_OPTIONS`-stripped) — **all verified on real hardware** (copilot vs CLI 1.0.61 + opencode vs 1.15.5: reply / multi-turn resume / trajectory / failure surfaced, dev:e2e)
 - [x] **Mention routing**: only @ -mentioned agents are woken in a channel (+ DM agent); others correctly stay idle
 - [ ] codex enhancement: per-agent `CODEX_HOME` isolation + auth/MCP injection; raw-v2 item/* trajectory detail
 

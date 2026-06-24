@@ -46,13 +46,13 @@ const ENGINES = [
   { name: "claude", icon: "claude", desc: "Anthropic's CLI, driven over streaming JSON for live thinking and tool calls.", tag: null },
   { name: "codex", icon: "codex", desc: "OpenAI's app-server, driven over JSON-RPC turns.", tag: null },
   { name: "copilot", icon: "copilot", desc: "GitHub Copilot CLI — one-shot turns chained by session id, prompt injected via AGENTS.md.", tag: null },
+  { name: "opencode", icon: "opencode", desc: "OpenCode — one-shot runs over JSON events, resumed by session id; any model via its provider config.", tag: null },
 ];
 
 // Runtimes on the roadmap. We add them one at a time, each verified on real hardware before it
 // ships — so these stay clearly marked "soon" rather than implying they already work (see docs/MISSION.md).
 const PLANNED_RUNTIMES = [
   { name: "Cursor", icon: "cursor" },
-  { name: "OpenCode", icon: "opencode" },
   { name: "Kimi", icon: "kimi" },
   { name: "Pi", icon: "pi" },
 ];
