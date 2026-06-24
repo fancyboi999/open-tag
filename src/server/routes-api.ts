@@ -531,8 +531,55 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     items.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
     let filtered = items;
     if (filter === "unread") filtered = items.filter((i) => i.unreadCount > 0);
-    else if (filter === "mentions") filtered = items.filter((i) => i.hasMention);
+    // The Mentions tab is its own message-grained stream (GET /api/mentions below — every @ of me, read or
+    // not), not a channel aggregate. hasMention above still drives the per-row @ badge on the all/unread tabs.
     return (sendJson(res, 200, { items: filtered.slice(offset, offset + limit) }), true);
+  }
+  // Mentions activity stream (GET /api/mentions?limit=&offset=): every message that @-mentions the current
+  // user — message-grained, read AND unread alike. The channel-aggregated inbox above only surfaces an @ that
+  // still sits in an unread channel (hasMention is computed inside `if (unreadCount > 0)`), so a mention you've
+  // already read vanishes from it. This is the canonical "who pinged me" history (Slack/Tag "Mentions &
+  // reactions"), backed by mentions_target_idx (mention_type, mention_id). INNER JOIN channel_members both
+  // scopes results to channels the user can still access (never leak a private/thread they were removed from)
+  // and yields lastReadSeq for the read flag.
+  if (p === "/api/mentions" && method === "GET") {
+    const limit = Math.min(Number(url.searchParams.get("limit") ?? 30), 100);
+    const offset = Math.max(Number(url.searchParams.get("offset") ?? 0), 0);
+    const rows = await db
+      .select({
+        messageId: schema.messages.id, seq: schema.messages.seq, content: schema.messages.content, createdAt: schema.messages.createdAt,
+        senderType: schema.messages.senderType, senderId: schema.messages.senderId, senderName: schema.messages.senderName,
+        channelId: schema.channels.id, channelName: schema.channels.name, channelType: schema.channels.type, parentMessageId: schema.channels.parentMessageId,
+        lastReadSeq: schema.channelMembers.lastReadSeq,
+      })
+      .from(schema.messageMentions)
+      .innerJoin(schema.messages, eq(schema.messages.id, schema.messageMentions.messageId))
+      .innerJoin(schema.channels, eq(schema.channels.id, schema.messages.channelId))
+      .innerJoin(schema.channelMembers, and(eq(schema.channelMembers.channelId, schema.channels.id), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)))
+      .where(and(eq(schema.messageMentions.mentionType, "user"), eq(schema.messageMentions.mentionId, userId), eq(schema.channels.serverId, serverId), isNull(schema.channels.deletedAt)))
+      .orderBy(desc(schema.messages.seq))
+      .limit(limit).offset(offset);
+    // Thread mentions: resolve the parent channel so a row can deep-link to the parent channel + open the thread panel.
+    const parentMsgIds = [...new Set(rows.filter((r) => r.channelType === "thread" && r.parentMessageId).map((r) => r.parentMessageId!))];
+    const parentMsgs = parentMsgIds.length ? await db.select().from(schema.messages).where(inArray(schema.messages.id, parentMsgIds)) : [];
+    const parentChs = parentMsgs.length ? await db.select().from(schema.channels).where(inArray(schema.channels.id, [...new Set(parentMsgs.map((m) => m.channelId))])) : [];
+    const mitems = rows.map((r) => {
+      let parentChannelId: string | null = null, parentChannelName: string | null = null;
+      if (r.channelType === "thread" && r.parentMessageId) {
+        const pm = parentMsgs.find((m) => m.id === r.parentMessageId);
+        if (pm) { parentChannelId = pm.channelId; parentChannelName = parentChs.find((c) => c.id === pm.channelId)?.name ?? null; }
+      }
+      // dm channel.name is an internal composite id; a DM mention always comes from the peer, so label it with the sender.
+      const channelName = r.channelType === "dm" ? r.senderName : r.channelType === "thread" ? (parentChannelName ?? r.channelName) : r.channelName;
+      return {
+        messageId: r.messageId, channelId: r.channelId, channelName, channelType: r.channelType,
+        parentMessageId: r.channelType === "thread" ? r.parentMessageId : null, parentChannelId, parentChannelName,
+        senderType: r.senderType, senderId: r.senderId, senderName: r.senderName,
+        preview: (r.content ?? "").slice(0, 140), createdAt: r.createdAt, seq: r.seq,
+        read: r.seq <= (r.lastReadSeq ?? 0),
+      };
+    });
+    return (sendJson(res, 200, { items: mitems }), true);
   }
   // ── Saved messages / bookmarks (/channels/saved; envelope {saved[], hasMore}) ──
   // List: query {limit=20, offset}; envelope {saved[], hasMore}

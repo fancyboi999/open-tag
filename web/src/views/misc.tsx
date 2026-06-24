@@ -43,6 +43,13 @@ interface InboxItem {
   lastMessageSenderType: string; lastMessageSenderId: string | null; lastMessageSenderName: string;
   unreadCount: number; hasMention: boolean;
 }
+// One @-mention of me, message-grained (GET /api/mentions): read & unread alike, deep-links to that message.
+interface MentionItem {
+  messageId: string; channelId: string; channelName: string; channelType: string;
+  parentMessageId?: string | null; parentChannelId?: string | null; parentChannelName?: string | null; // thread mention → open the parent thread panel
+  senderType: string; senderId: string | null; senderName: string;
+  preview: string; createdAt: string; seq: number; read: boolean;
+}
 // INBOX_FILTERS labels are i18n keys; call t(label) at render time
 const INBOX_FILTERS: { key: string; label: string }[] = [
   { key: "all", label: "misc.inboxFilterAll" },
@@ -62,15 +69,18 @@ export function Inbox() {
   const { t } = useTranslation();
   const [filter, setFilter] = useState("all");
   const [items, setItems] = useState<InboxItem[]>([]);
+  const [mentions, setMentions] = useState<MentionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const filterRef = useRef("all");
 
   const load = (f: string, silent = false) => {
     if (!silent) setLoading(true);
-    api("GET", `/api/channels/inbox?filter=${f}&limit=50`)
-      .then((r) => setItems(r?.items || []))
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
+    // Mentions is a message-grained activity stream (every @ of me, read or not — GET /api/mentions);
+    // all/unread stay channel-aggregated via the inbox endpoint.
+    const req = f === "mentions"
+      ? api("GET", `/api/mentions?limit=50`).then((r) => setMentions(r?.items || [])).catch(() => setMentions([]))
+      : api("GET", `/api/channels/inbox?filter=${f}&limit=50`).then((r) => setItems(r?.items || [])).catch(() => setItems([]));
+    req.finally(() => setLoading(false));
   };
   useEffect(() => { filterRef.current = filter; load(filter); /* eslint-disable-next-line */ }, [filter]);
 
@@ -93,9 +103,17 @@ export function Inbox() {
     else if (it.firstUnreadMessageId) nav(`/s/${slug}/channel/${it.channelId}?msg=${it.firstUnreadMessageId}`);
     else nav(`/s/${slug}/channel/${it.channelId}`);
   };
+  // Jump straight to the @-mention: highlight that message via ?msg=; a thread mention opens the parent thread panel.
+  const openMention = (m: MentionItem) => {
+    if (m.channelType === "thread" && m.parentChannelId && m.parentMessageId) nav(`/s/${slug}/channel/${m.parentChannelId}?thread=${m.parentMessageId}`);
+    else nav(`/s/${slug}/channel/${m.channelId}?msg=${m.messageId}`);
+  };
 
   const curFilter = INBOX_FILTERS.find((f) => f.key === filter);
   const curFilterLabel = curFilter ? t(curFilter.label) : filter;
+  const isMentions = filter === "mentions";
+  const listCount = isMentions ? mentions.length : items.length;
+  const isEmpty = isMentions ? !mentions.length : !items.length;
 
   return (
     <>
@@ -109,14 +127,14 @@ export function Inbox() {
         ))}
       </aside>
       <main className="content-col">
-        <div className="head"><h1>{t("misc.inboxTitle")}</h1><small>{loading ? t("misc.inboxLoading") : t("misc.inboxSummary", { count: items.length, filter: curFilterLabel })}</small></div>
+        <div className="head"><h1>{t("misc.inboxTitle")}</h1><small>{loading ? t("misc.inboxLoading") : t("misc.inboxSummary", { count: listCount, filter: curFilterLabel })}</small></div>
         <div className="inbox-list">
-          {!loading && !items.length && (
+          {!loading && isEmpty && (
             filter === "all"
               ? <div className="empty">{t("misc.inboxEmptyAll")}</div>
               : <div className="empty">{t("misc.inboxEmptyFilter", { filter: curFilterLabel })}</div>
           )}
-          {items.map((it) => (
+          {!isMentions && items.map((it) => (
             <button key={it.channelId} className={"inbox-row" + (it.unreadCount > 0 ? " unread" : "")} onClick={() => open(it)}>
               <span className={"ib-glyph k-" + it.kind}><KindGlyph type={it.channelType} /></span>
               <span className="ib-main">
@@ -128,6 +146,19 @@ export function Inbox() {
                 <span className="ib-preview"><b>{it.lastMessageSenderName}</b>: {it.lastMessagePreview}</span>
               </span>
               {it.unreadCount > 0 && <span className="ib-badge">{it.unreadCount}</span>}
+            </button>
+          ))}
+          {isMentions && mentions.map((m) => (
+            <button key={m.messageId} className={"inbox-row" + (m.read ? "" : " unread")} onClick={() => openMention(m)}>
+              <span className={"ib-glyph k-" + (m.channelType === "dm" ? "dm" : m.channelType === "thread" ? "thread" : "channel")}><KindGlyph type={m.channelType} /></span>
+              <span className="ib-main">
+                <span className="ib-top">
+                  <span className="ib-name">{m.channelName}</span>
+                  {!m.read && <span className="ib-mention" title={t("misc.inboxMentionTitle")}>@</span>}
+                  <span className="ib-time">{fmtTime(m.createdAt)}</span>
+                </span>
+                <span className="ib-preview"><b>{m.senderName}</b>: {m.preview}</span>
+              </span>
             </button>
           ))}
         </div>
