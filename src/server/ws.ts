@@ -45,6 +45,14 @@ async function onDaemon(ws: WebSocket, key: string): Promise<void> {
         await publish(serverId!, { type: "trajectory", agentId: msg.agentId, name: a?.name, entries: msg.entries ?? [] });
         for (const e of msg.entries ?? []) await logActivity(serverId!, msg.agentId, e); // persist to the activity log
       }
+      else if (msg.type === "pong" && machineId) {
+        // Heartbeat: the daemon replies pong to our 30s ping. Keep lastHeartbeat fresh so the
+        // liveness sweeper never offlines a live machine; if the sweeper raced ahead and offlined
+        // us (e.g. a transient DB error aged the heartbeat), flip back online — the link is clearly up.
+        const prev = (await db.select({ status: schema.machines.status }).from(schema.machines).where(eq(schema.machines.id, machineId)))[0];
+        await db.update(schema.machines).set({ lastHeartbeat: new Date(), status: "online" }).where(eq(schema.machines.id, machineId));
+        if (prev && prev.status !== "online") await publish(serverId!, { type: "machine", online: true, machineId });
+      }
       else if ((msg.type === "workspace:file_tree" || msg.type === "workspace:file_content" || msg.type === "skills:list") && msg.requestId) resolveDaemonRequest(msg.requestId, msg);
     } catch (e: any) { log.error("ws handler error", { type: msg?.type, detail: String(e?.message ?? e) }); }
   });

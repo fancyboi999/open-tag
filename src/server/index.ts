@@ -11,6 +11,7 @@ import { attachSocketIO } from "./socketio.js";
 import { initRealtime } from "./realtime.js";
 import { startReminderScheduler } from "./reminders.js";
 import { reconcileCounters } from "../redis.js";
+import { reconcileMachinesOnBoot, startMachineSweeper } from "./machineLiveness.js";
 import { sendJson, sendErr } from "./util.js";
 import { createLogger } from "../log.js";
 
@@ -64,4 +65,10 @@ startReminderScheduler(); // reminder scheduler: fires at due time, wakes the au
 reconcileCounters()
   .then((r) => log.info("counters reconciled", r))
   .catch((e) => log.error("counter reconcile failed (continuing)", { detail: String(e?.message ?? e) }))
-  .finally(() => server.listen(PORT, () => log.info("control plane up", { url: `http://localhost:${PORT}`, logs: "~/.open-tag/logs/" })));
+  // Before listening (so no daemon can reconnect first), flip stale "online" machines to offline —
+  // a fresh server instance has zero daemons connected; they re-mark online on reconnect.
+  .then(() => reconcileMachinesOnBoot().catch((e) => log.error("machine reconcile failed (continuing)", { detail: String(e?.message ?? e) })))
+  .finally(() => server.listen(PORT, () => {
+    log.info("control plane up", { url: `http://localhost:${PORT}`, logs: "~/.open-tag/logs/" });
+    startMachineSweeper(); // backstop: offline machines whose daemon died without a clean WS close
+  }));
