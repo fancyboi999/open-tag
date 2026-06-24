@@ -2,9 +2,9 @@
 // To tail logs: tail -f ~/.open-tag/logs/server.log  (or daemon/cli/agent-<id>)
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { logsDir } from "./paths.js";
 
-const LOG_DIR = process.env.OPEN_TAG_LOG_DIR ?? path.join(os.homedir(), ".open-tag", "logs");
+const LOG_DIR = logsDir();
 try { fs.mkdirSync(LOG_DIR, { recursive: true }); } catch { /* */ }
 
 type Level = "debug" | "info" | "warn" | "error";

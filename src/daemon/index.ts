@@ -10,6 +10,7 @@ import { AgentManager } from "./agentManager.js";
 import { listWorkspace, readWorkspaceFile, listSkills } from "./workspace.js";
 import { detectRuntimes } from "./runtimes.js";
 import { createLogger } from "../log.js";
+import { machineIdFile } from "../paths.js";
 
 const log = createLogger("daemon");
 const args = process.argv.slice(2);
@@ -28,7 +29,7 @@ if (!apiKey) {
 // Stable machine identity: on first connection the server assigns machine.id via ready:ack, persisted to ~/.open-tag/machine-id.
 // Subsequent connections include it so the server can recognize the same machine across restarts,
 // avoiding orphan machine rows from unstable hostnames.
-const MID_FILE = path.join(os.homedir(), ".open-tag", "machine-id");
+const MID_FILE = machineIdFile();
 const readMachineId = (): string | undefined => { try { return fs.readFileSync(MID_FILE, "utf8").trim() || undefined; } catch { return undefined; } };
 const saveMachineId = (id: string): void => { try { fs.mkdirSync(path.dirname(MID_FILE), { recursive: true }); fs.writeFileSync(MID_FILE, id); } catch { /* */ } };
 

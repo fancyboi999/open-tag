@@ -4,12 +4,12 @@
 import { createWriteStream } from "node:fs";
 import { readFile, mkdir } from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
 import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
+import { uploadsDir } from "../paths.js";
 
 const DRIVER = process.env.OPEN_TAG_STORAGE ?? "local";
-const LOCAL_DIR = process.env.OPEN_TAG_UPLOAD_DIR ?? path.join(os.homedir(), ".open-tag", "uploads");
+const LOCAL_DIR = uploadsDir();
 
 export interface Saved { key: string; size: number }
 

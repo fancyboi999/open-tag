@@ -2,11 +2,11 @@
 // Agents call `open-tag ...` from their shell/bash tool → routed to this repo's CLI.
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { fileURLToPath } from "node:url";
+import { binDir } from "../paths.js";
 
 export function ensureOpenTagBin(): string {
-  const dir = path.join(os.homedir(), ".open-tag", "bin");
+  const dir = binDir();
   fs.mkdirSync(dir, { recursive: true });
 
   const here = path.dirname(fileURLToPath(import.meta.url)); // .../src/daemon
