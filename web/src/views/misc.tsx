@@ -70,18 +70,24 @@ export function Inbox() {
   const [filter, setFilter] = useState("all");
   const [items, setItems] = useState<InboxItem[]>([]);
   const [mentions, setMentions] = useState<MentionItem[]>([]);
+  const [mentionsHasMore, setMentionsHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const filterRef = useRef("all");
+  const MENTIONS_PAGE = 50;
 
   const load = (f: string, silent = false) => {
     if (!silent) setLoading(true);
-    // Mentions is a message-grained activity stream (every @ of me, read or not — GET /api/mentions);
-    // all/unread stay channel-aggregated via the inbox endpoint.
+    // Mentions is a message-grained activity stream (every @ of me, read or not — GET /api/mentions), paginated
+    // with a Load-more button; all/unread stay channel-aggregated via the inbox endpoint. A realtime reload
+    // resets to the first page (newest @s are at the top).
     const req = f === "mentions"
-      ? api("GET", `/api/mentions?limit=50`).then((r) => setMentions(r?.items || [])).catch(() => setMentions([]))
+      ? api("GET", `/api/mentions?limit=${MENTIONS_PAGE}`).then((r) => { setMentions(r?.items || []); setMentionsHasMore(!!r?.hasMore); }).catch(() => { setMentions([]); setMentionsHasMore(false); })
       : api("GET", `/api/channels/inbox?filter=${f}&limit=50`).then((r) => setItems(r?.items || [])).catch(() => setItems([]));
     req.finally(() => setLoading(false));
   };
+  // Append the next page of mentions (offset = how many we already hold).
+  const loadMoreMentions = () => api("GET", `/api/mentions?limit=${MENTIONS_PAGE}&offset=${mentions.length}`)
+    .then((r) => { setMentions((prev) => [...prev, ...(r?.items || [])]); setMentionsHasMore(!!r?.hasMore); }).catch(() => {});
   useEffect(() => { filterRef.current = filter; load(filter); /* eslint-disable-next-line */ }, [filter]);
 
   // Real-time: on incoming message/message:updated socket events, debounce a silent re-fetch of the current filter to stay fresh without manual refresh.
@@ -161,6 +167,7 @@ export function Inbox() {
               </span>
             </button>
           ))}
+          {isMentions && mentionsHasMore && !loading && <button className="loadmore" onClick={loadMoreMentions}>{t("misc.loadMore")}</button>}
         </div>
       </main>
     </>

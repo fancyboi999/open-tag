@@ -152,6 +152,7 @@
     "inboxEmptyFilter": "No {{filter}} messages",
     "inboxEmptyAll": "No messages",
     "inboxMentionTitle": "Mentioned you",
+    "loadMore": "Load more",
     "computersTitle": "Computers",
     "computersMachines": "Machines",
     "computersConnectBtn": "Connect a machine",

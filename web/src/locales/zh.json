@@ -152,6 +152,7 @@
     "inboxEmptyFilter": "没有{{filter}}消息",
     "inboxEmptyAll": "没有消息",
     "inboxMentionTitle": "提及了你",
+    "loadMore": "加载更多",
     "computersTitle": "Computers",
     "computersMachines": "Machines",
     "computersConnectBtn": "连接一台机器",

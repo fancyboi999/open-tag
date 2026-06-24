@@ -558,12 +558,14 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
       .innerJoin(schema.channelMembers, and(eq(schema.channelMembers.channelId, schema.channels.id), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)))
       .where(and(eq(schema.messageMentions.mentionType, "user"), eq(schema.messageMentions.mentionId, userId), eq(schema.channels.serverId, serverId), isNull(schema.channels.deletedAt)))
       .orderBy(desc(schema.messages.seq))
-      .limit(limit).offset(offset);
+      .limit(limit + 1).offset(offset); // fetch one extra row to detect a next page without a second COUNT (Saved-style hasMore)
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
     // Thread mentions: resolve the parent channel so a row can deep-link to the parent channel + open the thread panel.
-    const parentMsgIds = [...new Set(rows.filter((r) => r.channelType === "thread" && r.parentMessageId).map((r) => r.parentMessageId!))];
+    const parentMsgIds = [...new Set(page.filter((r) => r.channelType === "thread" && r.parentMessageId).map((r) => r.parentMessageId!))];
     const parentMsgs = parentMsgIds.length ? await db.select().from(schema.messages).where(inArray(schema.messages.id, parentMsgIds)) : [];
     const parentChs = parentMsgs.length ? await db.select().from(schema.channels).where(inArray(schema.channels.id, [...new Set(parentMsgs.map((m) => m.channelId))])) : [];
-    const mitems = rows.map((r) => {
+    const mitems = page.map((r) => {
       let parentChannelId: string | null = null, parentChannelName: string | null = null;
       if (r.channelType === "thread" && r.parentMessageId) {
         const pm = parentMsgs.find((m) => m.id === r.parentMessageId);
@@ -579,7 +581,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
         read: r.seq <= (r.lastReadSeq ?? 0),
       };
     });
-    return (sendJson(res, 200, { items: mitems }), true);
+    return (sendJson(res, 200, { items: mitems, hasMore }), true);
   }
   // ── Saved messages / bookmarks (/channels/saved; envelope {saved[], hasMore}) ──
   // List: query {limit=20, offset}; envelope {saved[], hasMore}
