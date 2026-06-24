@@ -419,7 +419,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
     try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model || null, reasoning: runtime === "codex" ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) onCreated?.({ id: r.id, name: r.name ?? nm }); onClose(); }
     catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
-  const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "gemini", label: "Gemini" }, { value: "opencode", label: "OpenCode" }];
+  const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "gemini", label: "Gemini" }, { value: "opencode", label: "OpenCode" }];
   const machineOpts = machines.length ? machines.map((m) => ({ value: m.id, label: m.name || m.hostname || m.id, hint: m.status === "online" ? t("members.machineOnline") : t("members.machineOffline") })) : [];
   const modelOpts = (models.length ? models : [{ id: "default", label: "Default" }]).map((m) => ({ value: m.id, label: m.label || m.id }));
   return (

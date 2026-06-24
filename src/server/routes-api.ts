@@ -358,6 +358,10 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   if (rm && method === "GET") {
     // Model candidates: codex = slugs matching codex-rs + GPT-5.5 as default; claude = Claude Code aliases;
     // gemini/opencode likewise. For codex/claude/gemini the runtime uses its native CLI (no gateway model list); the frontend supplies these lists.
+    // copilot: a static candidate list (the CLI has no `models list` command; live per-account discovery
+    //   would need an ACP probe + daemon→server channel — tracked in docs/tech-debt-tracker.md). "auto"
+    //   is first/default so Copilot picks an accessible model; picking a model the account lacks fails
+    //   loudly at runtime (the runtime surfaces copilot's stderr).
     const MODELS: Record<string, { id: string; label: string }[]> = {
       claude: [{ id: "sonnet", label: "Sonnet" }, { id: "opus", label: "Opus" }, { id: "haiku", label: "Haiku" }],
       codex: [
@@ -366,6 +370,12 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
         { id: "gpt-5.2-codex", label: "GPT-5.2 Codex" }, { id: "gpt-5.2", label: "GPT-5.2" },
         { id: "gpt-5.1-codex-max", label: "GPT-5.1 Codex Max" }, { id: "gpt-5.1-codex", label: "GPT-5.1 Codex" },
         { id: "gpt-5-codex", label: "GPT-5 Codex" },
+      ],
+      copilot: [
+        { id: "auto", label: "Auto (recommended)" },
+        { id: "gpt-5.5", label: "GPT-5.5" }, { id: "gpt-5.4", label: "GPT-5.4" }, { id: "gpt-5.2-codex", label: "GPT-5.2 Codex" },
+        { id: "claude-opus-4.7", label: "Claude Opus 4.7" }, { id: "claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
+        { id: "claude-sonnet-4.5", label: "Claude Sonnet 4.5" }, { id: "claude-haiku-4.5", label: "Claude Haiku 4.5" },
       ],
       gemini: [{ id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" }, { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" }],
       kimi: [{ id: "kimi-k2", label: "Kimi K2" }],
