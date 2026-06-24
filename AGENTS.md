@@ -35,6 +35,14 @@ its own iterative improvement — autonomously.
 
 ## Parallel development (worktrees)
 
+- **Default workflow: do your work in a worktree, not the main checkout.** Start any
+  **feature, multi-file change, or task that needs an isolated stack** (agent runtime,
+  realtime, DB) with `npm run wt:add -- <name>`, and open the PR from there. The main
+  checkout stays on `main` (it's where prod runs). **Exception — trivial changes**
+  (a doc edit, a one/two-line fix) may use a plain branch off `origin/main` in the main
+  checkout; use judgment, don't spin up a worktree's whole DB+seed for a typo. A soft,
+  non-blocking reminder fires once per session when you edit on `main` in the main checkout
+  (`.claude/hooks/worktree-reminder.sh`, wired in `.claude/settings.json`).
 - Use `npm run wt:add -- <name>` to spin up an isolated git worktree (its own ports +
   `opentag_<name>` database + redis index + **`OPEN_TAG_HOME=~/.open-tag-<name>` data dir** +
   seeded data); `npm run wt:rm -- <name>` tears it down (and cleans the data dir + db). Lets
