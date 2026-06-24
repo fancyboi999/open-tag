@@ -1,6 +1,6 @@
 // Task board shared between the channel chatTab=tasks view and the global Tasks page.
 // Five-status columns + Board/List toggle (pure frontend) + Creator/Assignee filters (pure frontend, applied over the loaded array) + New Task (POST /api/tasks/channel/:id).
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Trash2, ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { DndContext, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -38,7 +38,7 @@ export const ynOptions = (status: string, manageServer: boolean, claimedByMe: bo
 // channelId = null means global scope (all tasks across channels); creating new tasks is disabled in global scope because tasks must belong to a specific channel
 export function TaskBoard({ channelId, onOpenThread }: { channelId: string | null; onOpenThread?: (t: Msg) => void }) {
   const { t } = useTranslation();
-  const { api, onEvent, agents, humans, me, myRole, channels, createTasks, slug } = useStore();
+  const { api, onEvent, agents, humans, me, myRole, channels, dms, createTasks, slug } = useStore();
   const manageServer = myRole === "owner" || myRole === "admin"; // determines the status dropdown permission set
   const nav = useNavigate();
   // Click on a task card/row → navigate to the source message (highlighted); cross-channel tasks use the task's own channelId
@@ -99,8 +99,25 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   // Status pill / dropdown: unclaimed tasks show a claim pill; editable statuses show a pill with a pencil icon; read-only statuses show a plain pill
   const StatusPill = ({ t: task }: { t: Msg }) => {
     const [open, setOpen] = useState(false);
+    const [pos, setPos] = useState<{ right: number; top: number } | null>(null);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
     const status = task.taskStatus || "todo";
     const claimedByMe = task.taskAssigneeType === "human" && task.taskAssigneeId === me?.id;
+    // Fixed positioning from the button rect (same approach as Select.tsx): each card sits in its own
+    // transform-induced stacking context, so an `absolute` menu is trapped beneath the next card no
+    // matter its z-index. A fixed, body-relative menu escapes that. Right-aligned to the pill.
+    useLayoutEffect(() => { if (!open) return; const r = btnRef.current?.getBoundingClientRect(); if (r) setPos({ right: window.innerWidth - r.right, top: r.bottom + 4 }); }, [open]);
+    useEffect(() => {
+      if (!open) return;
+      const onDown = (e: MouseEvent) => { const n = e.target as Node; if (!btnRef.current?.contains(n) && !menuRef.current?.contains(n)) setOpen(false); };
+      const onScroll = () => setOpen(false); // any scroll closes it (the fixed coords would otherwise drift)
+      const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+      document.addEventListener("mousedown", onDown);
+      window.addEventListener("scroll", onScroll, true);
+      document.addEventListener("keydown", onKey);
+      return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("scroll", onScroll, true); document.removeEventListener("keydown", onKey); };
+    }, [open]);
     // Unclaimed todo task → show claim pill (atomic claim, automatically sets status to in_progress)
     if (!task.taskAssigneeId && status === "todo") return <button className="claim-pill" onClick={(e) => { e.stopPropagation(); act(task, "claim"); }}>{t("tasks.claim")}</button>;
     const opts = ynOptions(status, manageServer, claimedByMe);
@@ -109,19 +126,23 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
     if (!canEdit) return pill; // read-only pill (no pencil icon)
     return (
       <span className="st-pill-wrap" onClick={(e) => e.stopPropagation()}>
-        <button className="st-pill-btn" onClick={() => setOpen((v) => !v)}>{pill}</button>
-        {open && <div className="st-menu" onMouseLeave={() => setOpen(false)}>
+        <button ref={btnRef} className="st-pill-btn" onClick={() => setOpen((v) => !v)}>{pill}</button>
+        {open && pos && <div ref={menuRef} className="st-menu" style={{ right: pos.right, top: pos.top }}>
           {opts.map((s) => <button key={s} className={s === status ? "on" : ""} onClick={() => { setOpen(false); if (s !== status) act(task, "status", { status: s }); }}><span className={"st-dot st-" + s} />{t(ST_LABEL[s])}</button>)}
         </div>}
       </span>
     );
   };
   const Card = ({ t: task }: { t: Msg }) => {
-    const chan = !channelId ? channels.find((c) => c.id === task.channelId)?.name : null; // channel name only shown in server-wide (global) view
+    // Source location, only shown in the server-wide (global) view. Channel tasks show `#name`; DM tasks
+    // are scoped to a 1:1 conversation (own per-DM numbering) so they show the peer as `@name` — visually
+    // distinct so a DM #1 is never mistaken for a channel #1.
+    const chan = !channelId ? channels.find((c) => c.id === task.channelId)?.name : null;
+    const dm = !channelId && !chan ? dms.find((d) => d.id === task.channelId) : null;
     return (
       <div className="card task" onClick={() => open(task)} title={t("tasks.openThread")}>
         <button className="tk-del" title={t("tasks.deleteTask")} onClick={(e) => { e.stopPropagation(); delTask(task); }}><Trash2 size={12} /></button>
-        {chan && <div className="tk-chan">#{chan}</div>}
+        {chan ? <div className="tk-chan">#{chan}</div> : dm ? <div className="tk-chan tk-chan-dm">@{dm.peerDisplayName || dm.peerName || dm.name}</div> : null}
         <div className="tk-num">#{task.taskNumber ?? "-"}</div>
         <div className="tk-title">{task.content}</div>
         <div className="tk-foot"><StatusPill t={task} /></div>

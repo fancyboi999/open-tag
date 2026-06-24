@@ -4,7 +4,7 @@ import { and, eq, gt, lt, inArray, asc, desc, ilike, like, sql, isNull } from "d
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, agentIdHeader } from "./util.js";
 import { resolveAgent } from "./auth.js";
-import { createMessage, resolveTarget, channelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, TASK_STATUSES, resolveMessageId, descTooLong, DESC_TOO_LONG } from "./core.js";
+import { createMessage, resolveTarget, channelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, descTooLong, DESC_TOO_LONG } from "./core.js";
 import { agentHasScope } from "./scopes.js";
 import { parseUpload } from "./attachments.js";
 import { readObject } from "./storage.js";
@@ -244,6 +244,13 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
   }
 
   // Tasks (basic)
+  // Agent claim/update target a message by id; if it is not yet a task, convert it first (canonical
+  // path → mints a channel-scoped task number + thread + task:created event) so a status mutation can
+  // never silently promote a plain message into a numberless task. No-op when already a task.
+  const ensureTaskForAgent = async (mid: string) => {
+    const cur = (await db.select({ s: schema.messages.taskStatus }).from(schema.messages).where(eq(schema.messages.id, mid)))[0];
+    if (cur && !cur.s) await convertMessageToTask(serverId, mid, { type: "agent", id: agent.id });
+  };
   if (p === "/agent-api/task/list" && method === "GET") {
     const tgt = await resolveTarget(serverId, url.searchParams.get("channel") ?? "", agent.id);
     if (!tgt) return (sendErr(res, 404, "channel not found"), true);
@@ -261,6 +268,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
       mid = await resolveMessageId(serverId, b.messageId); // Tolerates 8-character short id
     }
     if (!mid) return (sendErr(res, 404, "task not found"), true);
+    await ensureTaskForAgent(mid); // claiming a plain message converts it to a task first (so it gets a number), then claims
     const r = await claimTask(serverId, mid, "agent", agent.id); // Atomic claim: returns null if already taken
     if (!r) return (sendErr(res, 409, "already claimed", { code: "CLAIM_FAILED" }), true);
     // Guide agent to follow up in the task's thread (report in task thread, not the main channel)
@@ -282,6 +290,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     }
     if (!mid) return (sendErr(res, 404, "message not found"), true);
     if (!(TASK_STATUSES as readonly string[]).includes(String(b.status))) return (sendErr(res, 400, `valid status is required (${TASK_STATUSES.join(", ")})`), true);
+    await ensureTaskForAgent(mid); // updating the status of a plain message converts it to a task first (so it gets a number), then sets status
     // Reuse human-side setTaskStatus: done/closed writes completedAt + emits task:updated socket
     // (previously a bare db.update bypassed core → the web kanban did not refresh in real time for agent status changes)
     const upd = await setTaskStatus(serverId, mid, b.status, { type: "agent", id: agent.id });
