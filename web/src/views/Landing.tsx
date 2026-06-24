@@ -49,13 +49,13 @@ const ENGINES = [
   { name: "opencode", icon: "opencode", desc: "OpenCode — one-shot runs over JSON events, resumed by session id; any model via its provider config.", tag: null },
   { name: "kimi", icon: "kimi", desc: "Kimi Code — one-shot stream-json turns, resumed by session id; provider configured in ~/.kimi-code/config.toml.", tag: null },
   { name: "pi", icon: "pi", desc: "Pi Coding Agent — one-shot JSON-event turns, resumed by session id; any provider/model from its own config.", tag: null },
+  { name: "cursor", icon: "cursor", desc: "Cursor Agent — one-shot Claude-style stream-json turns, resumed by session id; runs on your Cursor account.", tag: null },
 ];
 
-// Runtimes on the roadmap. We add them one at a time, each verified on real hardware before it
-// ships — so these stay clearly marked "soon" rather than implying they already work (see docs/MISSION.md).
-const PLANNED_RUNTIMES = [
-  { name: "Cursor", icon: "cursor" },
-];
+// Runtimes on the roadmap. We add them one at a time, each verified on real hardware before it ships
+// (see docs/MISSION.md). Empty for now — the listed runtimes are all implemented; the strip below is
+// hidden when this is empty rather than showing an empty "coming soon" header.
+const PLANNED_RUNTIMES: { name: string; icon: string }[] = [];
 
 export function Landing() {
   const { me, slug } = useStore();
@@ -292,18 +292,20 @@ export function Landing() {
               </div>
             ))}
           </div>
-          <div className="lp-runtimes-more">
-            <span className="lp-runtimes-more__label">More runtimes, landing one at a time</span>
-            <ul className="lp-chips" aria-label="Planned runtimes">
-              {PLANNED_RUNTIMES.map((r) => (
-                <li className="lp-chip" key={r.name}>
-                  <img className="lp-chip__icon" src={`/agent-icons/${r.icon}.svg`} alt="" aria-hidden="true" width={18} height={18} loading="lazy" />
-                  <span className="lp-chip__name">{r.name}</span>
-                  <span className="lp-chip__soon">soon</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {PLANNED_RUNTIMES.length > 0 && (
+            <div className="lp-runtimes-more">
+              <span className="lp-runtimes-more__label">More runtimes, landing one at a time</span>
+              <ul className="lp-chips" aria-label="Planned runtimes">
+                {PLANNED_RUNTIMES.map((r) => (
+                  <li className="lp-chip" key={r.name}>
+                    <img className="lp-chip__icon" src={`/agent-icons/${r.icon}.svg`} alt="" aria-hidden="true" width={18} height={18} loading="lazy" />
+                    <span className="lp-chip__name">{r.name}</span>
+                    <span className="lp-chip__soon">soon</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </section>
 

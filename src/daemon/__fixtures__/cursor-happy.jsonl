@@ -1,0 +1,5 @@
+{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/private/tmp/claude-501/-Users-nowcoder-Desktop-auto-code-work-open-tag/7cb2f5b4-4ed2-4aa5-86a6-c3d369ce0ebc/scratchpad/cursor-probe","session_id":"d9560e74-ba8f-4e27-a1de-57b3db8cd7ab","model":"Composer 2.5 Fast","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Reply with exactly the single word PONG and nothing else."}]},"session_id":"d9560e74-ba8f-4e27-a1de-57b3db8cd7ab"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"P"}]},"session_id":"d9560e74-ba8f-4e27-a1de-57b3db8cd7ab"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ONG"}]},"session_id":"d9560e74-ba8f-4e27-a1de-57b3db8cd7ab"}
+{"type":"result","subtype":"success","duration_ms":16030,"duration_api_ms":16030,"is_error":false,"result":"PONG","session_id":"d9560e74-ba8f-4e27-a1de-57b3db8cd7ab","request_id":"49777aeb-58f3-422d-aec6-6cba2cf53cf1"}

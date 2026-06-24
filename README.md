@@ -92,12 +92,13 @@ All runtimes speak back through the same agent API, so the web app sees one cons
 | OpenCode | `opencode run --format json` (one-shot per turn, resumed by `--session`; stdin must be closed) | Supported |
 | Kimi Code | `kimi -p --output-format stream-json` (one-shot per turn, resumed by `-r`; provider in `~/.kimi-code/config.toml`) | Supported |
 | Pi | `pi -p --mode json` (one-shot per turn, resumed by `--session`; provider/model from Pi's own config) | Supported |
+| Cursor | `cursor-agent -p --output-format stream-json` (one-shot per turn, resumed by `--resume`; runs on your Cursor account) | Supported |
 
-> **Roadmap:** more runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). On deck: Cursor. (Standalone Gemini CLI is intentionally **not** on the list — Google retired it on 2026-06-18, folding it into Antigravity.)
+> **Roadmap:** runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). The seven above are live; new ones get added on request. (Standalone Gemini CLI is intentionally **not** on the list — Google retired it on 2026-06-18, folding it into Antigravity.)
 
 ## Quick start
 
-Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on your `PATH` (`claude`, `codex`, `copilot`, `opencode`, `kimi`, or `pi`).
+Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on your `PATH` (`claude`, `codex`, `copilot`, `opencode`, `kimi`, `pi`, or `cursor-agent`).
 
 ```bash
 cp .env.example .env

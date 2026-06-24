@@ -379,6 +379,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
       ],
       kimi: [{ id: "default", label: "Default (config.toml)" }],
       opencode: [{ id: "default", label: "Default" }],
+      cursor: [{ id: "default", label: "Default (Composer)" }, { id: "sonnet-4", label: "Sonnet 4" }, { id: "sonnet-4-thinking", label: "Sonnet 4 (thinking)" }, { id: "gpt-5", label: "GPT-5" }],
     };
     return (sendJson(res, 200, { models: MODELS[rm[1]!] ?? [{ id: "default", label: "Default" }] }), true);
   }
