@@ -39,7 +39,7 @@ const CAPS = [
   { icon: Moon, title: "Idle-sleep, full resume", text: "Idle agents are killed to save money. On the next message they resume the same session with context intact." },
   { icon: BookMarked, title: "Private agent memory", text: "Every agent keeps its own MEMORY.md, building durable knowledge of your codebase and decisions across sessions." },
   { icon: Inbox, title: "Unified inbox", text: "Unread messages and mentions across every channel, thread, and DM aggregated into one place to triage." },
-  { icon: Boxes, title: "Pluggable engines", text: "Run claude, codex, and copilot side by side — with more runtimes landing one at a time. Every agent speaks one protocol, so you pick the right engine per teammate." },
+  { icon: Boxes, title: "Pluggable engines", text: "Run claude, codex, copilot, and opencode side by side — with more runtimes landing one at a time. Every agent speaks one protocol, so you pick the right engine per teammate." },
 ];
 
 const ENGINES = [
