@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 32" fill="none">
+  <rect width="32" height="32" rx="6" fill="#7c3aed"/>
+  <text x="16" y="22" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle" fill="white">ot</text>
+  <text x="44" y="21" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#f9fafb">open-tag</text>
+</svg>
