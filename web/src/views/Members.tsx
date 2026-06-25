@@ -39,7 +39,7 @@ export function Members() {
       <aside className="sidebar">
         <div className="sb-scroll">
         <div className="sb-title">{t("nav.members")}</div>
-        <div className="sec">{t("common.agents")} <span><span className="cnt">{agents.length}</span> {capabilities.manageAgents && <button className="addbtn" title={t("members.createAgent")} onClick={() => setModal(true)}>+</button>}</span></div>
+        <div className="sec">{t("common.agents")} <span className="cnt">{agents.length}</span>{capabilities.manageAgents && <button className="addbtn" title={t("members.createAgent")} onClick={() => setModal(true)}>+</button>}</div>
         {Object.keys(byMachine).map((k) => (
           <div key={k}>
             <div className="machine"><IconMonitor size={13} /> {k === "_none" ? t("members.unassigned") : mName(k)}</div>
@@ -50,7 +50,7 @@ export function Members() {
             ))}
           </div>
         ))}
-        <div className="sec">{t("common.humans")} <span><span className="cnt">{humans.length}</span> {capabilities.manageMembers && <button className="addbtn" title={t("members.inviteMember")} onClick={() => setInviteModal(true)}>+</button>}</span></div>
+        <div className="sec">{t("common.humans")} <span className="cnt">{humans.length}</span>{capabilities.manageMembers && <button className="addbtn" title={t("members.inviteMember")} onClick={() => setInviteModal(true)}>+</button>}</div>
         {humans.map((u) => (
           <button key={u.userId} className={"item" + (u.userId === userId ? " active" : "")} onClick={() => nav(`/s/${slug}/human/${u.userId}`)}>
             <Avatar seed={u.name} url={avFor(u.avatarUrl)} size={20} /><span className="grow">{u.displayName || u.name}</span>

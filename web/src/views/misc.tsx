@@ -4,8 +4,9 @@ import { Star, Bookmark, AlertTriangle, Lock, MessageCircle } from "lucide-react
 import { useStore, fmtTime } from "../store.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { ChatSidebar } from "./ChatSidebar.tsx";
-import { IconMonitor } from "../icons.tsx";
+import { IconMonitor, IconInbox } from "../icons.tsx";
 import { TaskBoard } from "../TaskBoard.tsx";
+import { PaneEmpty } from "../PaneEmpty.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 import { useTranslation } from "react-i18next";
 
@@ -140,9 +141,7 @@ export function Inbox() {
         <div className="head"><h1>{t("misc.inboxTitle")}</h1><small>{loading ? t("misc.inboxLoading") : t("misc.inboxSummary", { count: listCount, filter: curFilterLabel })}</small></div>
         <div className="inbox-list">
           {!loading && isEmpty && (
-            filter === "all"
-              ? <div className="empty">{t("misc.inboxEmptyAll")}</div>
-              : <div className="empty">{t("misc.inboxEmptyFilter", { filter: curFilterLabel })}</div>
+            <PaneEmpty icon={<IconInbox size={30} />} title={filter === "all" ? t("misc.inboxEmptyAll") : t("misc.inboxEmptyFilter", { filter: curFilterLabel })} />
           )}
           {!isMentions && items.map((it) => (
             <button key={it.channelId} className={"inbox-row" + (it.unreadCount > 0 ? " unread" : "")} onClick={() => open(it)}>
@@ -218,7 +217,7 @@ export function Computers() {
         </div>
       </aside>
       <main className="content-col">
-        {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll"><div className="empty">{t("misc.computersNoMachineHint")}</div></div></>
+        {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll"><PaneEmpty icon={<IconMonitor size={30} />} title={t("misc.computersNoMachine")} sub={t("misc.computersNoMachineHint")} /></div></>
           : <>
             <div className="head"><h1>{cur.name || cur.hostname}</h1><small>{cur.status === "online" ? t("misc.computersOnline") : t("misc.computersOffline")} · {t("misc.computersDaemonLabel")} {cur.daemonVersion || "?"}</small>
               <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -546,7 +545,7 @@ export function Saved() {
       <main className="content-col">
         <div className="head"><h1>{t("common.saved")}</h1><small>{loading ? t("misc.savedLoading") : t("misc.savedCount", { count: items.length })}</small></div>
         <div className="inbox-list">
-          {!loading && !items.length && <div className="empty">{t("misc.savedEmpty")}</div>}
+          {!loading && !items.length && <PaneEmpty icon={<Bookmark size={28} />} title={t("misc.savedEmpty")} />}
           {items.map((it) => (
             <button key={it.messageId} className="inbox-row" onClick={() => open(it)}>
               <span className="ib-main">

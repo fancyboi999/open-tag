@@ -319,6 +319,7 @@
     "addAgent": "Add agent",
     "join": "Join",
     "noFiles": "No files in this channel yet. Click the paperclip in the chat composer to upload (files are sent with messages and visible to all members).",
+    "channelEmpty": "No messages yet",
     "jumpToMessage": "Jump to original message",
     "download": "Download",
     "asTask": "As Task"
