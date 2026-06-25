@@ -4,6 +4,7 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import helmet from "helmet";
 import { handleApi } from "./routes-api/index.js";
 import { handleAgentApi } from "./routes-agent.js";
 import { attachWs } from "./ws.js";
@@ -14,6 +15,20 @@ import { reconcileCounters } from "../redis.js";
 import { reconcileMachinesOnBoot, startMachineSweeper } from "./machineLiveness.js";
 import { sendJson, sendErr } from "./util.js";
 import { createLogger } from "../log.js";
+
+// ── Security headers (helmet) ────────────────────────────────────────────────
+// CSP, COEP, and CORP are disabled here: the Vite-built frontend uses inline
+// scripts/styles and may load cross-origin assets. Add proper CSP directives
+// once the frontend's nonce/hash strategy is established.
+const helmetMiddleware = helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
+});
+const applyHelmet = (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> =>
+  new Promise((resolve, reject) =>
+    helmetMiddleware(req, res, (err?: unknown) => (err ? reject(err as Error) : resolve()))
+  );
 
 const PORT = Number(process.env.PORT ?? 7777);
 const WEBDIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../web/dist");
@@ -33,6 +48,7 @@ async function serveStatic(res: import("node:http").ServerResponse, pathname: st
 }
 
 const server = http.createServer(async (req, res) => {
+  await applyHelmet(req, res);
   res.setHeader("access-control-allow-origin", "*");
   res.setHeader("access-control-allow-headers", "authorization,content-type,x-server-id,x-agent-id");
   res.setHeader("access-control-allow-methods", "GET,POST,PATCH,DELETE,OPTIONS");
