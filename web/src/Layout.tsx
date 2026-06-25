@@ -28,6 +28,7 @@ export function Layout() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set()); // session-dismissed alert ids (cleared on reload — alerts re-derive from live state)
   const [alertAnchor, setAlertAnchor] = useState<{ left: number; bottom: number } | null>(null); // notification popover anchor (fixed pos); null = closed
   const alerts = allAlerts.filter((a) => !dismissed.has(a.id));
+  useEffect(() => { if (!alerts.length) setAlertAnchor(null); }, [alerts.length]); // alerts emptied (all dismissed) → drop the anchor so a later new alert doesn't make the popover auto-open without a click
   const slug = server || "open-tag";
   const isChat = loc.pathname.includes("/channel");
   const go = (key: string) => nav(`/s/${slug}/${key}`);

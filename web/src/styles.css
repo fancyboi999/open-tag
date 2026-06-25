@@ -47,7 +47,8 @@ button{font-family:inherit}
 .rail a.t:hover{background:var(--canvas-soft);color:var(--ink)}
 .rail a.t.active{background:var(--surface);border-color:var(--hair-strong);color:var(--ink);box-shadow:0 1px 2px var(--shadow-1)}
 .rail .spacer{flex:1}
-.rail a.t.alert-tab{color:var(--amber)} /* warning button stands out from the neutral nav icons; hover/active still resolve to --ink */
+.rail a.t.alert-tab{color:var(--amber)} /* warning button stands out from the neutral nav icons */
+.rail a.t.alert-tab.active{color:var(--ink)} /* open state matches the other tabs' active ink (same specificity as .alert-tab but declared after, so it wins) */
 /* System alert center (alerts.tsx): rail warning button → fixed notification popover. Editorial style (our tokens),
    mirroring .sw-pop's rail-anchored overlay; deliberately not a brutalist black-border card. */
 .alert-backdrop{position:fixed;inset:0;z-index:40}
@@ -567,7 +568,7 @@ a:focus-visible,button:focus-visible,[role="button"]:focus-visible{outline:2px s
 input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ink-2)}
 .composer-input:focus-visible,.qs-search input:focus-visible{box-shadow:none}
 .rail a.t:focus-visible{outline-offset:-2px}
-.rail-badge{position:absolute;top:1px;right:1px;min-width:16px;height:16px;padding:0 4px;border-radius:9999px;background:var(--tint-rose-ink);color:var(--on-ink);font-size:10px;font-weight:600;line-height:16px;text-align:center;box-shadow:0 0 0 1.5px var(--canvas-soft)}
+.rail-badge{position:absolute;top:1px;right:1px;min-width:16px;height:16px;padding:0 4px;border-radius:9999px;background:var(--tint-rose-ink);color:var(--on-ink);font-size:10px;font-weight:600;line-height:16px;text-align:center;box-shadow:0 0 0 1.5px var(--surface-strong)}
 .inbox-list{flex:1;overflow:auto;padding:8px 0}
 .inbox-row{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;padding:13px 28px;border-bottom:1px solid var(--hair)}
 .inbox-row:hover{background:var(--canvas-soft)}
