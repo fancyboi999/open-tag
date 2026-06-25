@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, type ChangeEvent, type ClipboardEvent as RClipboardEvent, type DragEvent as RDragEvent, type ReactNode, type CSSProperties } from "react";
-import { ImagePlus, Paperclip, Send, CheckCircle2 } from "lucide-react";
+import { useState, useRef, useEffect, useMemo, type ChangeEvent, type ClipboardEvent as RClipboardEvent, type DragEvent as RDragEvent, type CSSProperties } from "react";
+import { ImagePlus, Paperclip, Send, CheckCircle2, Power, Moon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useStore } from "../store.tsx";
+import { useStore, type Agent } from "../store.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { IconFile } from "../icons.tsx";
 
@@ -12,15 +12,15 @@ const isImage = (m?: string) => !!m && m.startsWith("image/");
 // The only per-context difference is "As Task" (channels/DMs only), gated by `allowAsTask` —
 // threads leave it falsy so a thread reply is never a task. Sending POSTs to `channelId`; the
 // message echoes back over the socket, so the *parent* owns the message list + scroll, not this.
-export function Composer({ channelId, placeholder, allowAsTask = false, topSlot, className }: {
+export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent, className }: {
   channelId: string;
   placeholder: string;       // base placeholder; when As Task is checked the component swaps in the task placeholder
   allowAsTask?: boolean;     // channels/DMs pass true → show the As Task toggle + ⌘/Ctrl+Shift+Enter shortcut
-  topSlot?: ReactNode;       // rendered above the input (channels use it for the agent wake-state hint)
+  dmAgent?: Agent;           // DM peer agent (channels/threads omit) → drives the single-peer sleeping nudge
   className?: string;        // extra class on the .composer root (threads pass "thread-composer")
 }) {
   const { t } = useTranslation();
-  const { api, agents, humans, uploadOne, attachmentUrl } = useStore();
+  const { api, agents, humans, machines, uploadOne, attachmentUrl } = useStore();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const [text, setText] = useState("");
   const [asTask, setAsTask] = useState(false);
@@ -33,6 +33,21 @@ export function Composer({ channelId, placeholder, allowAsTask = false, topSlot,
   const imgRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { const el = inputRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }, [text]); // textarea auto-grows up to 160px
+
+  // Reachability / wake hint above the input. Targets a message will reach = the DM peer (if any) + agents
+  // @-mentioned in the current draft. Surfaces when a target's machine is offline (the message is saved but the
+  // agent can't see it until its machine reconnects — at which point reconnect catch-up wakes it to process the
+  // backlog), or, for a DM (single peer), when the peer is merely sleeping (sending wakes it). Channels have no
+  // single peer, so they only get the offline hint, keyed off whoever is @-mentioned in the draft.
+  const reach = useMemo<{ kind: "off" | "sleep"; names: string } | null>(() => {
+    const targets = new Map<string, Agent>();
+    if (dmAgent) targets.set(dmAgent.id, dmAgent);
+    for (const m of text.matchAll(/@([\p{L}\p{N}_-]+)/gu)) { const a = agents.find((x) => x.name === m[1]); if (a) targets.set(a.id, a); }
+    const offline = [...targets.values()].filter((a) => !a.machineId || machines.find((mc) => mc.id === a.machineId)?.status !== "online");
+    if (offline.length) return { kind: "off", names: offline.map((a) => a.displayName || a.name).join(", ") };
+    if (dmAgent) { const st = dmAgent.activity || dmAgent.status; if (st === "sleeping" || st === "inactive" || st === "offline") return { kind: "sleep", names: dmAgent.displayName || dmAgent.name }; }
+    return null;
+  }, [text, dmAgent, agents, machines]);
 
   const send = async (forceTask?: boolean) => {
     const v = text.trim(); if ((!v && !pendingAtts.length) || !channelId) return;
@@ -83,7 +98,9 @@ export function Composer({ channelId, placeholder, allowAsTask = false, topSlot,
 
   return (
     <div className={"composer" + (className ? " " + className : "")}>
-      {topSlot}
+      {reach && (reach.kind === "off"
+        ? <div className="wake-hint wh-off"><Power size={13} /> {t("chat.machineOffline", { names: reach.names })}</div>
+        : <div className="wake-hint"><Moon size={13} /> {t("chat.agentSleeping", { name: reach.names })}</div>)}
       {atQuery !== null && cands.length > 0 && (
         <div className="mention-menu">
           {cands.map((c, i) => (

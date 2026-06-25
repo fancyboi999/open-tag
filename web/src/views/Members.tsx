@@ -11,6 +11,7 @@ import { IconMonitor } from "../icons.tsx";
 import { Avatar, AvatarPicker, resolveAvatar } from "../Avatar.tsx";
 import { Select } from "../Select.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
+import { useToast } from "../toast.tsx";
 import i18n from "../i18n";
 
 // Unified agent status label: fine-grained activity (working/thinking/online) takes priority;
@@ -144,6 +145,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const { t } = useTranslation();
   const { api, reload, onEvent, capabilities, openDM, slug, uploadAgentAvatar, attachmentUrl } = useStore();
   const confirm = useConfirm();
+  const toast = useToast();
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
   const tab = sp.get("agentTab") || "profile";
@@ -157,13 +159,15 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const onPickAvatar = async (f: File) => { setAvBusy(true); setAvErr(""); try { const url = await uploadAgentAvatar(id, f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { await api("PATCH", "/api/agents/" + id, { avatarUrl: scheme }); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   if (!a) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
-  const ctl = async (action: string) => { await api("POST", `/api/agents/${id}/${action}`); setTimeout(refetch, 400); };
+  const ctl = async (action: string) => { const r = await api("POST", `/api/agents/${id}/${action}`); if (r?.error) toast.error(t("members.startFailed")); setTimeout(refetch, 400); }; // start/stop: surface daemon-offline failure (503 → {error}) instead of swallowing it
   // Three restart modes: restart=keep session+workspace; reset=clear session, keep workspace; full=clear session+delete workspace. All modes end with a restart.
   const doRestart = async (mode: "restart" | "reset" | "full") => {
     setShowRestart(false);
-    if (mode === "restart") await api("POST", `/api/agents/${id}/restart`);
-    else if (mode === "reset") await api("POST", `/api/agents/${id}/reset`, { restart: true });
-    else await api("POST", `/api/agents/${id}/reset`, { wipeWorkspace: true, restart: true });
+    let r: any;
+    if (mode === "restart") r = await api("POST", `/api/agents/${id}/restart`);
+    else if (mode === "reset") r = await api("POST", `/api/agents/${id}/reset`, { restart: true });
+    else r = await api("POST", `/api/agents/${id}/reset`, { wipeWorkspace: true, restart: true });
+    if (r?.error) toast.error(t("members.startFailed")); // pure restart returns 503 when daemon offline; reset/full return ok (restart leg stays best-effort)
     setTimeout(refetch, 500);
   };
   const del = async () => { if (!(await confirm({ title: t("members.deleteAgentTitle", { name: a.name }), message: t("members.deleteAgentMessage"), confirmLabel: t("members.delete"), danger: true }))) return; await api("DELETE", "/api/agents/" + id); await reload(); onDeleted(); };
@@ -427,6 +431,7 @@ function WorkspaceTab({ id }: { id: string }) {
 
 export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () => void; prefill?: { name?: string; description?: string }; onCreated?: (r: { id: string; name: string }) => void }) {
   const { t } = useTranslation();
+  const toast = useToast();
   useEscClose(onClose);
   const { api, serverId, machines, reload } = useStore();
   const [name, setName] = useState(prefill?.name ?? ""); const [desc, setDesc] = useState(prefill?.description ?? "");
@@ -441,7 +446,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
     if (!nm) { setErr(t("members.nameRequired")); return; }
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(nm) || nm.length > 64) { setErr(t("members.nameInvalid")); return; } // @mention handle must be machine-safe; keep regex + length 64 in sync with core.ts AGENT_NAME_RE / MAX_AGENT_NAME
     setBusy(true); setErr("");
-    try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model || null, reasoning: runtime === "codex" ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) onCreated?.({ id: r.id, name: r.name ?? nm }); onClose(); }
+    try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model || null, reasoning: runtime === "codex" ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) { if (r.started === false) toast.info(t("members.agentCreatedOffline")); onCreated?.({ id: r.id, name: r.name ?? nm }); } onClose(); }
     catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
   const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "opencode", label: "OpenCode" }, { value: "kimi", label: "Kimi Code" }, { value: "pi", label: "Pi" }, { value: "cursor", label: "Cursor" }];

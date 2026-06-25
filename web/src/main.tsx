@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { StoreProvider, useStore } from "./store.tsx";
 import { ConfirmProvider } from "./ConfirmModal.tsx";
+import { ToastProvider } from "./toast.tsx";
 import { Layout } from "./Layout.tsx";
 import { Chat } from "./views/Chat.tsx";
 import { Members } from "./views/Members.tsx";
@@ -39,6 +40,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <StoreProvider>
       <ConfirmProvider>
+      <ToastProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -65,6 +67,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="*" element={<RootRedirect />} />
         </Routes>
       </BrowserRouter>
+      </ToastProvider>
       </ConfirmProvider>
     </StoreProvider>
   </React.StrictMode>,

@@ -192,6 +192,16 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .wake-hint{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:0 2px 9px;line-height:1.4}
 .wake-hint svg{color:var(--g-sky);flex:0 0 auto}
 .wake-hint.wh-off svg{color:var(--muted-soft)}
+/* Global toast notifications (toast.tsx) — one-shot operation feedback, bottom-right stack. */
+.toast-stack{position:fixed;bottom:18px;right:18px;z-index:1000;display:flex;flex-direction:column;gap:8px;max-width:360px}
+.toast{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.45;background:var(--surface);border:1px solid var(--hair-strong);box-shadow:0 4px 16px rgba(12,10,9,.12);cursor:pointer;animation:toast-in .16s ease-out}
+.toast-error{background:var(--error-soft);border-color:var(--error-line)}
+.toast-info{background:var(--tint-blue);border-color:var(--tint-blue-strong)}
+.toast-msg{flex:1 1 auto;color:var(--ink)}
+.toast-error .toast-msg{color:var(--error)}
+.toast-x{flex:0 0 auto;background:none;border:none;color:var(--muted);font-size:16px;line-height:1;cursor:pointer;padding:0 2px}
+.toast-x:hover{color:var(--ink)}
+@keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .mention-menu{position:absolute;left:28px;right:28px;bottom:100%;margin-bottom:8px;background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;box-shadow:0 8px 28px var(--shadow-3);max-height:264px;overflow:auto;z-index:20}
 .mention-opt{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;padding:8px 12px;cursor:pointer;font-size:14px;text-align:left;color:var(--body)}
 .mention-opt:hover,.mention-opt.sel{background:var(--surface-strong)}
