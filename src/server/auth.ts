@@ -3,8 +3,19 @@ import jwt from "jsonwebtoken";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 
-const SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
-export const BOOTSTRAP_KEY = process.env.DAEMON_BOOTSTRAP_KEY ?? "poc-secret-key";
+/** Require an env var or abort startup with a clear message. Never falls back to a weak default. */
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(
+    `[open-tag] Required env var ${name} is not set.\n` +
+    `  Generate one:  openssl rand -hex 32\n` +
+    `  Then add it to .env before starting the server.`
+  );
+  return v;
+}
+
+const SECRET = requireEnv("JWT_SECRET");
+export const BOOTSTRAP_KEY = requireEnv("DAEMON_BOOTSTRAP_KEY");
 
 export const signUser = (userId: string) => jwt.sign({ uid: userId }, SECRET, { expiresIn: "30d" });
 export function verifyUser(token: string | null): string | null {

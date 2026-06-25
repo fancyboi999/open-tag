@@ -5,7 +5,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import jwt from "jsonwebtoken";
 
+// Both required vars must be set before importing auth.ts — the module throws at load time if either is missing.
 process.env.JWT_SECRET = "test-secret";
+process.env.DAEMON_BOOTSTRAP_KEY = "test-bootstrap-key";
 const auth = await import("../src/server/auth.ts");
 
 test("signUser / verifyUser round-trip returns the uid", () => {
