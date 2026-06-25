@@ -190,6 +190,16 @@ async function main() {
   check("non-party cannot read a DM channel", r6non.status === 403);
   const r6owner = await apiCall({ method: "GET", path: `/api/messages/channel/${dmChId}`, token: ownerToken, serverId });
   check("DM party can read the DM channel", r6owner.status === 200);
+
+  // ── [7] GET /api/tasks/server — server-wide board must NOT leak private-channel tasks ─
+  // First create a task in the private channel so there is something to find
+  console.log("\n[7] GET /api/tasks/server — private channel tasks must not appear to non-members");
+  await apiCall({ method: "POST", path: `/api/tasks/channel/${privateChId}`, token: ownerToken, serverId, body: { tasks: [{ title: "private-task-leak-test" }] } });
+  const r7non = await apiCall({ method: "GET", path: `/api/tasks/server`, token: nonMemberToken, serverId });
+  check("tasks/server returns 200 for server member", r7non.status === 200);
+  check("non-member tasks/server does NOT include private channel task", !JSON.stringify(r7non.body).includes("private-task-leak-test"));
+  const r7owner = await apiCall({ method: "GET", path: `/api/tasks/server`, token: ownerToken, serverId });
+  check("owner tasks/server DOES include the private channel task", JSON.stringify(r7owner.body).includes("private-task-leak-test"));
 }
 
 main()

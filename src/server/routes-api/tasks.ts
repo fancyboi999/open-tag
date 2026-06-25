@@ -1,6 +1,6 @@
 // Auto-extracted from the former routes-api.ts monolith — bodies are verbatim.
 import type { ServerCtx } from "./ctx.js";
-import { and, asc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { TASK_STATUSES, claimTask, convertMessageToTask, createMessage, deleteTask, setTaskStatus, unclaimTask } from "../core.js";
 import { readJson, sendErr, sendJson } from "../util.js";
@@ -29,8 +29,16 @@ export async function handleTasks(ctx: ServerCtx): Promise<boolean> {
     return (sendJson(res, 200, { tasks: await attachMentions(created) }), true);
   }
   if (p === "/api/tasks/server" && method === "GET") {
+    // Invariant 3: only surface tasks from channels the user may read — their own memberships + all public channels.
+    // Private/DM channel tasks must not leak to non-members (same guard as GET /tasks/channel/:id above).
+    const memberOf = await db.select({ channelId: schema.channelMembers.channelId }).from(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));
+    const publicChs = await db.select({ id: schema.channels.id }).from(schema.channels)
+      .where(and(eq(schema.channels.serverId, serverId), eq(schema.channels.type, "channel"), isNull(schema.channels.deletedAt)));
+    const accessibleIds = [...new Set([...memberOf.map((m) => m.channelId), ...publicChs.map((c) => c.id)])];
+    if (!accessibleIds.length) return (sendJson(res, 200, { tasks: [] }), true);
     const rows = await db.select().from(schema.messages)
-      .where(and(eq(schema.messages.serverId, serverId), isNotNull(schema.messages.taskStatus)))
+      .where(and(eq(schema.messages.serverId, serverId), isNotNull(schema.messages.taskStatus), inArray(schema.messages.channelId, accessibleIds)))
       .orderBy(asc(schema.messages.taskNumber));
     return (sendJson(res, 200, { tasks: await attachMentions(rows) }), true);
   }
