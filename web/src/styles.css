@@ -263,7 +263,7 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 /* Horizontal Kanban: full-height equal lanes (Trello/Linear) — the board fills the pane and every column spans it, so the WHOLE column (not just the title strip or the cards) is a drop target. dnd-kit re-measures (MeasuringStrategy.Always) so it uses the live rects. */
 .task-board.columns{display:flex;gap:14px;align-items:stretch;overflow-x:auto;padding-bottom:6px;flex:1 1 auto;min-height:0}
 .task-board.columns .task-col{flex:0 0 300px;min-width:280px;margin-bottom:0}
-.task-board.columns .task-col.collapsed{flex:0 0 auto;min-width:0;align-self:flex-start} /* collapsed column stays compact (header only), not a tall empty strip */
+.task-board.columns .task-col.collapsed{align-self:flex-start} /* same width as the others (no shrink), just collapsed to its header height instead of a full lane */
 .task-board.stack .task-col{margin-bottom:20px}
 /* Task card: #channel + #number + title + bottom-right status pill, no avatar/timestamp (editorial style) */
 .card.task{position:relative;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:transform .1s,border-color .1s}
