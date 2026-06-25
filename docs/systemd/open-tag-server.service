@@ -15,6 +15,11 @@
 #
 # Prerequisites: Node.js 20+ on PATH, .env.prod configured, web/dist built.
 # See docs/self-host.md "Bare Node.js (advanced)" for the full procedure.
+#
+# NOTE on nvm / PATH: systemd runs with a minimal PATH that may not include nvm-managed
+# Node.js. If npx is not found, use the full absolute path (e.g.
+# /home/ubuntu/.nvm/versions/node/v22.x.x/bin/npx) or add an Environment=PATH= line.
+# See docs/self-host.md "Start with systemd" for the full explanation.
 
 [Unit]
 Description=open-tag control-plane server

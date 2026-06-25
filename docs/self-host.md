@@ -82,12 +82,15 @@ The server is now on port **7788** (default) or `${APP_PORT}` if you overrode it
 
 > **Schema migration safety**: the entrypoint runs `drizzle-kit push` *without* `--force`.
 > Additive-only migrations (the normal case) are applied automatically. If a future version
-> requires a destructive migration (dropping a column or table), the container will refuse
-> to start rather than silently destroy data. When that happens, stop the container and run
-> the migration manually:
+> requires a destructive migration (dropping a column or table), drizzle-kit will detect
+> that stdin is not a TTY and exit with an error — causing the container to fail rather than
+> silently destroy data. When that happens, run the migration manually on a temporary
+> one-off container (the main container is stopped, so `docker exec` won't work):
 > ```bash
-> docker exec -it open-tag-app npx drizzle-kit push --force
-> # Review the diff carefully, then confirm.
+> # Run drizzle-kit interactively against the running postgres service
+> docker compose --profile app run --rm --entrypoint "" app \
+>   npx drizzle-kit push --force
+> # Review the diff and confirm, then start the app normally:
 > docker compose --profile app up -d
 > ```
 
@@ -139,9 +142,18 @@ web UI to confirm it appears online.
 > The daemon stores agent workspaces, `MEMORY.md` files, and logs under `OPEN_TAG_HOME`
 > (default: `~/.open-tag`). See [Data directory](#data-directory-open_tag_home) below.
 
-### Step 5 — HTTPS reverse proxy
+### Step 5 — Firewall and HTTPS
 
-Running on a public VPS, you need HTTPS. Two options:
+**Open HTTP/HTTPS ports** if you have a firewall (Ubuntu ships with `ufw` enabled):
+
+```bash
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+```
+
+Running on a public VPS, you also need TLS. Two options below use port **7788** (the
+Docker Compose default). If you are using bare Node.js with the default `PORT=7777`,
+substitute `7777` for `7788` in the proxy config.
 
 #### Option A — Caddy (automatic TLS)
 
@@ -177,7 +189,7 @@ server {
 
     # WebSocket support (required for daemon control plane and socket.io real-time)
     location / {
-        proxy_pass         http://localhost:7788;
+        proxy_pass         http://localhost:7788;  # change to :7777 for bare Node.js
         proxy_http_version 1.1;
         proxy_set_header   Upgrade $http_upgrade;
         proxy_set_header   Connection "upgrade";
@@ -264,13 +276,26 @@ docker exec open-tag-pg \
   > "open-tag-db-$(date +%Y%m%d-%H%M%S).dump"
 ```
 
-Automate with a cron job:
+Automate with a backup script and cron job:
+
+```bash
+# Create the backup directory
+sudo mkdir -p /backups && sudo chown $(whoami) /backups
+
+# Create the backup script
+cat > /usr/local/bin/open-tag-backup.sh << 'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+DEST="/backups/open-tag-db-$(date +%Y%m%d-%H%M%S).dump"
+docker exec open-tag-pg pg_dump -U opentag -d opentag -Fc > "$DEST"
+find /backups -name 'open-tag-db-*.dump' -mtime +14 -delete
+SCRIPT
+sudo chmod +x /usr/local/bin/open-tag-backup.sh
+```
 
 ```cron
-# /etc/cron.d/open-tag-backup
-0 3 * * * root docker exec open-tag-pg pg_dump -U opentag -d opentag -Fc \
-  > /backups/open-tag-db-$(date +\%Y\%m\%d).dump && \
-  find /backups -name 'open-tag-db-*.dump' -mtime +14 -delete
+# /etc/cron.d/open-tag-backup  (one line — no backslash continuation)
+0 3 * * * root /usr/local/bin/open-tag-backup.sh
 ```
 
 ### Database restore
@@ -361,6 +386,14 @@ Or install them natively (system packages or managed cloud instances).
 cp .env.example .env.prod
 ```
 
+> **Critical**: `.env.example` has `ALLOW_DEV_LOGIN=true` uncommented (it is a
+> development convenience default). You **must** comment it out or remove it before
+> starting the production server — leave it active and anyone who can reach your server
+> gets a passwordless login for any account. The systemd unit (Step 5) sets
+> `NODE_ENV=production` which disables dev-login at the code level regardless, but the
+> env file is also read by manual `npm run start:prod` invocations, so it is safer to
+> remove the line entirely.
+
 Edit `.env.prod`:
 
 ```env
@@ -372,8 +405,8 @@ JWT_SECRET=<openssl rand -hex 32>
 DAEMON_BOOTSTRAP_KEY=<openssl rand -hex 32>
 ADMIN_SETUP_TOKEN=<openssl rand -hex 32>
 
-# Unset or false for production — dev-login is disabled when NODE_ENV=production
-# ALLOW_DEV_LOGIN=false
+# ALLOW_DEV_LOGIN must be absent or commented out in production
+# ALLOW_DEV_LOGIN=true   ← remove or comment this line from the copied .env.example
 
 # Optional: override where agent workspaces and logs are stored
 # OPEN_TAG_HOME=/data/open-tag
@@ -410,6 +443,23 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now open-tag-server
 sudo systemctl enable --now open-tag-daemon
 ```
+
+> **nvm users**: systemd starts services with a minimal `PATH` that does not include
+> nvm-managed Node.js. If you installed Node via nvm, you have two options:
+>
+> **Option A** — use the full path. Find where npx lives:
+> ```bash
+> which npx   # e.g. /home/ubuntu/.nvm/versions/node/v22.x.x/bin/npx
+> ```
+> Then in the unit file, replace `npx` with that absolute path everywhere.
+>
+> **Option B** — add an `Environment=PATH=` line in `[Service]`:
+> ```ini
+> Environment=PATH=/home/ubuntu/.nvm/versions/node/v22.x.x/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+> ```
+>
+> Alternatively, install Node.js via the [official NodeSource PPA](https://github.com/nodesource/distributions)
+> or [system packages](https://nodejs.org/en/download/package-manager) so it is on the system PATH.
 
 Check status:
 
@@ -493,10 +543,11 @@ sudo systemctl restart open-tag-daemon
 
 ## Troubleshooting
 
-**Container won't start / entrypoint hangs**
+**Container won't start**
 
-Check the logs: `docker compose logs app`. If the schema migration failed due to destructive
-changes, follow the manual migration procedure in [Step 2](#step-2--start-the-control-plane).
+Check the logs: `docker compose logs app`. If the schema migration exited because
+destructive changes require confirmation, follow the manual migration procedure in
+[Step 2](#step-2--start-the-control-plane).
 
 **`/api/auth/setup` returns 404**
 

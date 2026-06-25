@@ -1,19 +1,23 @@
 # open-tag compute-plane daemon — systemd unit
 #
-# The daemon runs on the machine that hosts your agent CLIs
-# (claude, codex, copilot, opencode, etc.). It connects back to the
-# control-plane server over WebSocket using the DAEMON_BOOTSTRAP_KEY.
+# This unit is for the BARE NODE.JS path (see docs/self-host.md "Bare Node.js").
+# It requires: the repo cloned at WorkingDirectory, and tsx available on PATH.
 #
-# If the daemon runs on the SAME host as the server, install both units
-# and start them with `--now`. If the daemon runs on a SEPARATE machine,
-# install only this unit on that machine and point OPEN_TAG_SERVER_URL
-# at the server's public URL (or internal IP).
+# DOCKER COMPOSE users: the daemon still runs on the HOST (not in a container),
+# but you should use the published npm package form (no repo needed):
+#   ExecStart=/usr/bin/env npx @fancyboi999/open-tag-daemon@latest \
+#     --server-url http://localhost:7788 \
+#     --api-key change-me
+# (7788 is the Docker Compose default port; adjust OPEN_TAG_SERVER_URL below accordingly.)
 #
 # SETUP (run as root or with sudo):
 #   1. Edit the [Service] section below:
-#      - Replace /home/ubuntu/open-tag with the actual checkout path (or use npx — see below)
-#      - Replace ubuntu:ubuntu with the actual user:group running the daemon
-#      - Set OPEN_TAG_SERVER_URL and OPEN_TAG_API_KEY to match your .env.prod values
+#      - Set WorkingDirectory to the actual checkout path
+#      - Set User/Group to the user running the daemon
+#      - Set OPEN_TAG_SERVER_URL to where the server is reachable
+#        (bare Node.js default: http://localhost:7777;
+#         Docker Compose default: http://localhost:7788)
+#      - Set OPEN_TAG_API_KEY to match DAEMON_BOOTSTRAP_KEY in your .env.prod / .env.docker
 #   2. Copy to systemd:
 #        sudo cp docs/systemd/open-tag-daemon.service /etc/systemd/system/open-tag-daemon.service
 #   3. Enable and start:
@@ -23,19 +27,18 @@
 #        sudo systemctl status open-tag-daemon
 #        journalctl -u open-tag-daemon -f
 #
-# Alternative — use the published npm package (no repo needed on the daemon host):
-#   Replace ExecStart with:
-#     ExecStart=/usr/bin/env npx @fancyboi999/open-tag-daemon@latest \
-#       --server-url ${OPEN_TAG_SERVER_URL} \
-#       --api-key ${OPEN_TAG_API_KEY}
+# NOTE on nvm / PATH: systemd runs with a minimal PATH that may not include nvm-managed
+# Node.js. If `npx` is not found, use the full absolute path (e.g.
+# /home/ubuntu/.nvm/versions/node/v22.x.x/bin/npx) or add an Environment=PATH= line.
+# See docs/self-host.md "Start with systemd" for the full explanation.
 #
-# See docs/self-host.md for the full procedure.
+# See docs/self-host.md for the complete procedure.
 
 [Unit]
 Description=open-tag compute-plane daemon
 Documentation=https://github.com/fancyboi999/open-tag
 After=network.target
-# If the server runs on the same host, wait for it:
+# If the server runs on the same host (bare Node.js path), wait for it:
 After=open-tag-server.service
 Wants=network.target
 
@@ -45,10 +48,14 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/home/ubuntu/open-tag
 
-# Server URL and daemon API key (must match DAEMON_BOOTSTRAP_KEY in the server's .env.prod).
-# Replace these with real values, or load them from a secrets file:
-#   EnvironmentFile=/etc/open-tag/daemon.env
+# Server URL — set to where the control-plane server is reachable.
+# Bare Node.js default: http://localhost:7777
+# Docker Compose default: http://localhost:7788
 Environment=OPEN_TAG_SERVER_URL=http://localhost:7777
+
+# Must match DAEMON_BOOTSTRAP_KEY in the server's .env.prod / .env.docker.
+# Replace with the real value, or load from a secrets file:
+#   EnvironmentFile=/etc/open-tag/daemon.env
 Environment=OPEN_TAG_API_KEY=change-me
 
 # OPEN_TAG_HOME: where agent workspaces, MEMORY.md files, logs, and uploads are stored.
@@ -56,9 +63,15 @@ Environment=OPEN_TAG_API_KEY=change-me
 # Override here if you need a different path:
 # Environment=OPEN_TAG_HOME=/data/open-tag
 
+# Bare Node.js form (requires repo checkout + tsx in devDependencies):
 ExecStart=/usr/bin/env npx tsx src/daemon/index.ts \
   --server-url ${OPEN_TAG_SERVER_URL} \
   --api-key ${OPEN_TAG_API_KEY}
+
+# Docker Compose / no-repo form — uncomment and comment out the bare form above:
+# ExecStart=/usr/bin/env npx @fancyboi999/open-tag-daemon@latest \
+#   --server-url ${OPEN_TAG_SERVER_URL} \
+#   --api-key ${OPEN_TAG_API_KEY}
 
 Restart=on-failure
 RestartSec=10s
