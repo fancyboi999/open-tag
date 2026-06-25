@@ -67,7 +67,7 @@
   "devDependencies": {
     "@types/busboy": "^1.5.4",
     "@types/jsonwebtoken": "^9.0.7",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.0.1",
     "@types/ws": "^8.5.12",
     "drizzle-kit": "^0.31.10",
     "esbuild": "^0.28.0",
