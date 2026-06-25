@@ -30,6 +30,26 @@ const applyHelmet = (req: http.IncomingMessage, res: http.ServerResponse): Promi
     helmetMiddleware(req, res, (err?: unknown) => (err ? reject(err as Error) : resolve()))
   );
 
+// ── CORS origin whitelist ─────────────────────────────────────────────────────
+// Reads ALLOWED_ORIGIN (comma-separated list of allowed origins, e.g. "https://app.example.com").
+// Dev fallback (ALLOWED_ORIGIN unset): any localhost / 127.0.0.1 origin is permitted so Vite HMR
+// and direct curl still work. Production deployments must set ALLOWED_ORIGIN explicitly.
+const _allowedOrigins: Set<string> | null = (() => {
+  const v = process.env.ALLOWED_ORIGIN?.trim();
+  if (!v) return null; // null = dev mode, use localhost fallback
+  return new Set(v.split(",").map(s => s.trim()).filter(Boolean));
+})();
+
+/** Returns the ACAO value to echo back, or null if the origin is not allowed. */
+function corsOriginHeader(reqOrigin: string | undefined): string | null {
+  if (!reqOrigin) return null; // no Origin header → same-origin or non-browser → no ACAO needed
+  if (!_allowedOrigins) {
+    // Dev mode: allow any localhost / 127.0.0.1 origin (any port)
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(reqOrigin) ? reqOrigin : null;
+  }
+  return _allowedOrigins.has(reqOrigin) ? reqOrigin : null;
+}
+
 const PORT = Number(process.env.PORT ?? 7777);
 const WEBDIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../web/dist");
 const log = createLogger("server");
@@ -49,7 +69,11 @@ async function serveStatic(res: import("node:http").ServerResponse, pathname: st
 
 const server = http.createServer(async (req, res) => {
   await applyHelmet(req, res);
-  res.setHeader("access-control-allow-origin", "*");
+  const allowedOrigin = corsOriginHeader(req.headers.origin);
+  if (allowedOrigin) {
+    res.setHeader("access-control-allow-origin", allowedOrigin);
+    res.setHeader("vary", "Origin");
+  }
   res.setHeader("access-control-allow-headers", "authorization,content-type,x-server-id,x-agent-id");
   res.setHeader("access-control-allow-methods", "GET,POST,PATCH,DELETE,OPTIONS");
   if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }

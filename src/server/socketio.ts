@@ -12,8 +12,24 @@ import { createLogger } from "../log.js";
 const log = createLogger("server:io");
 let io: IOServer | null = null;
 
+/** Mirror the HTTP CORS whitelist for socket.io handshake/polling requests.
+ *  ALLOWED_ORIGIN (comma-separated) gates which browser origins may connect.
+ *  Dev fallback (unset): any localhost / 127.0.0.1 origin is allowed. */
+function socketIoCorsOrigin(): string | ((origin: string | undefined, cb: (err: Error | null, ok: boolean) => void) => void) {
+  const v = process.env.ALLOWED_ORIGIN?.trim();
+  if (v) {
+    const origins = new Set(v.split(",").map(s => s.trim()).filter(Boolean));
+    return (origin, cb) => cb(null, !origin || origins.has(origin));
+  }
+  // Dev mode: allow localhost / 127.0.0.1 (any port) or no origin (same-origin, postman)
+  return (origin, cb) => {
+    const ok = !origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    cb(ok ? null : new Error("CORS: origin not allowed"), ok);
+  };
+}
+
 export function attachSocketIO(server: Server): void {
-  io = new IOServer(server, { cors: { origin: "*" }, path: "/socket.io/" });
+  io = new IOServer(server, { cors: { origin: socketIoCorsOrigin() }, path: "/socket.io/" });
   io.on("connection", async (socket: Socket) => {
     const auth = (socket.handshake.auth || {}) as { token?: string; serverId?: string };
     const uid = verifyUser(auth.token ?? null);
