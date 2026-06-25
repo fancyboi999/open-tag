@@ -243,17 +243,19 @@ export function Computers() {
 // Connect machine modal: generates an API key and a ready-to-run daemon connection command
 function ConnectMachineModal({ onClose }: { onClose: () => void }) {
   useEscClose(onClose);
-  const { api, serverId, reload } = useStore();
+  const { api, serverId, reload, machines } = useStore();
   const { t } = useTranslation();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [res, setRes] = useState<{ key: string; name: string } | null>(null);
+  const [res, setRes] = useState<{ id: string; key: string; name: string } | null>(null);
   const [copied, setCopied] = useState("");
   const gen = async () => {
     setBusy(true);
-    try { const r = await api("POST", `/api/servers/${serverId}/machines`, { name: name.trim() }); if (r?.key) { setRes({ key: r.key, name: r.name }); await reload(); } }
+    try { const r = await api("POST", `/api/servers/${serverId}/machines`, { name: name.trim() }); if (r?.key) { setRes({ id: r.id, key: r.key, name: r.name }); await reload(); } }
     finally { setBusy(false); }
   };
+  // Auto-close once the just-added machine's daemon comes online (store refetches machines on the machine:status socket event).
+  useEffect(() => { if (res && machines.some((m) => m.id === res.id && m.status === "online")) onClose(); }, [machines, res, onClose]);
   const cmd = res ? `npx @fancyboi999/open-tag-daemon --server-url ${window.location.origin} --api-key ${res.key}` : "";
   const copy = (text: string, tag: string) => { navigator.clipboard?.writeText(text); setCopied(tag); setTimeout(() => setCopied(""), 1500); };
   return (
