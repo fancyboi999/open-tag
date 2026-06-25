@@ -341,7 +341,7 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 /* Centered empty state for a primary full content pane (Inbox / Saved / Tasks / empty channel / no machine
    / activity): a calm, editorial moment (serif headline, optional sub-line) instead of a small grey line
    pinned top-left. Secondary sub-section empties keep the inline .empty above. See <PaneEmpty>. */
-.pane-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:62vh;padding:48px 24px;text-align:center;color:var(--muted)}
+.pane-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:62vh;padding:48px 24px;text-align:center;color:var(--muted)}
 .pane-empty svg{color:var(--muted-soft)}
 .pane-empty .pe-title{font-family:var(--serif);font-weight:300;font-size:23px;line-height:1.25;letter-spacing:-.3px;color:var(--ink-2);max-width:34ch}
 .pane-empty .pe-sub{font-size:14px;line-height:1.55;color:var(--muted);max-width:44ch}

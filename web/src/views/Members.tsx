@@ -9,7 +9,6 @@ import { useTranslation } from "react-i18next";
 import { useStore, fmtTime } from "../store.tsx";
 import { IconMonitor } from "../icons.tsx";
 import { Avatar, AvatarPicker, resolveAvatar } from "../Avatar.tsx";
-import { PaneEmpty } from "../PaneEmpty.tsx";
 import { Select } from "../Select.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 import { useToast } from "../toast.tsx";
@@ -364,7 +363,7 @@ function ActivityTab({ id, name }: { id: string; name: string }) {
   const visible = (e: any) => !(e.kind === "status" && !e.activity && !e.detail) && !(e.kind === "tool_start" && e.toolName === "agentMessage" && !e.text);
   return (
     <div className="scroll" ref={scrollRef}>
-      {items.length === 0 ? <PaneEmpty title={t("members.activityEmpty", { name })} />
+      {items.length === 0 ? <div className="empty">{t("members.activityEmpty", { name })}</div>
         : <div className="actlog">{items.filter((it) => visible(entryOf(it.entry))).map((it, i) => {
           const e = entryOf(it.entry); const t2 = time(it.timestamp);
           if (e.kind === "tool_start") return <div className="act" key={i}><span className="act-t">{t2}</span><span className="act-tool"><Wrench size={11} /> {e.toolName}</span><span className="act-x mono">{e.toolInput}</span></div>;

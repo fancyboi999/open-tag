@@ -101,7 +101,7 @@ Lets any machine join a server without cloning the repo: `npx @fancyboi999/open-
 - `views/misc.tsx` — Tasks / Inbox / Computers / Search / Settings.
 - `views/Landing.tsx` + `landing/` — Public landing page (`/`): warm-editorial skin (tokens all scoped to `.lp-*`, strictly isolated from app editorial skin — no cross-contamination), hero / three-pillar / capability cards × 9 / engine / architecture / CTA / footer (9 sections). "Enter workspace" button navigates to `/s/:slug` when logged in, otherwise to `/login`. Copy and selling points are grounded in verified capabilities.
 - `TaskBoard.tsx` — 5-column kanban (todo / in_progress / in_review / done / closed) + List toggle + **Board layout toggle** (horizontal columns ↔ vertical stack, default horizontal, persisted in `localStorage["open-tag.tasks.boardLayout"]`; horizontal uses min-width columns + horizontal scroll so the narrow embedded channel tasks tab degrades gracefully) + filters + drag-and-drop status change + real-time subscription.
-- `Layout/Avatar/Select/icons.tsx`, `styles.css` — Shell / avatar / dropdown / icons + UI tokens (EB Garamond + Inter, drawn from DESIGN.md token subset).
+- `Layout/Avatar/Select/PaneEmpty/icons.tsx`, `styles.css` — Shell / avatar / dropdown / centered editorial empty-state (`<PaneEmpty>`, for primary full content panes — secondary sub-section empties keep the inline `.empty`) / icons + UI tokens (EB Garamond + Inter, drawn from DESIGN.md token subset).
 - `trajBuffer.ts` — Pure bounded ring buffer (`appendCapped`, `TRAJ_CAP=300`) for the global Agent Live Trace feed; the memory bound for the in-session trace held in `store.tsx`.
 - `dist/` — Build output, statically served by the server `index.ts`.
 

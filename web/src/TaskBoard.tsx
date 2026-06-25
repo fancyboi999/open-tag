@@ -171,7 +171,7 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
     const label = t(labelKey);
     return (
       <div ref={setNodeRef} className={"task-col" + (collapsed.has(k) ? " collapsed" : "") + (isOver ? " drop-over" : "")}>
-        <div className="sec" onClick={() => toggleCol(k)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}>{collapsed.has(k) ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{label} <span className="cnt">{groups[k]?.length || 0}</span></div>
+        <div className="sec" onClick={() => toggleCol(k)} style={{ cursor: "pointer" }}>{collapsed.has(k) ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{label} <span className="cnt">{groups[k]?.length || 0}</span></div>
         {isOver && <div className="drop-hint">{t("tasks.dropToSet", { label })}</div>}
         {!collapsed.has(k) && (groups[k] || []).map((task) => <DraggableCard key={task.id} t={task} />)}
       </div>
