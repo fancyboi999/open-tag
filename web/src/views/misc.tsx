@@ -4,7 +4,7 @@ import { Star, Bookmark, AlertTriangle, Lock, MessageCircle } from "lucide-react
 import { useStore, fmtTime } from "../store.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { ChatSidebar } from "./ChatSidebar.tsx";
-import { IconMonitor } from "../icons.tsx";
+import { IconMonitor, IconInbox } from "../icons.tsx";
 import { TaskBoard } from "../TaskBoard.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 import { useTranslation } from "react-i18next";
@@ -140,9 +140,10 @@ export function Inbox() {
         <div className="head"><h1>{t("misc.inboxTitle")}</h1><small>{loading ? t("misc.inboxLoading") : t("misc.inboxSummary", { count: listCount, filter: curFilterLabel })}</small></div>
         <div className="inbox-list">
           {!loading && isEmpty && (
-            filter === "all"
-              ? <div className="empty">{t("misc.inboxEmptyAll")}</div>
-              : <div className="empty">{t("misc.inboxEmptyFilter", { filter: curFilterLabel })}</div>
+            <div className="pane-empty">
+              <IconInbox size={30} />
+              <div className="pe-title">{filter === "all" ? t("misc.inboxEmptyAll") : t("misc.inboxEmptyFilter", { filter: curFilterLabel })}</div>
+            </div>
           )}
           {!isMentions && items.map((it) => (
             <button key={it.channelId} className={"inbox-row" + (it.unreadCount > 0 ? " unread" : "")} onClick={() => open(it)}>
@@ -546,7 +547,7 @@ export function Saved() {
       <main className="content-col">
         <div className="head"><h1>{t("common.saved")}</h1><small>{loading ? t("misc.savedLoading") : t("misc.savedCount", { count: items.length })}</small></div>
         <div className="inbox-list">
-          {!loading && !items.length && <div className="empty">{t("misc.savedEmpty")}</div>}
+          {!loading && !items.length && <div className="pane-empty"><Bookmark size={28} /><div className="pe-title">{t("misc.savedEmpty")}</div></div>}
           {items.map((it) => (
             <button key={it.messageId} className="inbox-row" onClick={() => open(it)}>
               <span className="ib-main">
