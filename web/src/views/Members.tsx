@@ -437,20 +437,22 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
   const [name, setName] = useState(prefill?.name ?? ""); const [desc, setDesc] = useState(prefill?.description ?? "");
   const [machineId, setMachineId] = useState(machines[0]?.id || "");
   const [runtime, setRuntime] = useState("claude"); const [model, setModel] = useState("");
-  const [models, setModels] = useState<{ id: string; label?: string }[]>([]); const [fast, setFast] = useState(false);
-  const [reasoning, setReasoning] = useState(""); // codex reasoning effort (""=Default, no override)
+  const [models, setModels] = useState<{ id: string; label?: string; thinking?: { levels: { value: string; label: string; description?: string }[]; default?: string } }[]>([]); const [fast, setFast] = useState(false);
+  const [reasoning, setReasoning] = useState(""); // reasoning effort (""=Default/no override); shown when selected model has thinking levels
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
-  useEffect(() => { (async () => { try { const d = await api("GET", `/api/servers/${serverId}/machines/${machineId || "none"}/runtime-models/${runtime}`); const ms = d.models || []; setModels(ms); setModel(ms[0]?.id || ""); } catch { setModels([]); } })(); }, [runtime, machineId]);
+  useEffect(() => { (async () => { try { const d = await api("GET", `/api/servers/${serverId}/machines/${machineId || "none"}/runtime-models/${runtime}`); const ms = d.models || []; setModels(ms); setModel(ms[0]?.id || ""); setReasoning(ms[0]?.thinking?.default ?? ""); } catch { setModels([]); } })(); }, [runtime, machineId]);
   const create = async () => {
     const nm = name.trim();
     if (!nm) { setErr(t("members.nameRequired")); return; }
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(nm) || nm.length > 64) { setErr(t("members.nameInvalid")); return; } // @mention handle must be machine-safe; keep regex + length 64 in sync with core.ts AGENT_NAME_RE / MAX_AGENT_NAME
     setBusy(true); setErr("");
-    try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model || null, reasoning: runtime === "codex" ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) { if (r.started === false) toast.info(t("members.agentCreatedOffline")); onCreated?.({ id: r.id, name: r.name ?? nm }); } onClose(); }
+    try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model || null, reasoning: thinkingLevels.length ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) { if (r.started === false) toast.info(t("members.agentCreatedOffline")); onCreated?.({ id: r.id, name: r.name ?? nm }); } onClose(); }
     catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
   const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "opencode", label: "OpenCode" }, { value: "kimi", label: "Kimi Code" }, { value: "pi", label: "Pi" }, { value: "cursor", label: "Cursor" }];
   const machineOpts = machines.length ? machines.map((m) => ({ value: m.id, label: m.name || m.hostname || m.id, hint: m.status === "online" ? t("members.machineOnline") : t("members.machineOffline") })) : [];
+  const selModel = models.find((m) => m.id === model);
+  const thinkingLevels = selModel?.thinking?.levels ?? [];
   const modelOpts = (models.length ? models : [{ id: "default", label: "Default" }]).map((m) => ({ value: m.id, label: m.label || m.id }));
   return (
     <div className="modal-bg" onClick={onClose}>
@@ -463,11 +465,11 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
         <label>Runtime</label>
         <Select ariaLabel="Runtime" value={runtime} options={RUNTIMES} onChange={setRuntime} />
         <label>{t("common.model")}</label>
-        <Select ariaLabel="Model" value={model} options={modelOpts} onChange={setModel} />
-        {runtime === "codex" && <>
+        <Select ariaLabel="Model" value={model} options={modelOpts} onChange={(v) => { setModel(v); const m = models.find((m) => m.id === v); setReasoning(m?.thinking?.default ?? ""); }} />
+        {thinkingLevels.length > 0 && <>
           <label>{t("members.reasoningLabel")}</label>
           <Select ariaLabel="Reasoning" value={reasoning} onChange={setReasoning}
-            options={[{ value: "", label: t("members.reasoningDefault") }, { value: "minimal", label: "Minimal" }, { value: "low", label: "Low" }, { value: "medium", label: "Medium" }, { value: "high", label: "High" }, { value: "xhigh", label: "XHigh" }]} />
+            options={[{ value: "", label: t("members.reasoningDefault") }, ...thinkingLevels.map((l) => ({ value: l.value, label: l.label }))]} />
         </>}
         <label className="ck-row"><input type="checkbox" checked={fast} onChange={(e) => setFast(e.target.checked)} /><span>{t("members.fastMode")}</span></label>
         {err && <div className="form-err">{err}</div>}

@@ -8,6 +8,7 @@ import { rateLimit, clientIp } from "./ratelimit.js";
 import { createMessage, getOrCreateDM, getOrCreateThread, convertMessageToTask, claimTask, unclaimTask, setTaskStatus, deleteTask, TASK_STATUSES, startAgent, stopAgent, resetAgent, syncAgentProfile, addReaction, removeReaction, aggregateReactions, saveMessage, unsaveMessage, checkSaved, listSaved, descTooLong, DESC_TOO_LONG, invalidAgentName, INVALID_AGENT_NAME, createServer } from "./core.js";
 import { publish } from "./realtime.js";
 import { requestDaemon } from "./daemonHub.js";
+import { getDynamicModels, DYNAMIC_RUNTIMES } from "./runtimeModels.js";
 import { parseUpload } from "./attachments.js";
 import { readObject } from "./storage.js";
 import { SCOPES, ALL_SCOPE_KEYS, isScopeLiteral, effectiveScopes } from "./scopes.js";
@@ -366,14 +367,14 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     }
     return (sendJson(res, 200, out), true);
   }
-  const rm = /^\/api\/servers\/[^/]+\/machines\/[^/]+\/runtime-models\/([^/]+)$/.exec(p);
+  const rm = /^\/api\/servers\/[^/]+\/machines\/([^/]+)\/runtime-models\/([^/]+)$/.exec(p);
   if (rm && method === "GET") {
-    // Model candidates: codex = slugs matching codex-rs + GPT-5.5 as default; claude = Claude Code aliases;
-    // gemini/opencode likewise. For codex/claude/gemini the runtime uses its native CLI (no gateway model list); the frontend supplies these lists.
-    // copilot: a static candidate list (the CLI has no `models list` command; live per-account discovery
-    //   would need an ACP probe + daemon→server channel — tracked in docs/tech-debt-tracker.md). "auto"
-    //   is first/default so Copilot picks an accessible model; picking a model the account lacks fails
-    //   loudly at runtime (the runtime surfaces copilot's stderr).
+    const machineId = rm[1]!, runtime = rm[2]!;
+    // The static lists below are the FALLBACK. opencode/cursor/pi are probed live on the machine (further
+    // down) and only use these on miss/offline/timeout. claude/codex use their native CLI (no gateway
+    // model list), so their catalog is curated here. copilot/kimi have no list command — live per-account
+    // discovery would need an ACP probe (tracked in docs/tech-debt-tracker.md); "auto" is first/default
+    // for copilot so it picks an accessible model (one the account lacks fails loudly at runtime).
     const MODELS: Record<string, { id: string; label: string }[]> = {
       claude: [{ id: "sonnet", label: "Sonnet" }, { id: "opus", label: "Opus" }, { id: "haiku", label: "Haiku" }],
       codex: [
@@ -393,7 +394,18 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
       opencode: [{ id: "default", label: "Default" }],
       cursor: [{ id: "default", label: "Default (Composer)" }, { id: "sonnet-4", label: "Sonnet 4" }, { id: "sonnet-4-thinking", label: "Sonnet 4 (thinking)" }, { id: "gpt-5", label: "GPT-5" }],
     };
-    return (sendJson(res, 200, { models: MODELS[rm[1]!] ?? [{ id: "default", label: "Default" }] }), true);
+    // Live discovery for runtimes whose CLI lists its own models: ask THAT machine's daemon to probe,
+    // cache briefly, serve the static list on any miss/offline/timeout (machineId "none" = unbound agent).
+    // Tenant isolation: machineId is client-supplied, so confirm it belongs to THIS server before routing
+    // a probe to it — otherwise a cross-tenant id could enumerate another server's machine model list.
+    if (DYNAMIC_RUNTIMES.has(runtime) && machineId !== "none") {
+      const owns = (await db.select().from(schema.machines).where(and(eq(schema.machines.id, machineId), eq(schema.machines.serverId, serverId))))[0];
+      if (owns) {
+        const models = await getDynamicModels(machineId, runtime);
+        if (models?.length) return (sendJson(res, 200, { models }), true);
+      }
+    }
+    return (sendJson(res, 200, { models: MODELS[runtime] ?? [{ id: "default", label: "Default" }] }), true);
   }
   // Reminders (read-only for users): reminders can only be created by the agent side via CLI; user side GETs to list them. ?ownerAgentId=&status=scheduled
   if (p === "/api/reminders" && method === "GET") {

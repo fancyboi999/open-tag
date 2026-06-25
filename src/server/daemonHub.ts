@@ -6,9 +6,12 @@ import { randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
 
 const daemons = new Map<WebSocket, string>(); // ws → the serverId this connection belongs to (registered by ws.ts after resolving the key)
+const machineConns = new Map<string, WebSocket>(); // machineId → ws, so a request can target ONE specific machine's daemon (not a serverId-wide broadcast)
 
 export function registerDaemon(ws: WebSocket, serverId: string): void { daemons.set(ws, serverId); }
 export function unregisterDaemon(ws: WebSocket): void { daemons.delete(ws); }
+export function registerMachineConn(machineId: string, ws: WebSocket): void { machineConns.set(machineId, ws); }
+export function unregisterMachineConn(ws: WebSocket): void { for (const [mid, w] of machineConns) if (w === ws) machineConns.delete(mid); }
 export function daemonCount(serverId: string): number {
   let n = 0; for (const sid of daemons.values()) if (sid === serverId) n++; return n;
 }
@@ -36,4 +39,19 @@ export function resolveDaemonRequest(requestId: string, data: unknown): void {
   const p = pending.get(requestId);
   if (!p) return;
   clearTimeout(p.timer); pending.delete(requestId); p.resolve(data);
+}
+
+// Like requestDaemon, but targets ONE machine's daemon (no broadcast) — used when a request is about a
+// specific machine (e.g. probing that machine's installed-runtime models). Reuses the same pending-by-
+// requestId machinery + resolveDaemonRequest. Resolves {error} if that machine's daemon isn't connected.
+export function requestDaemonByMachine(machineId: string, msg: Record<string, unknown>, timeoutMs = 6000): Promise<any> {
+  const ws = machineConns.get(machineId);
+  if (!ws || ws.readyState !== 1) return Promise.resolve({ error: "machine offline" });
+  const requestId = randomUUID();
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => { pending.delete(requestId); resolve({ error: "daemon timeout" }); }, timeoutMs);
+    pending.set(requestId, { resolve, timer });
+    try { ws.send(JSON.stringify({ ...msg, requestId })); }
+    catch { clearTimeout(timer); pending.delete(requestId); resolve({ error: "send failed" }); }
+  });
 }

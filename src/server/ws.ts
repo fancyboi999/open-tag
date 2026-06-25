@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 import { and, desc, eq, notInArray } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { BOOTSTRAP_KEY, hashToken } from "./auth.js";
-import { registerDaemon, unregisterDaemon, resolveDaemonRequest } from "./daemonHub.js";
+import { registerDaemon, unregisterDaemon, resolveDaemonRequest, registerMachineConn, unregisterMachineConn } from "./daemonHub.js";
 import { publish } from "./realtime.js";
 import { createLogger } from "../log.js";
 import { MACHINE_REJECTED_CODE } from "../daemonProtocol.js";
@@ -46,7 +46,7 @@ async function onDaemon(ws: WebSocket, key: string): Promise<void> {
   ws.on("message", async (data) => {
     let msg: any; try { msg = JSON.parse(data.toString()); } catch { return; }
     try {
-      if (msg.type === "ready") { machineId = await onReady(serverId!, key, msg); try { ws.send(JSON.stringify({ type: "ready:ack", machineId })); } catch { /* */ } }
+      if (msg.type === "ready") { machineId = await onReady(serverId!, key, msg); registerMachineConn(machineId, ws); try { ws.send(JSON.stringify({ type: "ready:ack", machineId })); } catch { /* */ } }
       else if (msg.type === "agent:status" || msg.type === "agent:activity") await onAgentUpdate(serverId!, msg);
       else if (msg.type === "agent:session" && msg.agentId) { await db.update(schema.agents).set({ sessionId: msg.sessionId }).where(eq(schema.agents.id, msg.agentId)); await publish(serverId!, { type: "agent:session", agentId: msg.agentId, sessionId: msg.sessionId }); } // forward to the frontend
       else if (msg.type === "agent:trajectory" && msg.agentId) {
@@ -62,11 +62,11 @@ async function onDaemon(ws: WebSocket, key: string): Promise<void> {
         await db.update(schema.machines).set({ lastHeartbeat: new Date(), status: "online" }).where(eq(schema.machines.id, machineId));
         if (prev && prev.status !== "online") await publish(serverId!, { type: "machine", online: true, machineId });
       }
-      else if ((msg.type === "workspace:file_tree" || msg.type === "workspace:file_content" || msg.type === "skills:list") && msg.requestId) resolveDaemonRequest(msg.requestId, msg);
+      else if ((msg.type === "workspace:file_tree" || msg.type === "workspace:file_content" || msg.type === "skills:list" || msg.type === "models") && msg.requestId) resolveDaemonRequest(msg.requestId, msg);
     } catch (e: any) { log.error("ws handler error", { type: msg?.type, detail: String(e?.message ?? e) }); }
   });
   ws.on("close", async () => {
-    clearInterval(ping); unregisterDaemon(ws);
+    clearInterval(ping); unregisterDaemon(ws); unregisterMachineConn(ws);
     // daemon disconnected → mark this machine offline (otherwise the list keeps showing it online)
     if (machineId) {
       await db.update(schema.machines).set({ status: "offline" }).where(eq(schema.machines.id, machineId)).catch(() => {});
