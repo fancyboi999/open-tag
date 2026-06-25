@@ -9,14 +9,16 @@ import { readObject } from "../storage.js";
 import { bearer, sendErr, sendJson } from "../util.js";
 
 /**
- * MIME types that are safe to serve inline in a browser without XSS risk.
+ * MIME types safe for inline display with no additional restrictions.
+ * Raster images, audio, video, and PDF cannot execute scripts even when
+ * navigated to directly — browsers parse them as media, not as documents.
  *
- * Exclusions (intentional):
- *   - text/html, application/xhtml+xml → browser renders as HTML, executes scripts.
- *   - image/svg+xml → SVG can contain inline <script> elements.
- *   - text/javascript, application/javascript → browser executes directly.
- *   - text/xml, application/xml → browsers may render with XSLT that loads resources.
- *   - Any unlisted type → defaults to attachment + octet-stream (defense-in-depth).
+ * Intentional exclusions:
+ *   - text/html, application/xhtml+xml → HTML execution.
+ *   - image/svg+xml → handled separately in SAFE_INLINE_WITH_CSP_TYPES.
+ *   - text/javascript, application/javascript → direct execution.
+ *   - text/xml, application/xml → XSLT may load external resources.
+ *   - Any unlisted type → attachment + octet-stream (defense-in-depth).
  */
 const SAFE_INLINE_TYPES = new Set<string>([
   "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
@@ -27,28 +29,55 @@ const SAFE_INLINE_TYPES = new Set<string>([
 ]);
 
 /**
+ * MIME types that need inline display (e.g. for browser image-element rendering) but carry
+ * script-execution risk when navigated to directly as a same-origin document.
+ *
+ * These are served inline with their declared content-type AND a hardened
+ * Content-Security-Policy that sandboxes the browsing context:
+ *   - `sandbox` → treats the document as a unique origin, blocks scripts,
+ *     blocks form submission, blocks popups; the SVG renders as an image
+ *     but cannot reach the parent page's localStorage or cookies.
+ *   - `default-src 'none'` → no external resources loaded.
+ *   - `style-src 'unsafe-inline'` → inline SVG styles still render correctly.
+ *
+ * When loaded via <img src="..."> the CSP of this response is irrelevant
+ * (browsers already forbid scripts in SVG images), so the sandbox is the
+ * backstop for direct URL navigation.
+ */
+const SAFE_INLINE_WITH_CSP_TYPES = new Set<string>([
+  "image/svg+xml",
+]);
+
+const SVG_SANDBOX_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+
+/**
  * Compute safe HTTP response headers for an attachment download.
  *
- * - Types in SAFE_INLINE_TYPES are served with their declared MIME and
- *   Content-Disposition: inline (e.g. images play in-page as expected).
- * - ALL other types — including text/html, image/svg+xml, text/javascript —
- *   are served as application/octet-stream with Content-Disposition: attachment.
- *   The browser is forced to download the file; it cannot inline-render it on
- *   the same origin and therefore cannot execute scripts in that file.
+ * Three tiers:
+ *  1. SAFE_INLINE_TYPES        → inline, declared MIME, nosniff.
+ *  2. SAFE_INLINE_WITH_CSP_TYPES (SVG) → inline, declared MIME, nosniff +
+ *     CSP sandbox (neutralises same-origin script execution on direct nav).
+ *  3. Everything else          → application/octet-stream, attachment, nosniff.
  *
- * This function is the primary XSS gate. It operates on stored MIME types, so
- * it also protects legacy records written before sanitizeMimeType() was added.
+ * Tier 3 covers legacy DB records too (operates on stored value, not upload-time
+ * declared value), so old records with dangerous MIMEs are also protected.
  */
 export function safeDownloadHeaders(storedMime: string, filename: string): Record<string, string> {
   const encodedName = encodeURIComponent(filename);
-  // nosniff: instruct browsers to strictly follow the declared content-type and not sniff the
-  // file bytes. This matters even for safe inline types — e.g. a JPEG slot being served to an
-  // older browser must not be MIME-sniffed as text/html if the bytes happen to look like HTML.
+  // nosniff: prevent browsers from sniffing the bytes and overriding the declared type.
   const nosniff = { "x-content-type-options": "nosniff" };
   if (storedMime && SAFE_INLINE_TYPES.has(storedMime)) {
     return {
       "content-type": storedMime,
       "content-disposition": `inline; filename*=UTF-8''${encodedName}`,
+      ...nosniff,
+    };
+  }
+  if (storedMime && SAFE_INLINE_WITH_CSP_TYPES.has(storedMime)) {
+    return {
+      "content-type": storedMime,
+      "content-disposition": `inline; filename*=UTF-8''${encodedName}`,
+      "content-security-policy": SVG_SANDBOX_CSP,
       ...nosniff,
     };
   }

@@ -78,10 +78,35 @@ test("safeDownloadHeaders: application/xhtml+xml → attachment", () => {
   assert.match(h["content-disposition"], /^attachment;/);
 });
 
-test("safeDownloadHeaders: image/svg+xml → attachment (SVG can contain inline scripts)", () => {
+// ── SVG: inline with CSP sandbox (avatar rendering must work; scripts must not execute) ──
+
+test("safeDownloadHeaders: image/svg+xml → inline with correct content-type (avatar renders)", () => {
+  // SVG avatars are fetched by browser image elements (src="/api/attachments/<id>") — they
+  // must be inline with image/svg+xml so the browser renders them as images.
+  const h = safeDownloadHeaders("image/svg+xml", "avatar.svg");
+  assert.equal(h["content-type"], "image/svg+xml",
+    "SVG must keep its content-type so browser image elements can render it");
+  assert.match(h["content-disposition"], /^inline;/,
+    "SVG must be inline so <img> tags do not trigger a download dialog");
+});
+
+test("safeDownloadHeaders: image/svg+xml → CSP sandbox (no same-origin script exec on direct nav)", () => {
+  // When a user navigates to the attachment URL directly, the browser renders the SVG as
+  // a document. Without CSP the <script> inside would execute on the same origin.
+  // The 'sandbox' directive creates a unique origin (no access to the parent page's
+  // localStorage/cookies) and blocks scripts; combined with default-src 'none' it also
+  // prevents external resource loads.
   const h = safeDownloadHeaders("image/svg+xml", "evil.svg");
-  assert.equal(h["content-type"], "application/octet-stream");
-  assert.match(h["content-disposition"], /^attachment;/);
+  assert.ok(h["content-security-policy"], "CSP header must be present for SVG");
+  assert.match(h["content-security-policy"]!, /\bsandbox\b/,
+    "CSP must include 'sandbox' to block script execution and isolate the origin");
+  assert.match(h["content-security-policy"]!, /default-src 'none'/,
+    "CSP must include default-src 'none' to block external resource loads");
+});
+
+test("safeDownloadHeaders: image/svg+xml → nosniff present", () => {
+  const h = safeDownloadHeaders("image/svg+xml", "icon.svg");
+  assert.equal(h["x-content-type-options"], "nosniff");
 });
 
 test("safeDownloadHeaders: text/xml → attachment", () => {
