@@ -34,11 +34,9 @@ test("horizontal Kanban lays the columns out in a scrollable flex row", () => {
   assertDecl(colInCols, "flex", "0 0 300px");
   assertDecl(colInCols, "min-width", "280px");
   assertDecl(colInCols, "margin-bottom", "0");
-
-  // a collapsed column keeps the same width as the others (no shrink) — it just collapses to its
-  // header height (align-self:flex-start) instead of being a full-height lane, so columns stay aligned
-  const collapsedInCols = ruleBody(".task-board.columns .task-col.collapsed");
-  assertDecl(collapsedInCols, "align-self", "flex-start");
+  // every lane is a soft surface container, so columns read as distinct containers (collapsed ones too —
+  // they keep the same width/height and just hide their cards)
+  assertDecl(colInCols, "background", "var\\(--surface-strong\\)");
 });
 
 test("vertical stack keeps the legacy block-flow spacing", () => {

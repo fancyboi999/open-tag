@@ -2,7 +2,8 @@
 // Five-status columns + Board/List toggle + Board layout toggle (horizontal columns ↔ vertical stack, persisted) (pure frontend) + Creator/Assignee filters (pure frontend, applied over the loaded array) + New Task (POST /api/tasks/channel/:id).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Trash2, ChevronDown, ChevronRight, Pencil, Columns3, Rows3, ListChecks } from "lucide-react";
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, MeasuringStrategy, type DragEndEvent } from "@dnd-kit/core";
+import { createPortal } from "react-dom";
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore, type Msg } from "./store.tsx";
@@ -57,6 +58,10 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   const [assigneeKey, setAssigneeKey] = useState(""); // "" = all | "unclaimed" | "type:id"
   const [mkOpen, setMkOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null); // id of the card being dragged → turns every column into a generous drop target
+  // Status-change menu, hoisted to the board (NOT inside StatusPill): the inner card/pill components are redefined
+  // every TaskBoard render, so React remounts them — a menu-open flag living inside one would be lost on the next
+  // render. Keeping it here (+ portaling the menu to <body>) makes click-to-open reliable.
+  const [menu, setMenu] = useState<{ task: Msg; status: string; opts: string[]; right: number; top: number } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const prevRects = useRef<Map<string, DOMRect>>(new Map()); // last-known card positions, for the FLIP move animation
 
@@ -70,6 +75,17 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
     if (channelId && task.channelId !== channelId) return;
     setTasks((cur) => { const rest = cur.filter((x) => x.id !== task.id); return [...rest, task].sort((a, b) => (a.taskNumber || 0) - (b.taskNumber || 0)); });
   }), [channelId]);
+  // Close the status menu on outside click / scroll / Escape (the menu is body-portaled with fixed coords).
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest(".st-menu, .st-pill-btn")) setMenu(null); };
+    const close = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenu(null); };
+    document.addEventListener("mousedown", onDown);
+    window.addEventListener("scroll", close, true);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("scroll", close, true); document.removeEventListener("keydown", onKey); };
+  }, [menu]);
 
   const act = async (task: Msg, action: string, body?: unknown) => { await api("PATCH", `/api/tasks/${task.id}/${action}`, body); load(); };
   // Move a task to another column optimistically: update local state first so the FLIP animation fires instantly,
@@ -77,6 +93,7 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   const moveTask = (task: Msg, status: string) => {
     if (status === (task.taskStatus || "todo")) return;
     setTasks((cur) => cur.map((x) => (x.id === task.id ? { ...x, taskStatus: status } : x)));
+    if (collapsed.has(status)) toggleCol(status); // a card moved into a collapsed column → expand it so you can see it land
     api("PATCH", `/api/tasks/${task.id}/status`, { status }).catch(() => load());
   };
   const delTask = async (task: Msg) => { await api("DELETE", `/api/tasks/${task.id}`); load(); }; // deleting a task reverts it to a plain message (clears task fields); the source message is preserved
@@ -141,28 +158,12 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
 
   const submit = async (titles: string[]) => { if (channelId && titles.length) { await createTasks(channelId, titles); setMkOpen(false); load(); } };
 
-  // Status pill / dropdown: unclaimed tasks show a claim pill; editable statuses show a pill with a pencil icon; read-only statuses show a plain pill
+  // Status pill: a claim button for unclaimed todos, a read-only pill for non-editable statuses, otherwise a
+  // button that opens the status menu. The menu itself lives at board level (`menu` state + portal below) so it
+  // survives this component being remounted on every render and escapes the draggable card's pointer/stacking.
   const StatusPill = ({ t: task }: { t: Msg }) => {
-    const [open, setOpen] = useState(false);
-    const [pos, setPos] = useState<{ right: number; top: number } | null>(null);
-    const btnRef = useRef<HTMLButtonElement>(null);
-    const menuRef = useRef<HTMLDivElement>(null);
     const status = task.taskStatus || "todo";
     const claimedByMe = task.taskAssigneeType === "human" && task.taskAssigneeId === me?.id;
-    // Fixed positioning from the button rect (same approach as Select.tsx): each card sits in its own
-    // transform-induced stacking context, so an `absolute` menu is trapped beneath the next card no
-    // matter its z-index. A fixed, body-relative menu escapes that. Right-aligned to the pill.
-    useLayoutEffect(() => { if (!open) return; const r = btnRef.current?.getBoundingClientRect(); if (r) setPos({ right: window.innerWidth - r.right, top: r.bottom + 4 }); }, [open]);
-    useEffect(() => {
-      if (!open) return;
-      const onDown = (e: MouseEvent) => { const n = e.target as Node; if (!btnRef.current?.contains(n) && !menuRef.current?.contains(n)) setOpen(false); };
-      const onScroll = () => setOpen(false); // any scroll closes it (the fixed coords would otherwise drift)
-      const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-      document.addEventListener("mousedown", onDown);
-      window.addEventListener("scroll", onScroll, true);
-      document.addEventListener("keydown", onKey);
-      return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("scroll", onScroll, true); document.removeEventListener("keydown", onKey); };
-    }, [open]);
     // Unclaimed todo task → show claim pill (atomic claim, automatically sets status to in_progress)
     if (!task.taskAssigneeId && status === "todo") return <button className="claim-pill" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); act(task, "claim"); }}>{t("tasks.claim")}</button>;
     const opts = ynOptions(status, manageServer, claimedByMe);
@@ -170,12 +171,11 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
     const pill = <span className={"st-pill st-" + status}>{t(ST_LABEL[status])}{canEdit && <Pencil size={10} />}</span>;
     if (!canEdit) return pill; // read-only pill (no pencil icon)
     return (
-      <span className="st-pill-wrap" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-        <button ref={btnRef} className="st-pill-btn" onClick={() => setOpen((v) => !v)}>{pill}</button>
-        {open && pos && <div ref={menuRef} className="st-menu" style={{ right: pos.right, top: pos.top }}>
-          {opts.map((s) => <button key={s} className={s === status ? "on" : ""} onClick={() => { setOpen(false); moveTask(task, s); }}><span className={"st-dot st-" + s} />{t(ST_LABEL[s])}</button>)}
-        </div>}
-      </span>
+      <button className="st-pill-btn" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => {
+        e.stopPropagation();
+        const r = e.currentTarget.getBoundingClientRect();
+        setMenu((m) => (m?.task.id === task.id ? null : { task, status, opts, right: window.innerWidth - r.right, top: r.bottom + 4 })); // toggle this card's menu
+      }}>{pill}</button>
     );
   };
   const Card = ({ t: task }: { t: Msg }) => {
@@ -254,8 +254,8 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
       </div>
       {filtered.length === 0 ? <PaneEmpty icon={<ListChecks size={30} />} title={tasks.length ? t("tasks.emptyFiltered") : channelId ? t("tasks.emptyChannel") : t("tasks.emptyServer")} />
         : view === "board" ? (
-          // measuring=Always so dnd-kit keeps the full-height column rects current; DragOverlay renders the moving card in a top-level portal (never clipped / never behind a column)
-          <DndContext sensors={sensors} measuring={{ droppable: { strategy: MeasuringStrategy.Always } }} onDragStart={(e) => setActiveId(String(e.active.id))} onDragCancel={() => setActiveId(null)} onDragEnd={onDragEnd}>
+          // DragOverlay renders the moving card in a top-level portal (never clipped / never painted behind a column)
+          <DndContext sensors={sensors} onDragStart={(e) => setActiveId(String(e.active.id))} onDragCancel={() => setActiveId(null)} onDragEnd={onDragEnd}>
             <div ref={boardRef} className={"task-board " + boardLayout + (activeId ? " dragging" : "")}>
               {TCOLS.map(([k, labelKey]) => <DroppableCol key={k} k={k} labelKey={labelKey} />)}
             </div>
@@ -280,6 +280,13 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
           </div>
         )}
       {mkOpen && channelId && <NewTaskModal onSubmit={submit} onClose={() => setMkOpen(false)} />}
+      {/* Status menu, portaled to <body>: outside the draggable card subtree (no pointer/stacking conflict) and stable across card remounts. */}
+      {menu && createPortal(
+        <div className="st-menu" style={{ position: "fixed", right: menu.right, top: menu.top }}>
+          {menu.opts.map((s) => <button key={s} className={s === menu.status ? "on" : ""} onClick={() => { moveTask(menu.task, s); setMenu(null); }}><span className={"st-dot st-" + s} />{t(ST_LABEL[s])}</button>)}
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
