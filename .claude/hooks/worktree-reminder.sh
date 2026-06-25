@@ -16,8 +16,8 @@ esac
 # Silent unless on the default branch `main`.
 [ "$(git branch --show-current 2>/dev/null)" = "main" ] || exit 0
 
-# Once per session: dedupe on the hook's session_id (parsed without jq — may be absent on macOS).
-# SessionStart also fires on resume/compact within the same session — the marker keeps it to one.
+# Defensive once-per-session dedupe on the hook's session_id (parsed without jq — may be absent
+# on macOS). The SessionStart matcher is limited to `startup`, so this normally fires once anyway.
 sid="$(printf '%s' "$input" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
 marker="${TMPDIR:-/tmp}/claude-wt-reminder-${sid:-default}"
 if [ -e "$marker" ]; then exit 0; fi

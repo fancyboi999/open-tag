@@ -1,0 +1,91 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: search existing issues to avoid duplicates.
+        **Do not report security vulnerabilities here** — see [SECURITY.md](../SECURITY.md).
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: "When I do X, Y happens. I expected Z."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reliably trigger the bug.
+      placeholder: |
+        1. Start the server with `npm run server`
+        2. ...
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened? Paste relevant logs or a screenshot.
+    validations:
+      required: true
+
+  - type: input
+    id: node_version
+    attributes:
+      label: Node.js version
+      description: Output of `node --version`
+      placeholder: "v20.x.x"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15 / Ubuntu 24.04 / Windows 11"
+    validations:
+      required: true
+
+  - type: input
+    id: daemon_version
+    attributes:
+      label: Daemon version
+      description: >
+        The `daemonVersion` shown in the machine row of the UI, or the output
+        of `npx @fancyboi999/open-tag-daemon --version` (if available).
+      placeholder: "0.4.0 / dev"
+    validations:
+      required: false
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Agent runtime (if applicable)
+      description: Which runtime is the affected agent using?
+      placeholder: "claude / codex / copilot / opencode / kimi / pi / cursor"
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Anything else that might help — config snippets, related issues, etc.
+    validations:
+      required: false
