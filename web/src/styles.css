@@ -573,7 +573,8 @@ aside.traj-col .ptabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px sol
 aside.traj-col .ptabs::-webkit-scrollbar{display:none}
 aside.traj-col .ptabs button{flex:none;font-size:12px;padding:4px 9px;border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:8px;white-space:nowrap}
 aside.traj-col .ptabs button.on{background:var(--surface-strong);color:var(--ink)}
-aside.traj-col .scroll{padding:0;margin:0 -20px;padding:0 20px}
+aside.traj-col.profile-mode{display:flex;flex-direction:column;overflow:hidden;min-height:0}
+aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -20px;padding:0 20px}
 
 /* ── Hover agent → info card ─────────────────────────── */
 .agent-hovercard{position:fixed;z-index:60;display:flex;gap:11px;align-items:flex-start;background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;box-shadow:0 8px 28px var(--shadow-3);padding:13px 15px;min-width:200px;max-width:248px;pointer-events:none;animation:ahc-in .12s cubic-bezier(.22,1,.36,1)}
