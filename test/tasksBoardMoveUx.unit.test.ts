@@ -23,13 +23,15 @@ function assertDecl(body: string, prop: string, value: string): void {
   assert.match(body, new RegExp(`${prop}\\s*:\\s*${value}(?:;|$)`), `expected ${prop}:${value} in:\n${body}`);
 }
 
-test("the whole column is a generous drop target while dragging", () => {
-  assertDecl(ruleBody(".task-col-body"), "min-height", "8px"); // tidy when idle
-  assertDecl(ruleBody(".task-col-body"), "flex", "1 1 auto");   // body fills the lane so the target covers the whole column
-  // columns layout: equal-height lanes while dragging → the whole column strip is droppable, not just the cards
-  assertDecl(ruleBody(".task-board.columns.dragging"), "align-items", "stretch");
-  assertDecl(ruleBody(".task-board.columns.dragging .task-col"), "min-height", "340px");
-  // stack layout: full-width columns get a generous body target instead
+test("columns are full-height lanes that fill the pane, so the whole column is a drop target", () => {
+  // the tasks pane is a flex column; the board fills the height left under the toolbar
+  assertDecl(ruleBody(".board-scroll"), "display", "flex");
+  assertDecl(ruleBody(".board-scroll"), "flex-direction", "column");
+  assertDecl(ruleBody(".task-board.columns"), "flex", "1 1 auto");      // board fills the pane
+  assertDecl(ruleBody(".task-board.columns"), "align-items", "stretch"); // every column spans the full height
+  assertDecl(ruleBody(".task-col-body"), "flex", "1 1 auto");            // body fills the lane → whole column is droppable
+  assertDecl(ruleBody(".task-col-body"), "overflow-y", "auto");          // cards scroll inside the lane when they overflow
+  // stack layout: full-width columns get a generous body target while dragging
   assertDecl(ruleBody(".task-board.stack.dragging .task-col-body"), "min-height", "96px");
 });
 

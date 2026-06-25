@@ -167,13 +167,13 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
       return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("scroll", onScroll, true); document.removeEventListener("keydown", onKey); };
     }, [open]);
     // Unclaimed todo task → show claim pill (atomic claim, automatically sets status to in_progress)
-    if (!task.taskAssigneeId && status === "todo") return <button className="claim-pill" onClick={(e) => { e.stopPropagation(); act(task, "claim"); }}>{t("tasks.claim")}</button>;
+    if (!task.taskAssigneeId && status === "todo") return <button className="claim-pill" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); act(task, "claim"); }}>{t("tasks.claim")}</button>;
     const opts = ynOptions(status, manageServer, claimedByMe);
     const canEdit = opts.length > 0;
     const pill = <span className={"st-pill st-" + status}>{t(ST_LABEL[status])}{canEdit && <Pencil size={10} />}</span>;
     if (!canEdit) return pill; // read-only pill (no pencil icon)
     return (
-      <span className="st-pill-wrap" onClick={(e) => e.stopPropagation()}>
+      <span className="st-pill-wrap" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
         <button ref={btnRef} className="st-pill-btn" onClick={() => setOpen((v) => !v)}>{pill}</button>
         {open && pos && <div ref={menuRef} className="st-menu" style={{ right: pos.right, top: pos.top }}>
           {opts.map((s) => <button key={s} className={s === status ? "on" : ""} onClick={() => { setOpen(false); moveTask(task, s); }}><span className={"st-dot st-" + s} />{t(ST_LABEL[s])}</button>)}
@@ -189,7 +189,7 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
     const dm = !channelId && !chan ? dms.find((d) => d.id === task.channelId) : null;
     return (
       <div className="card task" onClick={() => open(task)} title={t("tasks.openThread")}>
-        <button className="tk-del" title={t("tasks.deleteTask")} onClick={(e) => { e.stopPropagation(); delTask(task); }}><Trash2 size={12} /></button>
+        <button className="tk-del" title={t("tasks.deleteTask")} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); delTask(task); }}><Trash2 size={12} /></button>
         {chan ? <div className="tk-chan">#{chan}</div> : dm ? <div className="tk-chan tk-chan-dm">@{dm.peerDisplayName || dm.peerName || dm.name}</div> : null}
         <div className="tk-num">#{task.taskNumber ?? "-"}</div>
         <div className="tk-title">{task.content}</div>
@@ -232,7 +232,7 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   };
 
   return (
-    <div className="scroll">
+    <div className="scroll board-scroll">
       <div className="task-toolbar">
         <div className="seg">
           <button className={view === "board" ? "on" : ""} onClick={() => setView("board")}>{t("tasks.viewBoard")}</button>

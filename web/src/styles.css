@@ -257,13 +257,13 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .card.card-link:focus-visible{outline:2px solid var(--g-sky);outline-offset:2px}
 .composer .astask.on{color:var(--ink);font-weight:600}
 /* Board layout: horizontal Kanban (columns side by side, min-width + horizontal scroll so the narrow embedded tasks tab degrades gracefully) vs the legacy vertical stack. Toggle persisted in localStorage. */
-.task-col{display:flex;flex-direction:column} /* column is a flex container so its body can fill the lane height */
-.task-board.columns{display:flex;gap:14px;align-items:flex-start;overflow-x:auto;padding-bottom:6px}
+/* The tasks pane is a flex column so the board fills the height left under the toolbar (instead of being only as tall as its cards). */
+.board-scroll{display:flex;flex-direction:column;min-height:0}
+.task-col{display:flex;flex-direction:column;min-height:0} /* flex container so its body can fill the lane and scroll its own cards */
+/* Horizontal Kanban: full-height equal lanes (Trello/Linear) — the board fills the pane and every column spans it, so the WHOLE column (not just the title strip or the cards) is a drop target. dnd-kit re-measures (MeasuringStrategy.Always) so it uses the live rects. */
+.task-board.columns{display:flex;gap:14px;align-items:stretch;overflow-x:auto;padding-bottom:6px;flex:1 1 auto;min-height:0}
 .task-board.columns .task-col{flex:0 0 300px;min-width:280px;margin-bottom:0}
-.task-board.columns .task-col.collapsed{flex:0 0 auto;min-width:0} /* a collapsed column shrinks to its header instead of leaving a wide empty slot */
-/* While dragging, columns become equal-height lanes (Trello/Linear) so the WHOLE column — not just the title strip — is a drop target. dnd-kit re-measures (MeasuringStrategy.Always) so it uses the stretched rects. */
-.task-board.columns.dragging{align-items:stretch}
-.task-board.columns.dragging .task-col{min-height:340px}
+.task-board.columns .task-col.collapsed{flex:0 0 auto;min-width:0;align-self:flex-start} /* collapsed column stays compact (header only), not a tall empty strip */
 .task-board.stack .task-col{margin-bottom:20px}
 /* Task card: #channel + #number + title + bottom-right status pill, no avatar/timestamp (editorial style) */
 .card.task{position:relative;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:transform .1s,border-color .1s}
@@ -290,8 +290,8 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .tk-del-row{border:0;background:transparent;color:var(--muted-soft);cursor:pointer;padding:4px;border-radius:6px;flex:none} .tk-del-row:hover{color:var(--error)}
 /* Drag-and-drop + click-to-move: the whole column is the drop target (not just the title strip), and the
    drop indicator is appended after the cards so it never overlaps them. Editorial sky dashed affordance. */
-.task-col-body{min-height:8px;flex:1 1 auto} /* fills the lane so the drop target (and hover tint) cover the whole column, not just the cards */
-.task-board.stack.dragging .task-col-body{min-height:96px} /* stack columns are full-width; a 96px body is a generous target (columns layout uses equal-height lanes instead) */
+.task-col-body{flex:1 1 auto;min-height:0;overflow-y:auto} /* fills the lane (so the whole column is the drop target) and scrolls its own cards when they overflow */
+.task-board.stack.dragging .task-col-body{min-height:96px} /* stack columns are full-width; a 96px body is a generous target (columns layout fills the full lane height instead) */
 .task-col.drop-over{background:var(--surface-strong);border-radius:12px;outline:2px dashed var(--g-sky);outline-offset:-2px}
 .drop-slot{display:flex;align-items:center;justify-content:center;min-height:62px;font-size:12px;font-weight:600;color:var(--tint-blue-ink);text-align:center;padding:10px;border:1.5px dashed var(--g-sky);border-radius:12px;background:var(--tint-blue);margin-top:2px}
 /* FLIP move animation: a card slides from its old column to its new one (set imperatively in TaskBoard) */
