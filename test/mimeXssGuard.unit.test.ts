@@ -8,10 +8,13 @@
 // Fix contract:
 //   - sanitizeMimeType() normalises client-declared MIME before storage (strips params,
 //     lowercase, rejects malformed types).
-//   - safeDownloadHeaders() enforces a safe-inline whitelist: XSS-risky types (text/html,
-//     text/javascript, image/svg+xml, application/xhtml+xml …) become
-//     Content-Type: application/octet-stream + Content-Disposition: attachment.
-//   - Safe image types (jpeg/png/gif/webp) remain inline.
+//   - safeDownloadHeaders() three-tier whitelist:
+//       • SAFE_INLINE_TYPES (jpeg/png/gif/webp/pdf/audio/video): inline, no extra headers.
+//       • SAFE_INLINE_WITH_CSP_TYPES (image/svg+xml): inline with declared MIME + CSP sandbox
+//         (default-src 'none'; style-src 'unsafe-inline'; sandbox) so browser image elements
+//         can render it but direct navigation is sandboxed (no script execution, unique origin).
+//       • Everything else (text/html, text/javascript, application/xhtml+xml …):
+//         Content-Type: application/octet-stream + Content-Disposition: attachment.
 //
 // These tests will FAIL before the fix (the exported functions do not exist yet),
 // and PASS after.
@@ -87,7 +90,7 @@ test("safeDownloadHeaders: image/svg+xml → inline with correct content-type (a
   assert.equal(h["content-type"], "image/svg+xml",
     "SVG must keep its content-type so browser image elements can render it");
   assert.match(h["content-disposition"], /^inline;/,
-    "SVG must be inline so <img> tags do not trigger a download dialog");
+    "SVG must be inline so browser image elements do not trigger a download dialog");
 });
 
 test("safeDownloadHeaders: image/svg+xml → CSP sandbox (no same-origin script exec on direct nav)", () => {
