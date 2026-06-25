@@ -7,11 +7,25 @@ import type { IncomingMessage } from "node:http";
 type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
 
-/** Best-effort client identity: trust x-forwarded-for's first hop when present (deploys sit behind a proxy), else the socket address. */
+/** Best-effort client identity for rate-limiting.
+ *
+ * By default this uses the TCP socket address (req.socket.remoteAddress), which is
+ * unforgeable but returns the proxy's IP when the server runs behind a reverse proxy —
+ * making rate-limiting ineffective (all requests share one bucket).
+ *
+ * Set TRUST_PROXY=true in .env when running behind a trusted reverse proxy (nginx,
+ * Caddy, cloud load-balancer) that unconditionally rewrites X-Forwarded-For. Only enable
+ * this when you control the proxy; never enable it with a public-facing server that
+ * accepts arbitrary XFF headers, as clients can spoof the value and bypass rate limits.
+ *
+ * Note: this server uses node:http directly (not Express), so there is no framework-level
+ * trust proxy setting — the decision is explicit via this env flag. */
 export function clientIp(req: IncomingMessage): string {
-  const xff = req.headers["x-forwarded-for"];
-  const fwd = Array.isArray(xff) ? xff[0] : xff;
-  if (fwd) return fwd.split(",")[0]!.trim();
+  if (process.env.TRUST_PROXY === "true") {
+    const xff = req.headers["x-forwarded-for"];
+    const fwd = Array.isArray(xff) ? xff[0] : xff;
+    if (fwd) return fwd.split(",")[0]!.trim();
+  }
   return req.socket?.remoteAddress ?? "unknown";
 }
 
