@@ -1,8 +1,9 @@
 // User-facing REST: /api/*  (Bearer JWT + x-server-id)
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { and, eq, gt, ne, or, inArray, asc, desc, count, isNotNull, isNull, ilike } from "drizzle-orm";
+import { and, eq, gt, lt, ne, or, inArray, asc, desc, count, isNotNull, isNull, ilike } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, serverIdHeader } from "./util.js";
+import { parseMsgPageParams } from "./messagePage.js";
 import { verifyUser, signUser, hashPassword, verifyPassword, newKey, hashToken, devLoginEnabled, setupToken, safeEqual, isValidEmail, passwordError } from "./auth.js";
 import { rateLimit, clientIp } from "./ratelimit.js";
 import { createMessage, getOrCreateDM, getOrCreateThread, convertMessageToTask, claimTask, unclaimTask, setTaskStatus, deleteTask, TASK_STATUSES, startAgent, stopAgent, resetAgent, syncAgentProfile, addReaction, removeReaction, aggregateReactions, saveMessage, unsaveMessage, checkSaved, listSaved, descTooLong, DESC_TOO_LONG, invalidAgentName, INVALID_AGENT_NAME, createServer } from "./core.js";
@@ -988,9 +989,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   }
   const cmsg = /^\/api\/messages\/channel\/([^/]+)$/.exec(p);
   if (cmsg && method === "GET") {
-    const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
-    const msgs = await db.select().from(schema.messages).where(and(eq(schema.messages.serverId, serverId), eq(schema.messages.channelId, cmsg[1]!))).orderBy(desc(schema.messages.seq)).limit(limit); // serverId scope: a foreign channel UUID must not read another tenant's messages (cross-tenant read)
-    return (sendJson(res, 200, { messages: (await attachMentions(msgs.reverse())) }), true);
+    const { limit, before } = parseMsgPageParams(url.searchParams); // `before` = keyset cursor on seq → the older page (frontend scroll-to-top "load more")
+    const conds = [eq(schema.messages.serverId, serverId), eq(schema.messages.channelId, cmsg[1]!)]; // serverId scope: a foreign channel UUID must not read another tenant's messages (cross-tenant read)
+    if (before != null) conds.push(lt(schema.messages.seq, before)); // hits messages_channel_idx (channelId, seq) — keyset, no offset drift
+    const rows = await db.select().from(schema.messages).where(and(...conds)).orderBy(desc(schema.messages.seq)).limit(limit + 1); // +1 sentinel row: detect a further page without the exact-page-boundary false positive (mirrors the search/mentions routes)
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    return (sendJson(res, 200, { messages: (await attachMentions(page.reverse())), hasMore }), true);
   }
   if (p === "/api/messages" && method === "POST") {
     const b = await readJson(req);

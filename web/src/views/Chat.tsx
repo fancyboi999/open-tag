@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import { useStore, fmtTime, type Msg, type Att } from "../store.tsx";
+import { PAGE_SIZE, appendWithCap } from "../lib/msgPaging";
 import { MessageContent } from "../messageRender.tsx";
 import { Smile, X, ExternalLink, CheckCircle2, MessageCircle, MoreHorizontal, Link2, Clipboard, Bookmark, CheckSquare, Circle, Play, Eye, Ban, ArrowDown, BellOff, Lock, Globe, Archive, Trash2 } from "lucide-react";
 // Task badge per message row: icon changes with task status; color tokens from DESIGN.md (see .task-pill.st-* styles)
@@ -137,7 +138,13 @@ export function Chat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true); // tracks whether the scroll position is at the bottom; new messages auto-scroll only when already at the bottom, preserving history browsing
   const [showJump, setShowJump] = useState(false); // when not at the bottom, show the "Back to bottom" jump button
+  const [hasMore, setHasMore] = useState(false); // older messages remain before the loaded window → drives scroll-to-top "load more"
+  const loadingOlderRef = useRef(false); // de-dupes concurrent "load older" fetches while one is in flight
+  const prependRestoreRef = useRef<number | null>(null); // scrollHeight captured before a prepend; restored after so the viewport doesn't jump
+  const trimmedRef = useRef(false); // a live-tail trim dropped the oldest in-memory messages → mark hasMore so they stay re-fetchable
   const cur = [...channels, ...dms].find((c) => c.id === channelId) || channels.find((c) => c.name === "all") || channels[0];
+  const curIdRef = useRef<string | undefined>(undefined);
+  curIdRef.current = cur?.id; // latest channel id for async guards: a loadOlder that resolves after a channel switch must drop its stale-channel result (no cross-channel prepend / hasMore clobber)
   const isDm = !!dms.find((d) => d.id === cur?.id);
   const dmPeer = dms.find((d) => d.id === cur?.id);
   const dmAgent = dmPeer?.peerType === "agent" ? agents.find((a) => a.id === dmPeer.peerId) : undefined; // DM peer agent → used for the live status indicator in the header
@@ -151,8 +158,8 @@ export function Chat() {
   const closeProfile = () => { setProfile(null); setSp((prev) => { const n = new URLSearchParams(prev); n.delete("agentTab"); return n; }, { replace: true }); };
 
   useEffect(() => { if (!channelId && cur) nav(`/s/${slug}/channel/${cur.id}`, { replace: true }); }, [channelId, cur, slug, nav]);
-  useEffect(() => { if (!cur) return; setThread(null); setProfile(null); subscribeChannel(cur.id); (async () => { // switching channels closes any open thread + profile overlay from the previous channel (the live trace itself persists — accumulated in the store, see store.tsx); join the room while viewing so message:new arrives live (covers public non-member channels + channels relevant after connect)
-    const d = await api("GET", `/api/messages/channel/${cur.id}?limit=200`); const ms: Msg[] = d.messages || []; setMsgs(ms); markRead(cur.id);
+  useEffect(() => { if (!cur) return; setThread(null); setProfile(null); loadingOlderRef.current = false; prependRestoreRef.current = null; subscribeChannel(cur.id); (async () => { // switching channels closes any open thread + profile overlay from the previous channel (the live trace itself persists — accumulated in the store, see store.tsx); join the room while viewing so message:new arrives live (covers public non-member channels + channels relevant after connect)
+    const d = await api("GET", `/api/messages/channel/${cur.id}?limit=${PAGE_SIZE}`); const ms: Msg[] = d.messages || []; setMsgs(ms); setHasMore(!!d.hasMore); markRead(cur.id);
     const ids = ms.map((m) => m.id);
     if (ids.length) { try { setThreadMeta(await api("GET", `/api/channels/${cur.id}/threads?parentMessageIds=${ids.join(",")}`) || {}); } catch { setThreadMeta({}); } } else setThreadMeta({});
   })(); }, [cur?.id]);
@@ -169,7 +176,7 @@ export function Chat() {
     // eslint-disable-next-line
   }, [agentPanelReq]);
   useEffect(() => onEvent((e) => {
-    if (e.type === "message" && e.channelId === cur?.id) { setMsgs((m) => [...m, e.message]); markRead(cur.id); }
+    if (e.type === "message" && e.channelId === cur?.id) { setMsgs((m) => { const { next, trimmed } = appendWithCap(m, e.message, atBottomRef.current && !loadingOlderRef.current); if (trimmed) trimmedRef.current = true; return next; }); markRead(cur.id); } // don't trim mid-pagination: a trim's setHasMore(true) would race the in-flight loadOlder's setHasMore — suppressing it closes the window (the next message trims instead)
     else if (e.type === "message:updated" && e.message) setMsgs((m) => m.map((x) => (x.id === e.message.id ? { ...x, ...e.message } : x))); // sync reactions and task fields
     else if (e.type === "thread:updated" && e.parentMessageId) setThreadMeta((tm) => { // live reply count update; unreadCount is approximated from the replyCount delta (socket does not carry unreadCount; the authoritative value is corrected on channel switch via GET)
       const prev = tm[e.parentMessageId]; const delta = prev ? Math.max(0, e.replyCount - prev.replyCount) : 0;
@@ -178,22 +185,40 @@ export function Chat() {
     else if (e.type === "agent") setSub(e.activity ? `${e.name} · ${e.activity}${e.detail ? " · " + e.detail : ""}` : ""); // live-trace entries are accumulated globally in the store (see store.tsx agent:activity handler), so they persist across channel/DM switches
   }), [cur?.id]);
   useEffect(() => { const el = scrollRef.current; if (!el || msgParam) return; if (atBottomRef.current) el.scrollTop = el.scrollHeight; }, [msgs, msgParam]); // auto-scroll only when already pinned to the bottom
+  // Keep the viewport anchored across an older-page prepend: restore scrollTop before paint. Runs before the auto-scroll effect above, which is a no-op here anyway (a prepend only happens while scrolled up, so atBottomRef is false).
+  useLayoutEffect(() => { const el = scrollRef.current; if (el && prependRestoreRef.current != null) { el.scrollTop = el.scrollHeight - prependRestoreRef.current; prependRestoreRef.current = null; } }, [msgs]);
+  useEffect(() => { if (trimmedRef.current) { trimmedRef.current = false; setHasMore(true); } }, [msgs]); // a live-tail trim opened a gap at the top → older messages stay re-fetchable
   useEffect(() => { atBottomRef.current = true; setShowJump(false); }, [cur?.id]); // reset bottom-pin state on channel switch
   const toBottom = () => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; atBottomRef.current = true; setShowJump(false); };
-  const onScroll = () => { const el = scrollRef.current; if (!el) return; const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120; atBottomRef.current = near; setShowJump(!near); };
+  // Fetch the previous (older) page via the `before` keyset cursor and prepend it; guarded so concurrent scroll events can't fire duplicate loads.
+  const loadOlder = async () => {
+    if (!cur || loadingOlderRef.current || !hasMore || !msgs.length) return;
+    const chId = cur.id; // pin the channel this fetch belongs to
+    loadingOlderRef.current = true;
+    try {
+      const d = await api("GET", `/api/messages/channel/${chId}?limit=${PAGE_SIZE}&before=${msgs[0]!.seq}`);
+      if (curIdRef.current !== chId) return; // channel switched mid-fetch → drop the stale result (finally still clears the in-flight flag)
+      const older: Msg[] = d.messages || [];
+      if (older.length) { const el = scrollRef.current; prependRestoreRef.current = el ? el.scrollHeight : null; setMsgs((m) => [...older, ...m]); } // capture height right before prepend; layout effect restores after
+      setHasMore(!!d.hasMore);
+    } catch { /* transient — the next scroll-to-top retries */ } finally { loadingOlderRef.current = false; }
+  };
+  const onScroll = () => { const el = scrollRef.current; if (!el) return; if (el.scrollTop < 80 && hasMore && !loadingOlderRef.current) void loadOlder(); const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120; atBottomRef.current = near; setShowJump(!near); };
   useEffect(() => { // scroll to and highlight the target message for 2s when msgParam is set
     if (!msgParam || chatTab !== "chat") return;
     const el = document.getElementById("m-" + msgParam);
     if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("msg-hl"); const t = setTimeout(() => el.classList.remove("msg-hl"), 2200); return () => clearTimeout(t); }
-  }, [msgParam, msgs, chatTab]);
+    else if (hasMore && !loadingOlderRef.current) void loadOlder(); // target outside the loaded window → page older history (re-runs on each prepend via the msgs dep) until it appears or the channel start is reached
+  }, [msgParam, msgs, chatTab, hasMore]);
   useEffect(() => { // ?thread= auto-opens the thread panel: finds the parent message (full id or 8-char short id) in the loaded list and calls startThread; each threadParam is only opened once
     if (!threadParam || !msgs.length) return;
     if (thread) return; // panel already open, do not re-open
     const short = threadParam.includes(":") ? threadParam.split(":").pop()! : threadParam;
     const m = msgs.find((x) => x.id === threadParam || x.id.startsWith(short));
     if (m) startThread(m);
+    else if (hasMore && !loadingOlderRef.current) void loadOlder(); // parent outside the loaded window → page older history until it appears or the channel start is reached
     // eslint-disable-next-line
-  }, [threadParam, msgs]);
+  }, [threadParam, msgs, hasMore]);
 
   const setTab = (t: string) => { const n = new URLSearchParams(sp); if (t === "chat") n.delete("chatTab"); else n.set("chatTab", t); setSp(n, { replace: true }); };
   const doDM = async (agentId: string) => { const id = await openDM("agent", agentId); if (id) nav(`/s/${slug}/channel/${id}`); }; // used by AgentProfile onMessage callback
