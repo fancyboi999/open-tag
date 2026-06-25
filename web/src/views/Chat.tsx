@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import { useStore, fmtTime, type Msg, type Att } from "../store.tsx";
 import { MessageContent } from "../messageRender.tsx";
-import { Smile, X, ExternalLink, CheckCircle2, MessageCircle, MoreHorizontal, Link2, Clipboard, Bookmark, CheckSquare, Circle, Play, Eye, Ban, ArrowDown, BellOff, Moon, Power, Lock, Globe, Archive, Trash2 } from "lucide-react";
+import { Smile, X, ExternalLink, CheckCircle2, MessageCircle, MoreHorizontal, Link2, Clipboard, Bookmark, CheckSquare, Circle, Play, Eye, Ban, ArrowDown, BellOff, Lock, Globe, Archive, Trash2 } from "lucide-react";
 // Task badge per message row: icon changes with task status; color tokens from DESIGN.md (see .task-pill.st-* styles)
 const TASK_ICON: Record<string, typeof Circle> = { todo: Circle, in_progress: Play, in_review: Eye, done: CheckCircle2, closed: Ban };
 import { IconWrench, IconFile, IconExternalLink, IconDownload } from "../icons.tsx";
@@ -116,7 +116,7 @@ function ActionCardMsg({ m }: { m: Msg }) {
 
 export function Chat() {
   const { t } = useTranslation();
-  const { api, channels, dms, unread, agents, humans, machines, traj, slug, me, myRole, capabilities, reload, onEvent, subscribeChannel, openDM, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, agentPanelReq, clearAgentPanelReq } = useStore();
+  const { api, channels, dms, unread, agents, humans, traj, slug, me, myRole, capabilities, reload, onEvent, subscribeChannel, openDM, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, agentPanelReq, clearAgentPanelReq } = useStore();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   // A message's sender avatar: look the sender up in the loaded agents/humans lists (carry avatarUrl) — no message-schema change needed.
   const senderAvatar = (m: Msg) => avFor(m.senderType === "agent" ? agents.find((a) => a.id === m.senderId)?.avatarUrl : humans.find((h) => h.userId === m.senderId)?.avatarUrl);
@@ -305,16 +305,7 @@ export function Chat() {
               channelId={cur?.id ?? ""}
               placeholder={isDm ? t("chat.dmPlaceholder", { name: cur?.name }) : t("chat.channelPlaceholder")}
               allowAsTask
-              topSlot={isDm && dmAgent ? (() => {
-                // Wake-state hint: messaging a sleeping agent wakes it (backend resumes the prior session); if its machine is offline the wake-up is a no-op and the message is queued.
-                const mc = machines.find((m) => m.id === dmAgent.machineId);
-                const offline = !dmAgent.machineId || mc?.status !== "online";
-                const st = dmAgent.activity || dmAgent.status;
-                const nm = dmAgent.displayName || dmAgent.name;
-                if (offline) return <div className="wake-hint wh-off"><Power size={13} /> {t("chat.machineOffline", { name: nm })}</div>;
-                if (st === "sleeping" || st === "inactive" || st === "offline") return <div className="wake-hint"><Moon size={13} /> {t("chat.agentSleeping", { name: nm })}</div>;
-                return null;
-              })() : null}
+              dmAgent={isDm ? dmAgent : undefined}
             />
           </>}
       </main>
