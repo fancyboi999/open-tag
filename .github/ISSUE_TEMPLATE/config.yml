@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question or discuss ideas
+    url: https://github.com/fancyboi999/open-tag/discussions
+    about: Use GitHub Discussions for general questions and design conversations.
+  - name: Security vulnerability
+    url: https://github.com/fancyboi999/open-tag/security/advisories/new
+    about: Report a security issue privately via GitHub's vulnerability reporting.
