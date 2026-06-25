@@ -7,6 +7,7 @@ import remarkBreaks from "remark-breaks";
 import rehypeSanitize from "rehype-sanitize";
 import { useTranslation } from "react-i18next";
 import { useStore, fmtTime } from "../store.tsx";
+import { fmtDateTime } from "../format";
 import { IconMonitor } from "../icons.tsx";
 import { Avatar, AvatarPicker, resolveAvatar } from "../Avatar.tsx";
 import { Select } from "../Select.tsx";
@@ -195,7 +196,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
           <button className="joinbtn pph-close" title={t("members.close")} onClick={onClose}><X size={14} /></button>
           {acts}
         </div>
-      ) : <div className="head head-agent"><AvatarPicker name={a.name} url={signedAvatar} size={48} editable={!!capabilities.manageAgents} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div><h1>{a.displayName || a.name}</h1><small>@{a.name} <span className={"dot " + live} />{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div>{acts}</div>}
+      ) : <div className="head head-agent"><AvatarPicker name={a.name} url={signedAvatar} size={48} editable={!!capabilities.manageAgents} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div className="head-id"><h1>{a.displayName || a.name}</h1><small>@{a.name} <span className={"dot " + live} />{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div>{acts}</div>}
       <div className="ptabs">
         {/* Tab order follows AgentDetailPanel spec: integrations (not apps) */}
         {([
@@ -234,6 +235,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
                 <div className="kv"><b>{t("common.status")}</b> <span className="kv-v"><span className={"dot " + live} /> {live}</span></div>
                 <div className="kv"><b>{t("common.session")}</b> {a.sessionId || "(none)"}</div>
                 <div className="kv"><b>{t("common.workspace")}</b> ~/.open-tag/agents/{a.id}</div>
+                {a.createdAt && <div className="kv"><b>{t("common.created")}</b> {fmtDateTime(a.createdAt)}</div>}
                 {capabilities.manageAgents && <div className="task-acts" style={{ marginTop: 14 }}>
                   <button className="joinbtn" onClick={startEdit}>{t("members.editProfile")}</button>
                 </div>}
@@ -507,7 +509,7 @@ export function HumanProfile({ uid, onClose, onMessage }: { uid: string; onClose
           <button className="joinbtn pph-close" title={t("members.close")} onClick={onClose}><X size={14} /></button>
           {dmBtn && <div className="agent-acts">{dmBtn}</div>}
         </div>
-      ) : <div className="head head-agent"><AvatarPicker name={p.name} url={signedAvatar} size={48} editable={isMe} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div><h1>{p.displayName || p.name}</h1><small>@{p.name} · {p.role}{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div><div className="agent-acts">{dmBtn}</div></div>}
+      ) : <div className="head head-agent"><AvatarPicker name={p.name} url={signedAvatar} size={48} editable={isMe} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div className="head-id"><h1>{p.displayName || p.name}</h1><small>@{p.name} · {p.role}{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div><div className="agent-acts">{dmBtn}</div></div>}
       <div className="scroll">
         <div className="card">
           {edit ? (
@@ -520,8 +522,8 @@ export function HumanProfile({ uid, onClose, onMessage }: { uid: string; onClose
           ) : (<>
             <div className="meta">{p.description || "No description"}</div>
             <div className="kv"><b>{t("members.role")}</b> {p.role}</div>
-            {p.joinedAt && <div className="kv"><b>{t("members.joined")}</b> {fmtTime(p.joinedAt)}</div>}
-            {isMe && p.email && <div className="kv"><b>{t("members.email")}</b> {p.email}</div>}
+            {p.joinedAt && <div className="kv"><b>{t("members.joined")}</b> {fmtDateTime(p.joinedAt)}</div>}
+            {p.email && <div className="kv"><b>{t("members.email")}</b> {p.email}</div>}
             {isMe && <div className="task-acts" style={{ marginTop: 14 }}><button className="joinbtn" onClick={() => { setDs(p.description || ""); setEdit(true); }}>{t("members.editProfile")}</button></div>}
           </>)}
         </div>

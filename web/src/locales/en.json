@@ -85,7 +85,7 @@
     "editProfile": "Edit profile",
     "scopeWorkspace": "workspace",
     "scopeGlobal": "global",
-    "skillsEmpty": "No skills detected on this machine (~/.claude/skills or workspace .claude/skills), or daemon is offline.",
+    "skillsEmpty": "No skills detected for this runtime on this machine, or the daemon is offline.",
     "skillInvocable": "invocable",
     "noDescription": "(no description)",
     "permCustom": "Custom permissions",
@@ -430,6 +430,7 @@
     "model": "Model",
     "session": "Session",
     "workspace": "Workspace",
+    "created": "Created",
     "hostname": "Hostname",
     "reasoning": "Reasoning",
     "membersCount": "{{count}} members"

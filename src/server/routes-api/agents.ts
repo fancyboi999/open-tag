@@ -117,12 +117,13 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     await db.update(schema.agents).set({ scopes: next }).where(eq(schema.agents.id, agId));
     return (sendJson(res, 200, { agentId: agId, ...next }), true);
   }
-  // Agent Skills (used by Profile tab): daemon reads ~/.claude/skills on the machine + .claude/skills in the workspace
+  // Agent Skills (used by Profile tab): daemon reads the runtime's own skills dir on the machine
+  // (claude → ~/.claude/skills, codex → ~/.codex/skills, …) + the matching dir in the workspace.
   const askill = /^\/api\/agents\/([^/]+)\/skills$/.exec(p);
   if (askill && method === "GET") {
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, askill[1]!), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
-    try { const r = await requestDaemon(serverId, { type: "agent:skills:list", agentId: askill[1]! }); return (sendJson(res, 200, { global: r.global ?? [], workspace: r.workspace ?? [] }), true); }
+    try { const r = await requestDaemon(serverId, { type: "agent:skills:list", agentId: askill[1]!, runtime: a.runtime }); return (sendJson(res, 200, { global: r.global ?? [], workspace: r.workspace ?? [] }), true); }
     catch { return (sendJson(res, 200, { global: [], workspace: [] }), true); }
   }
   // Apps tab (connected third-party integrations): no integrations implemented yet, returns empty array
