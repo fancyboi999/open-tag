@@ -79,7 +79,13 @@ export const agents = pgTable("agents", {
   creatorId: uuid("creator_id").references(() => users.id), // human creator; used in member profile "Created Agents" section. Null for historical records
   deletedAt: timestamp("deleted_at", { withTimezone: true }), // soft delete: keep the row so historical message/DM names stay resolvable by-id
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => ({ byServer: index("agents_server_idx").on(t.serverId) }));
+}, (t) => ({
+  byServer: index("agents_server_idx").on(t.serverId),
+  // A live agent's name is the @mention / DM routing key (core.ts parseMentions/resolveTarget resolve by name),
+  // so it must be unique per server — otherwise a same-named agent becomes an unreachable routing blind spot.
+  // Partial index excludes soft-deleted rows, so a name frees up after delete and can be reused by a new agent.
+  nameUniq: uniqueIndex("agents_name_uniq").on(t.serverId, t.name).where(sql`${t.deletedAt} is null`),
+}));
 
 // ── Channel / DM / Thread ───────────────────────────────────────
 export const channels = pgTable("channels", {

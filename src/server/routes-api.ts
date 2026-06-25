@@ -239,6 +239,11 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     if (!b.name) return (sendErr(res, 400, "name required"), true);
     if (invalidAgentName(b.name)) return (sendErr(res, 400, INVALID_AGENT_NAME), true);
     if (descTooLong(b.description)) return (sendErr(res, 400, DESC_TOO_LONG), true);
+    // A live agent name must be unique per server — it is the @mention / DM routing key, so a duplicate becomes an
+    // unreachable routing blind spot. Reject with a friendly 409; the agents_name_uniq partial index is the
+    // race-proof DB backstop. Soft-deleted names are excluded, so a deleted agent's name can be reused.
+    const dup = (await db.select({ id: schema.agents.id }).from(schema.agents).where(and(eq(schema.agents.serverId, serverId), eq(schema.agents.name, b.name), isNull(schema.agents.deletedAt))))[0];
+    if (dup) return (sendErr(res, 409, `an agent named "${b.name}" already exists`), true);
     const [agent] = await db.insert(schema.agents).values({
       serverId, name: b.name, displayName: b.displayName || b.name, description: b.description ?? null,
       model: b.model || "sonnet", runtime: b.runtime || "claude", machineId: b.machineId ?? null,
@@ -823,7 +828,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     const mem = (await db.select().from(schema.serverMembers).where(and(eq(schema.serverMembers.serverId, serverId), eq(schema.serverMembers.userId, uid))))[0];
     const u = mem ? (await db.select().from(schema.users).where(eq(schema.users.id, uid)))[0] : null;
     if (!mem || !u) return (sendErr(res, 404, "member not found"), true);
-    const created = await db.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), eq(schema.agents.creatorId, uid)));
+    const created = await db.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), eq(schema.agents.creatorId, uid), isNull(schema.agents.deletedAt))); // exclude soft-deleted agents, same as GET /api/agents — otherwise deleted agents leak into the profile's "Created Agents" card
     return (sendJson(res, 200, {
       userId: u.id, name: u.name, displayName: u.displayName, description: u.description,
       avatarUrl: u.avatarUrl, email: u.email, gravatarHash: u.gravatarHash,
