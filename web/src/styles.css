@@ -256,6 +256,7 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 /* Board layout: horizontal Kanban (columns side by side, min-width + horizontal scroll so the narrow embedded tasks tab degrades gracefully) vs the legacy vertical stack. Toggle persisted in localStorage. */
 .task-board.columns{display:flex;gap:14px;align-items:flex-start;overflow-x:auto;padding-bottom:6px}
 .task-board.columns .task-col{flex:0 0 300px;min-width:280px;margin-bottom:0}
+.task-board.columns .task-col.collapsed{flex:0 0 auto;min-width:0} /* a collapsed column shrinks to its header instead of leaving a wide empty slot */
 .task-board.stack .task-col{margin-bottom:20px}
 /* Task card: #channel + #number + title + bottom-right status pill, no avatar/timestamp (editorial style) */
 .card.task{position:relative;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:transform .1s,border-color .1s}
@@ -379,8 +380,7 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .seg button{background:none;border:0;padding:6px 14px;font-size:13px;color:var(--muted);cursor:pointer}
 .seg button+button{box-shadow:-1px 0 0 var(--hair-strong)}
 .seg button.on{background:var(--surface-strong);color:var(--ink);font-weight:600}
-.seg-icon button{display:flex;align-items:center;padding:6px 10px}
-.seg-icon button.on{color:var(--ink)}
+.seg-icon button{display:flex;align-items:center;padding:6px 10px} /* icon-only segment; active state inherited from .seg button.on */
 .tfilter{font-family:var(--sans);font-size:13px;color:var(--body);background:var(--surface);border:1px solid var(--hair-strong);border-radius:8px;padding:6px 10px;outline:none;cursor:pointer;max-width:180px}
 .newtask{font-size:14px;font-weight:500;color:var(--on-ink);background:var(--ink-2);border:0;padding:7px 16px;border-radius:9999px;cursor:pointer}
 .newtask:hover{background:var(--ink)}

@@ -34,6 +34,11 @@ test("horizontal Kanban lays the columns out in a scrollable flex row", () => {
   assertDecl(colInCols, "flex", "0 0 300px");
   assertDecl(colInCols, "min-width", "280px");
   assertDecl(colInCols, "margin-bottom", "0");
+
+  // a collapsed column shrinks to its header instead of leaving a wide empty slot
+  const collapsedInCols = ruleBody(".task-board.columns .task-col.collapsed");
+  assertDecl(collapsedInCols, "flex", "0 0 auto");
+  assertDecl(collapsedInCols, "min-width", "0");
 });
 
 test("vertical stack keeps the legacy block-flow spacing", () => {

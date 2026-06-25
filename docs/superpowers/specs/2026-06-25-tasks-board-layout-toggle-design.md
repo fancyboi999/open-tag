@@ -73,7 +73,11 @@ DnD is hit-tested by pointer-over rectangle → **layout-agnostic, zero logic ch
 - `.task-board.columns .task-col{flex:0 0 300px;min-width:280px;margin-bottom:0}`
   — min-width + horizontal scroll is the narrow-panel fallback.
 - `.task-board.stack .task-col{margin-bottom:20px}` — current behavior preserved.
-- `collapsed` behavior unchanged (hides cards, keeps the header).
+- `collapsed` still hides cards / keeps the header; in horizontal mode a collapsed
+  column also shrinks to its header
+  (`.task-board.columns .task-col.collapsed{flex:0 0 auto;min-width:0}`) so the
+  default-collapsed done/closed columns don't leave two wide empty 300px slots at the
+  right edge (raised by the independent verifier). Vertical mode is unaffected.
 
 ## Out of scope (fail-loud)
 
