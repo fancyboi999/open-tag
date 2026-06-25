@@ -3,7 +3,7 @@
 // Run: npx tsx --test --test-force-exit test/listModels.unit.test.ts
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseOpencodeModels, parseCursorModels, parsePiModels, parseClaudeEffortLevels, parseCodexModels } from "../src/daemon/listModels.ts";
+import { parseOpencodeModels, parseCursorModels, parsePiModels, parseClaudeEffortLevels, claudeThinkingForModel, parseCodexModels } from "../src/daemon/listModels.ts";
 
 // ── opencode ──
 test("opencode: plain (non-verbose) lines → provider/model", () => {
@@ -83,6 +83,35 @@ test("claude: parses --effort levels across the wrapped help line", () => {
 
 test("claude: no --effort line → []", () => {
   assert.deepEqual(parseClaudeEffortLevels("  --model <m>   Model to use\n"), []);
+});
+
+// ── claude per-model effort projection (multica's claudeModelEffortAllow: xhigh is Opus-only, max not on Haiku) ──
+const FULL = ["low", "medium", "high", "xhigh", "max"];
+test("claude effort: opus keeps the full superset", () => {
+  assert.deepEqual(claudeThinkingForModel("opus", FULL)?.levels.map((l) => l.value), ["low", "medium", "high", "xhigh", "max"]);
+});
+
+test("claude effort: sonnet drops xhigh, keeps max", () => {
+  assert.deepEqual(claudeThinkingForModel("sonnet", FULL)?.levels.map((l) => l.value), ["low", "medium", "high", "max"]);
+});
+
+test("claude effort: haiku drops both xhigh and max", () => {
+  assert.deepEqual(claudeThinkingForModel("haiku", FULL)?.levels.map((l) => l.value), ["low", "medium", "high"]);
+});
+
+test("claude effort: friendly labels (xhigh → 'Extra high', not 'Xhigh') and medium default", () => {
+  const t = claudeThinkingForModel("opus", FULL)!;
+  assert.equal(t.levels.find((l) => l.value === "xhigh")!.label, "Extra high");
+  assert.equal(t.levels.find((l) => l.value === "max")!.label, "Max");
+  assert.equal(t.default, "medium");
+});
+
+test("claude effort: result is superset ∩ allow-list (CLI that lists only low/medium/high → opus gets those 3)", () => {
+  assert.deepEqual(claudeThinkingForModel("opus", ["low", "medium", "high"])?.levels.map((l) => l.value), ["low", "medium", "high"]);
+});
+
+test("claude effort: unknown model id keeps the full superset (defensive — new alias still gets a picker)", () => {
+  assert.deepEqual(claudeThinkingForModel("future-model", FULL)?.levels.map((l) => l.value), ["low", "medium", "high", "xhigh", "max"]);
 });
 
 // ── codex thinking (`codex debug models` JSON; fixture mirrors real codex-cli 0.142.0) ──

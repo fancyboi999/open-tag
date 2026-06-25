@@ -32,16 +32,46 @@ function isModelId(s: string): boolean {
 // claude/codex have no "list models" command — their catalog is static, but each model's reasoning-effort
 // levels ARE probed (so the UI offers exactly what the installed CLI supports, not a guess).
 
-// claude has a single global effort set, parsed from `claude --help`'s `--effort` line:
+// `claude --help` advertises the effort *superset* on one `--effort` line:
 //   `--effort <level>   Effort level for the current session (low, medium, high, xhigh, max)`
 // (the help wraps across lines; [^(] in the regex spans newlines, so the multi-line form still matches).
+// But that superset has per-model gaps the CLI does NOT express programmatically — xhigh is Opus-only,
+// max is not offered on Haiku. So we parse the superset, then project it through a per-model allow-list
+// (multica's hand-maintained claudeModelEffortAllow, MUL-2339, thinking.go — collapsed to our short ids).
+// Over-offering a level the model rejects would defeat the point of discovery, so we filter, not flatten.
 const CLAUDE_MODELS: { id: string; label: string }[] = [
   { id: "sonnet", label: "Sonnet" }, { id: "opus", label: "Opus" }, { id: "haiku", label: "Haiku" },
 ];
+
+// Friendly labels for Claude's effort tokens (matches Anthropic's own slash UI; titleCase would give "Xhigh").
+const CLAUDE_EFFORT_LABEL: Record<string, string> = {
+  low: "Low", medium: "Medium", high: "High", xhigh: "Extra high", max: "Max",
+};
+
+// Per-model effort allow-list. A model absent from this map keeps the full parsed superset (defensive:
+// a newly-shipped alias still gets a usable picker until the table is updated). Update when Anthropic
+// ships a model with a different effort surface.
+const CLAUDE_MODEL_EFFORT_ALLOW: Record<string, Set<string>> = {
+  opus: new Set(["low", "medium", "high", "xhigh", "max"]),
+  sonnet: new Set(["low", "medium", "high", "max"]),
+  haiku: new Set(["low", "medium", "high"]),
+};
+
 export function parseClaudeEffortLevels(helpText: string): string[] {
   const m = /--effort\s*(?:<[^>]+>)?\s*(?:Effort level[^(]*)?\(([^)]+)\)/.exec(helpText);
   if (!m) return [];
   return m[1]!.split(",").map((s) => s.trim()).filter((s) => /^[a-z]+$/i.test(s));
+}
+
+// Project the parsed effort superset onto one model: keep only the levels the model supports (∩ allow-list),
+// label them, and default to medium when offered. Returns undefined when nothing survives (UI hides the picker).
+export function claudeThinkingForModel(modelId: string, superset: string[]): ModelThinking | undefined {
+  const allow = CLAUDE_MODEL_EFFORT_ALLOW[modelId];
+  const levels: ThinkingLevel[] = superset
+    .filter((v) => !allow || allow.has(v))
+    .map((v) => ({ value: v, label: CLAUDE_EFFORT_LABEL[v] ?? titleCase(v) }));
+  if (!levels.length) return undefined;
+  return { levels, default: levels.some((l) => l.value === "medium") ? "medium" : levels[0]!.value };
 }
 
 // codex: `codex debug models` emits the raw catalog as JSON. Each model carries per-model
@@ -184,10 +214,12 @@ export async function listModels(runtime: string): Promise<DiscoveredModel[] | n
     }
     case "claude": {
       const r = await runList("claude", ["--help"]);
-      const levels = parseClaudeEffortLevels(r.stdout || r.stderr);
-      if (!levels.length) return null; // no effort info → static fallback (no thinking)
-      const thinking: ModelThinking = { levels: levels.map((v) => ({ value: v, label: titleCase(v) })), default: levels.includes("medium") ? "medium" : levels[0] };
-      return CLAUDE_MODELS.map((m) => ({ ...m, provider: "anthropic", thinking }));
+      const superset = parseClaudeEffortLevels(r.stdout || r.stderr);
+      if (!superset.length) return null; // no effort info → static fallback (no thinking)
+      return CLAUDE_MODELS.map((m) => {
+        const thinking = claudeThinkingForModel(m.id, superset); // per-model effort subset, not the flat superset
+        return { ...m, provider: "anthropic", ...(thinking ? { thinking } : {}) };
+      });
     }
     case "codex": {
       const r = await runList("codex", ["debug", "models"]);
