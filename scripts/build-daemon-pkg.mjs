@@ -9,7 +9,7 @@
 // bundled in. ws's optional native accelerators stay external (ws falls back to pure JS).
 // ESM output (not CJS) so `import.meta.url` in openTagBin.ts resolves correctly.
 import { build } from "esbuild";
-import { chmodSync, mkdirSync, statSync } from "node:fs";
+import { chmodSync, mkdirSync, statSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -34,8 +34,12 @@ const common = {
 // Daemon — the published bin. The source entry already has a `#!/usr/bin/env node` shebang which esbuild
 // preserves on line 1 (so DON'T add another in the banner — two shebangs is a syntax error in ESM).
 // chmod +x so npx / global-install run it directly.
+// Inject the published package version so the daemon reports its real version to the server.
+// src/daemon/index.ts reads process.env.DAEMON_VERSION; esbuild inlines it here for the bundle, and it
+// falls back to "dev" when the daemon is run from source via tsx (no define).
+const daemonVersion = JSON.parse(readFileSync(path.join(root, "packages/daemon/package.json"), "utf8")).version;
 const daemonOut = path.join(distDir, "cli.mjs");
-await build({ ...common, entryPoints: [path.join(root, "src/daemon/index.ts")], outfile: daemonOut, banner: { js: requireShim } });
+await build({ ...common, entryPoints: [path.join(root, "src/daemon/index.ts")], outfile: daemonOut, banner: { js: requireShim }, define: { "process.env.DAEMON_VERSION": JSON.stringify(daemonVersion) } });
 chmodSync(daemonOut, 0o755);
 
 // Agent CLI — invoked by the generated wrapper via `node agent-cli.mjs`, so no shebang needed.

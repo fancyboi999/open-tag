@@ -41,7 +41,7 @@ button{font-family:inherit}
 .sw-add{display:flex;align-items:center;gap:7px;width:100%;border:0;border-top:1px solid var(--hair);background:transparent;cursor:pointer;padding:9px 8px 5px;margin-top:5px;color:var(--muted);font-size:13px}
 .sw-add:hover{color:var(--ink)}
 .sw-create{display:flex;gap:6px;margin-top:6px;padding:2px}
-.sw-create input{flex:1;font-size:13px;padding:6px 9px;border:1px solid var(--hair-strong);border-radius:8px;outline:none;background:var(--canvas);color:var(--ink);font-family:inherit}
+.sw-create input{flex:1;min-width:0;font-size:13px;padding:6px 9px;border:1px solid var(--hair-strong);border-radius:8px;outline:none;background:var(--canvas);color:var(--ink);font-family:inherit}
 .sw-go{font-size:13px;color:var(--on-ink);background:var(--ink-2);border:0;padding:6px 12px;border-radius:8px;cursor:pointer}
 .rail a.t{width:40px;height:40px;border-radius:12px;border:1px solid transparent;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none}
 .rail a.t:hover{background:var(--surface-strong);color:var(--ink)}

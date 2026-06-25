@@ -56,7 +56,7 @@ conn = new Connection(serverUrl, apiKey, (msg) => {
   log.info("ready", { runtimes, hostname: os.hostname() });
   conn.send({
     type: "ready", capabilities: ["agent:start", "agent:stop", "agent:sleep", "agent:reset", "agent:profile", "agent:deliver", "agent:workspace"],
-    runtimes, runningAgents: mgr.running(), hostname: os.hostname(), os: `${os.platform()} ${os.arch()}`, daemonVersion: "0.1.0",
+    runtimes, runningAgents: mgr.running(), hostname: os.hostname(), os: `${os.platform()} ${os.arch()}`, daemonVersion: process.env.DAEMON_VERSION ?? "dev",
     machineId: readMachineId(), // Stable identity: empty on first connection; server sends it back via ready:ack for persistence.
   });
 });
