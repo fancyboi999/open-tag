@@ -186,8 +186,8 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
         </div>
         {view === "board" && (
           <div className="seg seg-icon">
-            <button className={boardLayout === "columns" ? "on" : ""} title={t("tasks.layoutColumns")} aria-label={t("tasks.layoutColumns")} aria-pressed={boardLayout === "columns"} onClick={() => setLayout("columns")}><Columns3 size={15} /></button>
-            <button className={boardLayout === "stack" ? "on" : ""} title={t("tasks.layoutStack")} aria-label={t("tasks.layoutStack")} aria-pressed={boardLayout === "stack"} onClick={() => setLayout("stack")}><Rows3 size={15} /></button>
+            <button className={boardLayout === "columns" ? "on" : ""} title={t("tasks.layoutColumns")} aria-label={t("tasks.layoutColumns")} onClick={() => setLayout("columns")}><Columns3 size={15} /></button>
+            <button className={boardLayout === "stack" ? "on" : ""} title={t("tasks.layoutStack")} aria-label={t("tasks.layoutStack")} onClick={() => setLayout("stack")}><Rows3 size={15} /></button>
           </div>
         )}
         <Select ariaLabel={t("tasks.filterByCreator")} value={creatorKey} onChange={setCreatorKey}
