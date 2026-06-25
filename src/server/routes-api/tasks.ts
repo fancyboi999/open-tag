@@ -5,18 +5,21 @@ import { db, schema } from "../../db/index.js";
 import { TASK_STATUSES, claimTask, convertMessageToTask, createMessage, deleteTask, setTaskStatus, unclaimTask } from "../core.js";
 import { readJson, sendErr, sendJson } from "../util.js";
 import { attachMentions } from "./shared.js";
+import { canUserReadChannel } from "../channelAccess.js";
 
 export async function handleTasks(ctx: ServerCtx): Promise<boolean> {
   const { req, res, method, p, userId, serverId } = ctx;
   // ---- Tasks (messages as tasks) ----
   const tch = /^\/api\/tasks\/channel\/([^/]+)$/.exec(p);
   if (tch && method === "GET") {
+    if (!(await canUserReadChannel(serverId, tch[1]!, userId))) return (sendErr(res, 403, "forbidden"), true); // invariant 3: private/DM channel tasks not visible to non-members
     const rows = await db.select().from(schema.messages)
       .where(and(eq(schema.messages.channelId, tch[1]!), isNotNull(schema.messages.taskStatus)))
       .orderBy(asc(schema.messages.taskNumber));
     return (sendJson(res, 200, { tasks: await attachMentions(rows) }), true);
   }
   if (tch && method === "POST") { // New Task: bulk create tasks, body { tasks: [{ title }] }
+    if (!(await canUserReadChannel(serverId, tch[1]!, userId))) return (sendErr(res, 403, "forbidden"), true); // invariant 3: non-members must not create tasks in private/DM channels
     const b = await readJson(req);
     const titles = (Array.isArray(b.tasks) ? b.tasks : []).map((t: any) => String(t?.title ?? "").trim()).filter(Boolean);
     if (!titles.length) return (sendErr(res, 400, "tasks[].title required"), true);
