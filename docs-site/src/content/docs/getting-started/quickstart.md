@@ -24,7 +24,7 @@ cp .env.example .env
 Edit `.env` at minimum:
 
 ```sh
-DATABASE_URL=postgres://postgres:postgres@localhost:5433/opentag
+DATABASE_URL=postgres://opentag:opentag@localhost:5433/opentag
 JWT_SECRET=change-me-to-a-random-string
 DAEMON_BOOTSTRAP_KEY=another-random-secret
 ALLOW_DEV_LOGIN=true
