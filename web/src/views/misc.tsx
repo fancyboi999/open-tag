@@ -180,7 +180,7 @@ export function Inbox() {
 // Runtime name → display label mapping
 const RT_LABEL: Record<string, string> = { claude: "Claude Code", codex: "Codex CLI", opencode: "OpenCode", copilot: "Copilot CLI", cursor: "Cursor CLI", gemini: "Gemini CLI", kimi: "Kimi" };
 export function Computers() {
-  const { machines, agents, slug, api, serverId, reload, attachmentUrl } = useStore();
+  const { machines, agents, slug, api, serverId, reload, attachmentUrl, capabilities } = useStore();
   const confirm = useConfirm();
   const { t } = useTranslation();
   const { machineId } = useParams();
@@ -208,7 +208,7 @@ export function Computers() {
       <aside className="sidebar">
         <div className="sb-scroll">
         <div className="sb-title">{t("misc.computersTitle")}</div>
-        <div className="sec">{t("misc.computersMachines")} <span className="cnt">{machines.length}</span><button className="addbtn" title={t("misc.computersConnectBtn")} onClick={() => setConnect(true)}>+</button></div>
+        <div className="sec">{t("misc.computersMachines")} <span className="cnt">{machines.length}</span>{capabilities.manageMachines && <button className="addbtn" title={t("misc.computersConnectBtn")} onClick={() => setConnect(true)}>+</button>}</div>
         {machines.length ? machines.map((m) => (
           <button key={m.id} className={"item" + (m.id === cur?.id ? " active" : "")} onClick={() => nav(`/s/${slug}/computer/${m.id}`)}>
             <IconMonitor size={15} /><span className="grow">{m.name || m.hostname}</span><span className={"dot " + (m.status === "online" ? "online" : "")} />
@@ -220,10 +220,10 @@ export function Computers() {
         {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll"><PaneEmpty icon={<IconMonitor size={30} />} title={t("misc.computersNoMachine")} sub={t("misc.computersNoMachineHint")} /></div></>
           : <>
             <div className="head"><h1>{cur.name || cur.hostname}</h1><small>{cur.status === "online" ? t("misc.computersOnline") : t("misc.computersOffline")} · {t("misc.computersDaemonLabel")} {cur.daemonVersion || "?"}</small>
-              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              {capabilities.manageMachines && <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
                 {cur.status !== "online" && <button className="action-btn" onClick={() => setReconnect({ id: cur.id, name: cur.name || cur.hostname || "" })}>{t("misc.computersReconnectBtn")}</button>}
                 <button className="danger-btn" onClick={removeMachine} disabled={deleting}>{deleting ? t("misc.computersDeleting") : t("misc.computersDeleteBtn")}</button>
-              </div>
+              </div>}
             </div>
             <div className="scroll">
               {delErr && <div className="form-err" style={{ marginBottom: 14 }}>{delErr}</div>}
