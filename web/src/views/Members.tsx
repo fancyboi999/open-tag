@@ -529,9 +529,7 @@ export function HumanProfile({ uid, onClose, onMessage }: { uid: string; onClose
           <div className="card">
             <h3>{t("members.memberManagement")}</h3>
             {capabilities.changeMemberRoles && (
-              <div className="kv"><b>{t("members.role")}</b> <select className="role-sel" value={p.role} onChange={async (e) => { const role = e.target.value; const r = await api("PATCH", `/api/servers/${serverId}/members/${uid}`, { role }); if (r?.error) { alert(r.error); return; } await refetch(); await reload(); }}>
-                <option value="owner">owner</option><option value="admin">admin</option><option value="member">member</option>
-              </select></div>
+              <div className="kv"><b>{t("members.role")}</b> <Select ariaLabel={t("members.role")} value={p.role} options={[{ value: "owner", label: "owner" }, { value: "admin", label: "admin" }, { value: "member", label: "member" }]} onChange={async (role) => { const r = await api("PATCH", `/api/servers/${serverId}/members/${uid}`, { role }); if (r?.error) { alert(r.error); return; } await refetch(); await reload(); }} /></div>
             )}
             {capabilities.manageMembers && <button className="joinbtn" style={{ color: "var(--error)", marginTop: 12 }} onClick={async () => { if (!(await confirm({ title: t("members.removeMemberTitle", { name: p.name }), message: t("members.removeMemberMessage"), confirmLabel: t("members.remove"), danger: true }))) return; const r = await api("DELETE", `/api/servers/${serverId}/members/${uid}`); if (r?.error) { alert(r.error); return; } await reload(); if (onClose) onClose(); else nav(`/s/${slug}/agent`); }}>{t("members.removeMember")}</button>}
           </div>

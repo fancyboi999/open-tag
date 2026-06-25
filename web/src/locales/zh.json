@@ -6,7 +6,18 @@
     "tasks": "任务",
     "members": "成员",
     "computers": "电脑",
-    "settings": "设置"
+    "settings": "设置",
+    "alerts": "警告"
+  },
+  "alerts": {
+    "title": "通知",
+    "count": "{{count}} 项",
+    "view": "查看",
+    "dismiss": "忽略",
+    "daemonOutdatedTitle": "daemon 版本过期",
+    "daemonOutdatedBody": "{{names}} — 停止 daemon 并重新连接以更新。",
+    "machineOfflineTitle": "{{name}} 已离线",
+    "machineOfflineBody": "这台机器上的 {{count}} 个 agent 在重新连接前无法运行。"
   },
   "settings": {
     "title": "设置",

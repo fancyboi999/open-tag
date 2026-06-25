@@ -23,7 +23,7 @@ button{font-family:inherit}
 .resizer-sb{left:calc(56px + var(--sb-w,248px) - 3px)}
 .resizer-traj{right:calc(var(--traj-w,320px) - 3px)}
 
-.rail{background:var(--canvas-soft);box-shadow:1px 0 0 var(--hair-strong);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:6px}
+.rail{background:var(--surface-strong);box-shadow:1px 0 0 var(--hair-strong);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:6px}
 .rail .brand{width:36px;height:36px;border-radius:8px;background:var(--ink);color:var(--canvas);font-family:var(--serif);font-size:20px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;position:relative}
 .rail .brand .dot{position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:50%;background:var(--g-peach);border:1px solid var(--canvas-soft)}
 .rail .brand .brand-img{width:100%;height:100%;border-radius:8px;object-fit:cover;display:block}
@@ -44,9 +44,28 @@ button{font-family:inherit}
 .sw-create input{flex:1;min-width:0;font-size:13px;padding:6px 9px;border:1px solid var(--hair-strong);border-radius:8px;outline:none;background:var(--canvas);color:var(--ink);font-family:inherit}
 .sw-go{font-size:13px;color:var(--on-ink);background:var(--ink-2);border:0;padding:6px 12px;border-radius:8px;cursor:pointer}
 .rail a.t{width:40px;height:40px;border-radius:12px;border:1px solid transparent;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none}
-.rail a.t:hover{background:var(--surface-strong);color:var(--ink)}
+.rail a.t:hover{background:var(--canvas-soft);color:var(--ink)}
 .rail a.t.active{background:var(--surface);border-color:var(--hair-strong);color:var(--ink);box-shadow:0 1px 2px var(--shadow-1)}
 .rail .spacer{flex:1}
+.rail a.t.alert-tab{color:var(--amber)} /* warning button stands out from the neutral nav icons */
+.rail a.t.alert-tab.active{color:var(--ink)} /* open state matches the other tabs' active ink (same specificity as .alert-tab but declared after, so it wins) */
+/* System alert center (alerts.tsx): rail warning button → fixed notification popover. Editorial style (our tokens),
+   mirroring .sw-pop's rail-anchored overlay; deliberately not a brutalist black-border card. */
+.alert-backdrop{position:fixed;inset:0;z-index:40}
+.alert-pop{position:fixed;z-index:41;width:320px;max-height:60vh;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;box-shadow:0 12px 36px var(--shadow-4);overflow:hidden}
+.alert-pop-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--hair);flex:none}
+.alert-pop-title{font-size:11px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
+.alert-pop-count{margin-left:auto;font-size:12px;color:var(--muted-soft)}
+.alert-list{list-style:none;margin:0;padding:0;overflow-y:auto;min-height:0}
+.alert-item{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--hair)}
+.alert-item:last-child{border-bottom:0}
+.alert-ic{flex:none;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--mention);color:var(--amber)}
+.alert-body{min-width:0;flex:1}
+.alert-item-title{font-size:14px;font-weight:600;color:var(--ink);line-height:1.35}
+.alert-item-desc{font-size:13px;color:var(--body);margin-top:2px;line-height:1.4}
+.alert-acts{display:flex;align-items:center;gap:8px;margin-top:9px}
+.alert-dismiss{border:0;background:transparent;color:var(--muted);font-size:11px;padding:3px 6px;cursor:pointer;border-radius:6px}
+.alert-dismiss:hover{color:var(--ink);background:var(--surface-strong)}
 
 /* sidebar = flex column: .sb-scroll (scrolls) above a pinned .live-bar footer. Height comes from the .app grid cell (desktop) or the fixed drawer's top/bottom:0 (mobile @820), so .sb-scroll needs no own height. */
 .sidebar{background:var(--canvas-soft);border-right:1px solid var(--hair);display:flex;flex-direction:column;min-height:0}
@@ -126,7 +145,6 @@ mark{background:var(--g-peach);color:var(--ink);padding:0 2px;border-radius:4px}
 .auth-submit{width:100%;margin-top:4px;padding:10px}
 .auth-alt{margin-top:14px;font-size:13px;color:var(--muted);text-align:center}
 .auth-alt a{color:var(--ink);cursor:pointer;text-decoration:underline}
-.role-sel{font-size:14px;padding:5px 9px;border:1px solid var(--hair-strong);border-radius:8px;background:var(--canvas);color:var(--ink);font-family:inherit}
 .logout-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:26px;padding-top:18px;border-top:1px solid var(--hair)}
 /* Language switcher: segmented control (settings account page) */
 .lang-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:26px;padding-top:18px;border-top:1px solid var(--hair)}
@@ -550,7 +568,7 @@ a:focus-visible,button:focus-visible,[role="button"]:focus-visible{outline:2px s
 input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none;box-shadow:0 0 0 2px var(--ink-2)}
 .composer-input:focus-visible,.qs-search input:focus-visible{box-shadow:none}
 .rail a.t:focus-visible{outline-offset:-2px}
-.rail-badge{position:absolute;top:1px;right:1px;min-width:16px;height:16px;padding:0 4px;border-radius:9999px;background:var(--tint-rose-ink);color:var(--on-ink);font-size:10px;font-weight:600;line-height:16px;text-align:center;box-shadow:0 0 0 1.5px var(--canvas-soft)}
+.rail-badge{position:absolute;top:1px;right:1px;min-width:16px;height:16px;padding:0 4px;border-radius:9999px;background:var(--tint-rose-ink);color:var(--on-ink);font-size:10px;font-weight:600;line-height:16px;text-align:center;box-shadow:0 0 0 1.5px var(--surface-strong)}
 .inbox-list{flex:1;overflow:auto;padding:8px 0}
 .inbox-row{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;padding:13px 28px;border-bottom:1px solid var(--hair)}
 .inbox-row:hover{background:var(--canvas-soft)}

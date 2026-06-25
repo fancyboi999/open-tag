@@ -206,10 +206,16 @@ export function Chat() {
     } catch { /* transient — the next scroll-to-top retries */ } finally { loadingOlderRef.current = false; }
   };
   const onScroll = () => { const el = scrollRef.current; if (!el) return; if (el.scrollTop < 80 && hasMore && !loadingOlderRef.current) void loadOlder(); const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120; atBottomRef.current = near; setShowJump(!near); };
-  useEffect(() => { // scroll to and highlight the target message for 2s when msgParam is set
+  // highlightedMsgRef guards the flash to once per target. The deps below include `msgs`, so without it every
+  // incoming live message (msgs changes) would re-run this while ?msg= is still in the URL and re-flash the
+  // inbox-clicked message on each new message. Re-armed on channel switch so re-opening the same target flashes again.
+  const highlightedMsgRef = useRef<string | null>(null);
+  useEffect(() => { highlightedMsgRef.current = null; }, [cur?.id]);
+  useEffect(() => { // scroll to and highlight the target message for ~2s when msgParam is set (once per target)
     if (!msgParam || chatTab !== "chat") return;
+    if (highlightedMsgRef.current === msgParam) return; // already flashed this target — ignore msgs/live-update re-runs
     const el = document.getElementById("m-" + msgParam);
-    if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("msg-hl"); const t = setTimeout(() => el.classList.remove("msg-hl"), 2200); return () => clearTimeout(t); }
+    if (el) { highlightedMsgRef.current = msgParam; el.scrollIntoView({ block: "center" }); el.classList.add("msg-hl"); setTimeout(() => el.classList.remove("msg-hl"), 2200); } // no cleanup-cancel: the removal must outlive re-renders, else a re-render cancels the timer and the highlight sticks
     else if (hasMore && !loadingOlderRef.current) void loadOlder(); // target outside the loaded window → page older history (re-runs on each prepend via the msgs dep) until it appears or the channel start is reached
   }, [msgParam, msgs, chatTab, hasMore]);
   useEffect(() => { // ?thread= auto-opens the thread panel: finds the parent message (full id or 8-char short id) in the loaded list and calls startThread; each threadParam is only opened once
@@ -516,7 +522,7 @@ function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: s
   /* avatars: data.agents/humans come from /channels/:id/members (carry avatarUrl); resolve to signed/scheme via resolveAvatar */
   const { t } = useTranslation();
   useEscClose(onClose);
-  const { api, agents, attachmentUrl } = useStore();
+  const { api, agents, attachmentUrl, capabilities } = useStore();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const [data, setData] = useState<{ agents: any[]; humans: any[] }>({ agents: [], humans: [] });
   const load = async () => { const d = await api("GET", `/api/channels/${channelId}/members`); setData({ agents: d?.agents || [], humans: d?.humans || [] }); };
@@ -531,13 +537,13 @@ function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: s
         <h3># {channelName} · {t("chat.membersCount", { count: data.agents.length + data.humans.length })}</h3>
         <div className="sec">{t("common.agents")} <span className="cnt">{data.agents.length}</span></div>
         {data.agents.map((a) => (
-          <div key={a.id} className="item"><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + (a.activity || a.status)} /><button className="joinbtn" onClick={() => remove(a.id)}>{t("chat.remove")}</button></div>
+          <div key={a.id} className="item"><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + (a.activity || a.status)} />{capabilities.manageChannels && <button className="joinbtn" onClick={() => remove(a.id)}>{t("chat.remove")}</button>}</div>
         ))}
         <div className="sec">{t("common.humans")} <span className="cnt">{data.humans.length}</span></div>
         {data.humans.map((u) => (
           <div key={u.userId} className="item"><Avatar seed={u.name} url={avFor(u.avatarUrl)} size={22} /><span className="grow">{u.displayName || u.name}</span></div>
         ))}
-        {addable.length > 0 && <>
+        {capabilities.manageChannels && addable.length > 0 && <>
           <div className="sec sec-sub">{t("chat.addAgent")}</div>
           {addable.map((a) => (
             <div key={a.id} className="item ghost"><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><button className="joinbtn" onClick={() => add(a.id)}>{t("chat.join")}</button></div>

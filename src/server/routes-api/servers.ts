@@ -8,6 +8,12 @@ import { createServer } from "../core.js";
 import { publish } from "../realtime.js";
 import { DYNAMIC_RUNTIMES, getDynamicModels } from "../runtimeModels.js";
 import { readJson, sendErr, sendJson } from "../util.js";
+import { createRequire } from "node:module";
+
+// Single source of truth for the newest published daemon version (packages/daemon/package.json). The web client
+// compares each machine's reported daemonVersion against this to raise an "outdated daemon" system alert. Falls
+// back to "" — a safe no-op that raises no outdated alert — if the file isn't reachable in the current layout.
+const LATEST_DAEMON_VERSION: string = (() => { try { return String(createRequire(import.meta.url)("../../../packages/daemon/package.json").version ?? ""); } catch { return ""; } })();
 
 export async function handleServersUserScope(ctx: UserCtx): Promise<boolean> {
   const { req, res, method, p, userId } = ctx;
@@ -173,7 +179,7 @@ export async function handleServersServerScope(ctx: ServerCtx): Promise<boolean>
       return (sendJson(res, 200, users.map((u) => ({ userId: u.id, name: u.name, displayName: u.displayName, description: u.description, avatarUrl: u.avatarUrl, role: rows.find((r) => r.userId === u.id)?.role }))), true);
     }
     const machines = await db.select().from(schema.machines).where(eq(schema.machines.serverId, serverId));
-    return (sendJson(res, 200, { machines: machines.map((m) => ({ id: m.id, name: m.name, hostname: m.hostname, os: m.os, runtimes: m.runtimes, status: m.status, daemonVersion: m.daemonVersion, isComputer: m.isComputer, apiKeyPrefix: m.apiKeyPrefix, lastHeartbeat: m.lastHeartbeat })), latestDaemonVersion: "0.1.0" }), true);
+    return (sendJson(res, 200, { machines: machines.map((m) => ({ id: m.id, name: m.name, hostname: m.hostname, os: m.os, runtimes: m.runtimes, status: m.status, daemonVersion: m.daemonVersion, isComputer: m.isComputer, apiKeyPrefix: m.apiKeyPrefix, lastHeartbeat: m.lastHeartbeat })), latestDaemonVersion: LATEST_DAEMON_VERSION }), true);
   }
   // Notification settings (GET/PATCH /api/servers/:id/notification-settings): per-user push mute setting for this server
   const nset = /^\/api\/servers\/[^/]+\/notification-settings$/.exec(p);
