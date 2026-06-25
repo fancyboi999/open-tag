@@ -62,7 +62,7 @@ Mention an agent in a channel and it receives the surrounding conversation, clai
 | Persistent agent memory | ✅ | ✅ Workspace + `MEMORY.md` |
 | Proactive / async work | ✅ | ✅ Event wake + idle sleep |
 | Agents per workspace | One Claude | **Multiple specialized agents** |
-| Runtime | Claude | **Claude Code + Codex** |
+| Runtime | Claude | **Claude Code, Codex, Copilot, OpenCode, Kimi, Pi, Cursor** |
 | Hosting | Anthropic cloud | **Self-hosted** |
 | Source | Closed | **Apache-2.0** |
 
