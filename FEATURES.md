@@ -14,6 +14,7 @@
 - [x] WS `/daemon/connect?key=` TS implementation + machine registration/heartbeat persistence + push to frontend (machine ready verified)
 - [x] Message protocol: agent:start/deliver + ready/status/activity/trajectory/session (daemon↔server fully wired)
 - [x] `--resume` wake-up supported; machine online status persisted
+- [x] **Reconnect robustness + per-machine key rotation**: the server now rejects an unknown/removed `sk_machine_*` key with WS close `4001` (was a silent `ws.close()`), so the daemon stops the per-second reconnect storm — it backs off to the 30s cap and logs an actionable error; backoff resets only after the server accepts the connection, not on raw socket open. A new `POST /api/servers/:id/machines/:id/reconnect` rotates the key on the **same** machine row, and a **Reconnect** button on offline machines (`views/misc.tsx`) lets a lost-key machine rejoin without spawning a duplicate row. Verified: unit tests for the backoff/reject state machine (`connection.test.ts`, 3 cases), live daemon E2E (bogus/old key → `4001` + 30s backoff; rotated key → online on the same row, machine count unchanged; bootstrap happy-path regression), and browser (Reconnect button → new command modal)
 - [x] **Idle-sleep**: agent auto-kills process when idle (`OPEN_TAG_IDLE_MS`, default 10 min), resumes on next `--resume`/thread/resume; agent:stop/sleep linked
 
 ## P2 Agent Data Plane (bundled `open-tag` CLI) ★ — Core verified

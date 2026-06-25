@@ -183,6 +183,7 @@ export function Computers() {
   const { machineId } = useParams();
   const nav = useNavigate();
   const [connect, setConnect] = useState(false);
+  const [reconnect, setReconnect] = useState<{ id: string; name: string } | null>(null);
   const [delErr, setDelErr] = useState("");
   const [deleting, setDeleting] = useState(false);
   const cur = machines.find((m) => m.id === machineId) || machines[0];
@@ -214,7 +215,10 @@ export function Computers() {
         {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll"><div className="empty">{t("misc.computersNoMachineHint")}</div></div></>
           : <>
             <div className="head"><h1>{cur.name || cur.hostname}</h1><small>{cur.status === "online" ? t("misc.computersOnline") : t("misc.computersOffline")} · {t("misc.computersDaemonLabel")} {cur.daemonVersion || "?"}</small>
-              <button className="danger-btn" style={{ marginLeft: "auto" }} onClick={removeMachine} disabled={deleting}>{deleting ? t("misc.computersDeleting") : t("misc.computersDeleteBtn")}</button>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                {cur.status !== "online" && <button className="action-btn" onClick={() => setReconnect({ id: cur.id, name: cur.name || cur.hostname || "" })}>{t("misc.computersReconnectBtn")}</button>}
+                <button className="danger-btn" onClick={removeMachine} disabled={deleting}>{deleting ? t("misc.computersDeleting") : t("misc.computersDeleteBtn")}</button>
+              </div>
             </div>
             <div className="scroll">
               {delErr && <div className="form-err" style={{ marginBottom: 14 }}>{delErr}</div>}
@@ -236,23 +240,30 @@ export function Computers() {
           </>}
       </main>
       {connect && <ConnectMachineModal onClose={() => setConnect(false)} />}
+      {reconnect && <ConnectMachineModal machine={reconnect} onClose={() => setReconnect(null)} />}
     </>
   );
 }
 
 // Connect machine modal: generates an API key and a ready-to-run daemon connection command
-function ConnectMachineModal({ onClose }: { onClose: () => void }) {
+function ConnectMachineModal({ onClose, machine }: { onClose: () => void; machine?: { id: string; name: string } }) {
   useEscClose(onClose);
   const { api, serverId, reload, machines } = useStore();
   const { t } = useTranslation();
+  const reconnecting = !!machine;
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<{ id: string; key: string; name: string } | null>(null);
   const [copied, setCopied] = useState("");
   const gen = async () => {
     setBusy(true);
-    try { const r = await api("POST", `/api/servers/${serverId}/machines`, { name: name.trim() }); if (r?.key) { setRes({ id: r.id, key: r.key, name: r.name }); await reload(); } }
-    finally { setBusy(false); }
+    try {
+      // Reconnect rotates the key on the existing row; the plain connect flow creates a new machine.
+      const r = reconnecting
+        ? await api("POST", `/api/servers/${serverId}/machines/${machine!.id}/reconnect`, {})
+        : await api("POST", `/api/servers/${serverId}/machines`, { name: name.trim() });
+      if (r?.key) { setRes({ id: r.id, key: r.key, name: r.name }); await reload(); }
+    } finally { setBusy(false); }
   };
   // Auto-close once the just-added machine's daemon comes online (store refetches machines on the machine:status socket event).
   useEffect(() => { if (res && machines.some((m) => m.id === res.id && m.status === "online")) onClose(); }, [machines, res, onClose]);
@@ -261,13 +272,17 @@ function ConnectMachineModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        {!res ? <>
+        {!res ? (reconnecting ? <>
+          <h3>{t("misc.reconnectModalTitle", { name: machine!.name })}</h3>
+          <p className="modal-note"><AlertTriangle size={14} /> {t("misc.reconnectModalNote")}</p>
+          <div className="acts"><button className="cancel" onClick={onClose}>{t("misc.connectModalCancel")}</button><button className="ok" onClick={gen} disabled={busy}>{busy ? t("misc.connectModalGenerating") : t("misc.reconnectModalGenerateBtn")}</button></div>
+        </> : <>
           <h3>{t("misc.connectModalTitle")}</h3>
           <p className="modal-note">{t("misc.connectModalNote")}</p>
           <label>{t("misc.connectModalNameLabel")}</label>
           <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("misc.connectModalNamePlaceholder")} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) gen(); }} />
           <div className="acts"><button className="cancel" onClick={onClose}>{t("misc.connectModalCancel")}</button><button className="ok" onClick={gen} disabled={busy}>{busy ? t("misc.connectModalGenerating") : t("misc.connectModalGenerateBtn")}</button></div>
-        </> : <>
+        </>) : <>
           <h3>{t("misc.connectModalReadyTitle", { name: res.name })}</h3>
           <p className="modal-note"><AlertTriangle size={14} /> {t("misc.connectModalReadyNote")}</p>
           <label>{t("misc.connectModalKeyLabel")}</label>

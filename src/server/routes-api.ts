@@ -914,6 +914,22 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     }).returning();
     return (sendJson(res, 200, { id: m!.id, name: m!.name, apiKeyPrefix: m!.apiKeyPrefix, key }), true);
   }
+  // Reconnect a machine: rotate the connection key on the SAME row. Lets an offline machine whose one-time
+  // key was lost come back online without spawning a duplicate row (the old key stops resolving → its daemon
+  // gets a permanent-rejection close). Returns the new key in plaintext exactly once, same shape as create.
+  const recon = /^\/api\/servers\/[^/]+\/machines\/([^/]+)\/reconnect$/.exec(p);
+  if (recon && method === "POST") {
+    if (!await requireCap(serverId, userId, "manageMachines")) return (sendErr(res, 403, "need manageMachines capability"), true);
+    const mid = recon[1]!;
+    const m = (await db.select().from(schema.machines).where(and(eq(schema.machines.id, mid), eq(schema.machines.serverId, serverId))))[0];
+    if (!m) return (sendErr(res, 404, "machine not found"), true);
+    // Rotating the key orphans whatever daemon currently holds it; an online machine has a live daemon, so
+    // refuse and tell the operator to stop it first (the UI only offers Reconnect on offline machines anyway).
+    if (m.status === "online") return (sendErr(res, 409, "machine is online; stop its daemon before rotating the key"), true);
+    const key = newKey("sk_machine_");
+    await db.update(schema.machines).set({ apiKeyHash: hashToken(key), apiKeyPrefix: key.slice(0, 14) }).where(eq(schema.machines.id, mid));
+    return (sendJson(res, 200, { id: m.id, name: m.name, apiKeyPrefix: key.slice(0, 14), key }), true);
+  }
   // Delete machine: reject if agents are present, prompting removal of all agents first
   const dmach = /^\/api\/servers\/[^/]+\/machines\/([^/]+)$/.exec(p);
   if (dmach && method === "DELETE") {

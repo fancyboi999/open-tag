@@ -483,6 +483,10 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .danger-btn{font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--hair-strong);border-radius:9999px;padding:6px 14px;cursor:pointer;transition:all .12s}
 .danger-btn:hover{color:var(--error);border-color:var(--error-line);background:var(--error-soft)}
 .danger-btn:disabled{opacity:.5;cursor:default}
+/* Neutral pill action button (same shape as .danger-btn, non-destructive) — e.g. Reconnect a machine */
+.action-btn{font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--hair-strong);border-radius:9999px;padding:6px 14px;cursor:pointer;transition:all .12s}
+.action-btn:hover{border-color:var(--ink-2)}
+.action-btn:disabled{opacity:.5;cursor:default}
 /* Edit-channel modal secondary action buttons */
 .modal .ch-act{width:100%;display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;border:1px solid var(--hair-strong);background:var(--surface);color:var(--ink);font-size:14px;cursor:pointer;font-family:inherit;text-align:left;transition:background .1s}
 .modal .ch-act:hover{background:var(--surface-strong)}

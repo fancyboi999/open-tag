@@ -7,6 +7,7 @@ import { BOOTSTRAP_KEY, hashToken } from "./auth.js";
 import { registerDaemon, unregisterDaemon, resolveDaemonRequest } from "./daemonHub.js";
 import { publish } from "./realtime.js";
 import { createLogger } from "../log.js";
+import { MACHINE_REJECTED_CODE } from "../daemonProtocol.js";
 
 const log = createLogger("server:ws");
 
@@ -29,7 +30,14 @@ async function onDaemon(ws: WebSocket, key: string): Promise<void> {
   } else {
     serverId = (await db.select().from(schema.machines).where(eq(schema.machines.apiKeyHash, hashToken(key))))[0]?.serverId ?? null;
   }
-  if (!serverId) { ws.close(); return; }
+  if (!serverId) {
+    // A missing sk_machine_* row is a permanent rejection (key deleted or never existed) → signal the daemon
+    // to stop hammering and tell its operator. A missing bootstrap server row is a not-yet-seeded race, so a
+    // plain close lets the daemon retry on its normal backoff once seeding completes.
+    if (key !== BOOTSTRAP_KEY) ws.close(MACHINE_REJECTED_CODE, "unknown or removed machine key");
+    else ws.close();
+    return;
+  }
   registerDaemon(ws, serverId); // register by serverId → broadcastToDaemons only reaches this server's daemons (multi-tenant isolation, routed by connection)
   log.info("daemon connected", { serverId });
   const ping = setInterval(() => { try { ws.send(JSON.stringify({ type: "ping" })); } catch { /* */ } }, 30000);
