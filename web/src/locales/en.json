@@ -29,6 +29,8 @@
     "dropToSet": "Drop to set {{label}}",
     "viewBoard": "Board",
     "viewList": "List",
+    "layoutColumns": "Columns",
+    "layoutStack": "Stack",
     "filterByCreator": "Filter by creator",
     "allCreators": "All Creators",
     "myTasks": "Created by me",

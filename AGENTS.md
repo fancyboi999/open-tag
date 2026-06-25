@@ -91,7 +91,7 @@ setup otherwise. Decide per task.
 
 | You changed… | Must also update |
 |---|---|
-| `src/db/schema.ts` (tables / columns) | `docs/generated/db-schema.md` |
+| `src/db/schema.ts` (tables / columns) | `docs/generated/db-schema.md` — **and the prod DB gets migrated on deploy** (`prod:up` now runs `db:push:prod`; see **Release discipline**). |
 | Routes/endpoints (`routes-api` / `routes-agent`), CLI sub-commands, daemon protocol | `ARCHITECTURE.md` codemap / boundaries / contracts |
 | Module purpose / boundary / architectural invariant | `ARCHITECTURE.md` §II–IV |
 | A feature (completed or modified) | `FEATURES.md` checkbox + `README.md` "Verified" section if relevant |
@@ -118,6 +118,13 @@ setup otherwise. Decide per task.
   plain merge / tag / push publishes nothing. (New runtime → minor bump; bugfix → patch.)
 - A long-lived daemon keeps running the **old** bundle until **restarted** — bounce it
   (`npx @fancyboi999/open-tag-daemon@latest`) on each prod machine after publishing.
+
+**Server-side: code ≠ deployed until the DB is migrated too.** A change to `src/db/schema.ts`
+(new column / index / `onConflict` target) makes the new server code expect a schema the prod DB
+may not have yet — once a merged-but-unmigrated partial unique index made agent-create 500 in prod.
+`scripts/prod-up.sh` now runs `db:push:prod` **between the web build and the server start**, so a
+normal deploy migrates the DB before the new code serves. **Don't hand-restart the prod server and
+skip it.** (`db:push` is additive-safe and prompts before any destructive change.)
 
 ## Code quality (load-bearing — full text in `docs/code-quality.md`)
 
