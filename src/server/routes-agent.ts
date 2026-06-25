@@ -46,7 +46,7 @@ async function agentChannels(agentId: string) {
 }
 
 /** Human-readable addressable target: channel → #name; DM → dm:@peer; thread → <parentChannelTarget>:parentMessageShortId. Agent uses this to reply back to the same location. */
-async function addressableTarget(ch: typeof schema.channels.$inferSelect, selfAgentId: string): Promise<string> {
+export async function addressableTarget(ch: typeof schema.channels.$inferSelect, selfAgentId: string): Promise<string> {
   // Thread channel: render as #parentChannel:shortid (or dm:@peer:shortid) so the agent can reuse it with message send --target
   if (ch.type === "thread" && ch.parentMessageId) {
     const parent = (await db.select().from(schema.messages).where(eq(schema.messages.id, ch.parentMessageId)))[0];
@@ -73,11 +73,15 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 // Local YYYY-MM-DD HH:MM:SS format for message header time= field (not ISO)
 const localTime = (d: Date | string | null | undefined) => { const t = d instanceof Date ? d : new Date(d ?? Date.now()); return `${t.getFullYear()}-${pad2(t.getMonth() + 1)}-${pad2(t.getDate())} ${pad2(t.getHours())}:${pad2(t.getMinutes())}:${pad2(t.getSeconds())}`; };
 // Message rendering: header + task suffix [task #N status=] + attachment suffix
-const fmt = (m: typeof schema.messages.$inferSelect, target: string, atts: { filename: string; id: string }[] = []) => {
+export const fmt = (m: typeof schema.messages.$inferSelect, target: string, atts: { filename: string; id: string }[] = []) => {
   const taskSuffix = m.taskStatus ? ` [task #${m.taskNumber} status=${m.taskStatus}]` : "";
   const attSuffix = atts.length ? ` [${atts.length} attachment${atts.length > 1 ? "s" : ""}: ${atts.map((a) => `${a.filename} (id:${a.id})`).join(", ")} — use open-tag attachment view to download]` : "";
   const type = m.senderType === "user" ? "human" : m.senderType; // message header uses "human" for human senders, not "user"
-  return `[target=${target}${m.threadId ? ":" + m.threadId.slice(0, 8) : ""} msg=${m.id.slice(0, 8)} time=${localTime(m.createdAt)} type=${type}] @${m.senderName}: ${m.content}${taskSuffix}${attSuffix}`;
+  // A thread-anchor message (m.threadId set = the thread it owns) is rendered as #chan:<this message's id>
+  // — NOT the thread channel id — because resolveTarget resolves the suffix as a PARENT MESSAGE id prefix
+  // (matches addressableTarget's convention). Using the thread channel id here made the shown target
+  // unresolvable (404), so agents reusing it couldn't reply into the thread. See threadTargetRoundtrip test.
+  return `[target=${target}${m.threadId ? ":" + m.id.slice(0, 8) : ""} msg=${m.id.slice(0, 8)} time=${localTime(m.createdAt)} type=${type}] @${m.senderName}: ${m.content}${taskSuffix}${attSuffix}`;
 };
 
 export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, url: URL, method: string): Promise<boolean> {
