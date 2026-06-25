@@ -2,8 +2,7 @@
 // Five-status columns + Board/List toggle + Board layout toggle (horizontal columns ↔ vertical stack, persisted) (pure frontend) + Creator/Assignee filters (pure frontend, applied over the loaded array) + New Task (POST /api/tasks/channel/:id).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Trash2, ChevronDown, ChevronRight, Pencil, Columns3, Rows3, ListChecks } from "lucide-react";
-import { DndContext, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, MeasuringStrategy, type DragEndEvent } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, MeasuringStrategy, type DragEndEvent } from "@dnd-kit/core";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore, type Msg } from "./store.tsx";
@@ -60,7 +59,6 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   const [activeId, setActiveId] = useState<string | null>(null); // id of the card being dragged → turns every column into a generous drop target
   const boardRef = useRef<HTMLDivElement>(null);
   const prevRects = useRef<Map<string, DOMRect>>(new Map()); // last-known card positions, for the FLIP move animation
-  const skipFlipId = useRef<string | null>(null); // the just-dropped card already moved with the cursor; don't double-animate it
 
   const path = channelId ? `/api/tasks/channel/${channelId}` : "/api/tasks/server";
   const load = async () => { const d = await api("GET", path); setTasks(d.tasks || []); };
@@ -128,7 +126,7 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
       const id = el.dataset.taskId!;
       const rect = el.getBoundingClientRect();
       next.set(id, rect);
-      if (!animate || id === skipFlipId.current) return;
+      if (!animate) return;
       const prev = prevRects.current.get(id);
       if (prev) { const dx = prev.left - rect.left, dy = prev.top - rect.top; if (dx || dy) moves.push({ el, dx, dy, fresh: false }); }
       else moves.push({ el, dx: 0, dy: 6, fresh: true });
@@ -139,7 +137,6 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
     moves.forEach(({ el, fresh }) => { el.style.transition = ""; el.style.transform = ""; if (fresh) el.style.opacity = ""; });
     prevRects.current = next;
     lastSig.current = layoutSig;
-    skipFlipId.current = null;
   }, [tasks, creatorKey, assigneeKey, boardLayout, view, collapsed]);
 
   const submit = async (titles: string[]) => { if (channelId && titles.length) { await createTasks(channelId, titles); setMkOpen(false); load(); } };
@@ -205,11 +202,13 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
     setActiveId(null);
     const task = e.active?.data?.current?.task as Msg | undefined;
     const col = e.over?.id as string | undefined;
-    if (task && col && col !== (task.taskStatus || "todo")) { skipFlipId.current = task.id; moveTask(task, col); } // the drag already carried it across; let it settle, don't re-FLIP
+    if (task && col && col !== (task.taskStatus || "todo")) moveTask(task, col); // the real card stays put during drag (DragOverlay shows the moving copy), then FLIPs into its new column
   };
+  // The original card stays in place and just dims; the moving copy is rendered by <DragOverlay> in a top-level
+  // portal, so it's never clipped by a column's overflow or painted behind a later column.
   const DraggableCard = ({ t: task }: { t: Msg }) => {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id, data: { task } });
-    return <div ref={setNodeRef} {...attributes} {...listeners} style={{ transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : 1, zIndex: isDragging ? 100 : undefined, position: "relative" }}><Card t={task} /></div>;
+    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id, data: { task } });
+    return <div ref={setNodeRef} {...attributes} {...listeners} style={{ opacity: isDragging ? 0.4 : 1, cursor: "grab", touchAction: "none" }}><Card t={task} /></div>;
   };
   const DroppableCol = ({ k, labelKey }: { k: string; labelKey: string }) => {
     const { setNodeRef, isOver } = useDroppable({ id: k });
@@ -230,6 +229,8 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
       </div>
     );
   };
+
+  const activeTask = activeId ? tasks.find((x) => x.id === activeId) : null; // the card currently being dragged, rendered in the DragOverlay
 
   return (
     <div className="scroll board-scroll">
@@ -253,11 +254,14 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
       </div>
       {filtered.length === 0 ? <PaneEmpty icon={<ListChecks size={30} />} title={tasks.length ? t("tasks.emptyFiltered") : channelId ? t("tasks.emptyChannel") : t("tasks.emptyServer")} />
         : view === "board" ? (
-          // measuring=Always: while dragging, columns stretch to a full-height lane (.dragging); re-measure so dnd-kit uses the stretched rects, not the pre-stretch ones
+          // measuring=Always so dnd-kit keeps the full-height column rects current; DragOverlay renders the moving card in a top-level portal (never clipped / never behind a column)
           <DndContext sensors={sensors} measuring={{ droppable: { strategy: MeasuringStrategy.Always } }} onDragStart={(e) => setActiveId(String(e.active.id))} onDragCancel={() => setActiveId(null)} onDragEnd={onDragEnd}>
             <div ref={boardRef} className={"task-board " + boardLayout + (activeId ? " dragging" : "")}>
               {TCOLS.map(([k, labelKey]) => <DroppableCol key={k} k={k} labelKey={labelKey} />)}
             </div>
+            <DragOverlay dropAnimation={null}>
+              {activeTask ? <div className="card-overlay"><Card t={activeTask} /></div> : null}
+            </DragOverlay>
           </DndContext>
         ) : (
           <div className="task-list">
