@@ -16,9 +16,8 @@ it private until a fix is published and a CVE (if warranted) is issued.
 
 ### Fallback contact
 
-If you cannot use GitHub's private reporting, email:
-
-**<security contact — fill me>**
+If you cannot use GitHub's private reporting, contact the maintainer
+[@fancyboi999](https://github.com/fancyboi999) on GitHub.
 
 Include:
 - A description of the vulnerability and its potential impact.

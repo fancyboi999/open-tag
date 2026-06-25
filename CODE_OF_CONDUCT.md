@@ -61,7 +61,9 @@ representative at an online or offline event.
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at:
 
-**<INSERT CONTACT>**
+the project maintainers via a
+[private GitHub security advisory](https://github.com/fancyboi999/open-tag/security/advisories/new),
+or by contacting [@fancyboi999](https://github.com/fancyboi999).
 
 All complaints will be reviewed and investigated promptly and fairly.
 
