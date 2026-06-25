@@ -91,10 +91,12 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   // Move a task to another column optimistically: update local state first so the FLIP animation fires instantly,
   // then persist in the background; a failed PATCH reloads to revert. Realtime task:updated reconciles the rest.
   const moveTask = (task: Msg, status: string) => {
-    if (status === (task.taskStatus || "todo")) return;
+    const live = tasks.find((x) => x.id === task.id) || task; // current status, not a drag-start / menu-open snapshot
+    if (status === (live.taskStatus || "todo")) return;
     setTasks((cur) => cur.map((x) => (x.id === task.id ? { ...x, taskStatus: status } : x)));
-    if (collapsed.has(status)) toggleCol(status); // a card moved into a collapsed column → expand it so you can see it land
-    api("PATCH", `/api/tasks/${task.id}/status`, { status }).catch(() => load());
+    const didExpand = collapsed.has(status);
+    if (didExpand) toggleCol(status); // a card moved into a collapsed column → expand it so you can see it land
+    api("PATCH", `/api/tasks/${task.id}/status`, { status }).catch(() => { load(); if (didExpand) toggleCol(status); }); // PATCH failed → revert the optimistic move and the auto-expand
   };
   const delTask = async (task: Msg) => { await api("DELETE", `/api/tasks/${task.id}`); load(); }; // deleting a task reverts it to a plain message (clears task fields); the source message is preserved
   const nameOf = (type?: string | null, id?: string | null) => {
