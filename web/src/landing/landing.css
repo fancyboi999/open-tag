@@ -74,7 +74,11 @@
 .lp-root *::before,
 .lp-root *::after { box-sizing: border-box; }
 
-.lp-root h1, .lp-root h2, .lp-root h3, .lp-root p { margin: 0; }
+/* Reset with zero specificity so any single-class rule (e.g. .lp-section-lead, .lp-engine__desc)
+   can set margin-top without needing a compound selector to win. The hero section's
+   .lp-hero__intro prefixes (specificity 0,2,0) remain valid and now win over this reset
+   rather than relying on needing equal specificity to tie-break by order. */
+:where(.lp-root) :where(h1, h2, h3, p) { margin: 0; }
 .lp-root a { color: inherit; text-decoration: none; }
 
 /* —— Layout primitives —— */
