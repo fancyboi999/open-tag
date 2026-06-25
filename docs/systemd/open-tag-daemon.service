@@ -1,0 +1,70 @@
+# open-tag compute-plane daemon — systemd unit
+#
+# The daemon runs on the machine that hosts your agent CLIs
+# (claude, codex, copilot, opencode, etc.). It connects back to the
+# control-plane server over WebSocket using the DAEMON_BOOTSTRAP_KEY.
+#
+# If the daemon runs on the SAME host as the server, install both units
+# and start them with `--now`. If the daemon runs on a SEPARATE machine,
+# install only this unit on that machine and point OPEN_TAG_SERVER_URL
+# at the server's public URL (or internal IP).
+#
+# SETUP (run as root or with sudo):
+#   1. Edit the [Service] section below:
+#      - Replace /home/ubuntu/open-tag with the actual checkout path (or use npx — see below)
+#      - Replace ubuntu:ubuntu with the actual user:group running the daemon
+#      - Set OPEN_TAG_SERVER_URL and OPEN_TAG_API_KEY to match your .env.prod values
+#   2. Copy to systemd:
+#        sudo cp docs/systemd/open-tag-daemon.service /etc/systemd/system/open-tag-daemon.service
+#   3. Enable and start:
+#        sudo systemctl daemon-reload
+#        sudo systemctl enable --now open-tag-daemon
+#   4. Check status:
+#        sudo systemctl status open-tag-daemon
+#        journalctl -u open-tag-daemon -f
+#
+# Alternative — use the published npm package (no repo needed on the daemon host):
+#   Replace ExecStart with:
+#     ExecStart=/usr/bin/env npx @fancyboi999/open-tag-daemon@latest \
+#       --server-url ${OPEN_TAG_SERVER_URL} \
+#       --api-key ${OPEN_TAG_API_KEY}
+#
+# See docs/self-host.md for the full procedure.
+
+[Unit]
+Description=open-tag compute-plane daemon
+Documentation=https://github.com/fancyboi999/open-tag
+After=network.target
+# If the server runs on the same host, wait for it:
+After=open-tag-server.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/open-tag
+
+# Server URL and daemon API key (must match DAEMON_BOOTSTRAP_KEY in the server's .env.prod).
+# Replace these with real values, or load them from a secrets file:
+#   EnvironmentFile=/etc/open-tag/daemon.env
+Environment=OPEN_TAG_SERVER_URL=http://localhost:7777
+Environment=OPEN_TAG_API_KEY=change-me
+
+# OPEN_TAG_HOME: where agent workspaces, MEMORY.md files, logs, and uploads are stored.
+# Defaults to ~/.open-tag (i.e. /home/ubuntu/.open-tag for User=ubuntu).
+# Override here if you need a different path:
+# Environment=OPEN_TAG_HOME=/data/open-tag
+
+ExecStart=/usr/bin/env npx tsx src/daemon/index.ts \
+  --server-url ${OPEN_TAG_SERVER_URL} \
+  --api-key ${OPEN_TAG_API_KEY}
+
+Restart=on-failure
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=open-tag-daemon
+
+[Install]
+WantedBy=multi-user.target
