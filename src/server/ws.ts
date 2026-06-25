@@ -8,6 +8,7 @@ import { registerDaemon, unregisterDaemon, resolveDaemonRequest } from "./daemon
 import { publish } from "./realtime.js";
 import { createLogger } from "../log.js";
 import { MACHINE_REJECTED_CODE } from "../daemonProtocol.js";
+import { catchUpAgentsOnMachine } from "./reconnectCatchup.js";
 
 const log = createLogger("server:ws");
 
@@ -116,6 +117,11 @@ async function onReady(serverId: string, key: string, msg: any): Promise<string>
     await publish(serverId, { type: "agent", id: a.id, name: a.name, status: "inactive", activity: "offline" });
     log.info("reconciled stale-active agent → inactive", { agentId: a.id, machineId });
   }
+  // Reconnect catch-up: wake agents on this machine that accumulated a wakeable backlog while it was offline,
+  // so missed @/DM messages get processed instead of sitting unread forever (the symmetric counterpart to the
+  // human side's reconnect message-sync). Fire-and-forget — it must not delay the ready:ack the caller sends
+  // right after, and any failure must never break the connection.
+  void catchUpAgentsOnMachine(serverId, machineId, runningIds).catch((e: any) => log.error("catch-up failed", { machineId, detail: String(e?.message ?? e) }));
   return machineId;
 }
 
