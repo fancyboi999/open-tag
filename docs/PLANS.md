@@ -9,6 +9,15 @@
 
 ## Active
 
+- **Authorization hardening** — a two-plane security audit (human `routes-api` + agent `routes-agent`)
+  surfaced ~20 access-control gaps. The canonical model + the full prioritized findings register live in
+  **[`docs/authorization.md`](./authorization.md)** (§6 roadmap). First slice shipped: cross-tenant IDOR
+  batch (F4/F6/F7/F9/F10 + C9) + machine-create/delete `manageMachines` gate (F1/F2). Remaining slices —
+  each its own PR with a cross-tenant/cross-channel test: capability gates (F3/F5/F8); the agent-plane
+  channel-membership layer (C1–C3, C5–C8 — `resolveTarget` has no `canReadChannel` equivalent; build it
+  **with** the "agents join channels/threads" feature so public is free but private/DM stays invite-only);
+  auth primitives (C4 deleted-agent token still valid → HIGH; C10/C11/C12). **越权很危险 — verify each fix.**
+
 - **Harness engineering rollout** — ordered checklist: git init → slim CLAUDE.md → mechanically enforce invariants → independent evaluator loop → one-command instance start → plans in repo / doc-gardening → planner/generator/evaluator personas. Current state: `ARCHITECTURE.md` ✅, `docs/` skeleton ✅, `CLAUDE.md` slimmed ✅, git ✅; remaining items ⬜.
 
 ### Capability Slice Progress (evidence-driven; specs in `docs/exec-plans/active/`)

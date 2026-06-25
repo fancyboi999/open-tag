@@ -1,4 +1,4 @@
-// Agent-side REST: /agent-api/*  (Bearer machine/bootstrap key + x-agent-id)
+// Agent-side REST: /agent-api/*  (Bearer per-agent token sk_agent_* + x-agent-id; NOT a machine/bootstrap key — see docs/authorization.md §1)
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { and, eq, gt, lt, inArray, asc, desc, ilike, like, sql, isNull } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
@@ -85,7 +85,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
   if (!p.startsWith("/agent-api/")) return false;
 
   const agent = await resolveAgent(bearer(req), agentIdHeader(req));
-  if (!agent) return (sendErr(res, 401, "unauthorized (need Bearer machine key + x-agent-id)"), true);
+  if (!agent) return (sendErr(res, 401, "unauthorized (need Bearer sk_agent_* token + x-agent-id header)"), true);
   const serverId = agent.serverId;
 
   // Scope enforcement: in custom mode, missing scope → 403 (in default mode effectiveScopes returns all, passes through)

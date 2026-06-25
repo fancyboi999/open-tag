@@ -23,6 +23,10 @@ its own iterative improvement — autonomously.
   architectural invariants, module boundaries. "Where does X live?" — check here first.
 - **`docs/core-beliefs.md`** — Load-bearing project beliefs: `src/` is canonical,
   three-plane auth, credential hygiene, etc. Scan before you touch anything.
+- **`docs/authorization.md`** — The authoritative access-control model: three auth planes, role→capability
+  + agent scope tables, the four invariants every route must obey (tenant isolation, resource-access checks,
+  channel visibility), and the hardening roadmap. Read before touching any route, `resolveAgent`/`resolveTarget`,
+  or anything that reads a resource by a client-supplied id. **越权很危险.**
 - **`docs/tech-debt-tracker.md`** — Known doc/implementation drift and debt.
 - **`docs/generated/db-schema.md`** — Ground truth for the data model (from `src/db/schema.ts`).
 - **`docs/PLANS.md`** — Plan conventions + in-progress plans + roadmap index.
@@ -176,6 +180,10 @@ Completing code ≠ completing the task. Verification layers (use every applicab
 it must be accompanied by the above checklist.
 
 ## Human auth & first deploy
+
+> Full access-control model (capability/scope tables, the four invariants, per-plane enforcement, and the
+> hardening roadmap of known gaps) lives in **[`docs/authorization.md`](./docs/authorization.md)** — this
+> section is just the deploy-facing summary.
 
 Three separate auth planes — do not conflate them (`src/server/auth.ts`):
 - **human** → JWT (`signUser`/`verifyUser`), endpoints under `/api/auth/*`.

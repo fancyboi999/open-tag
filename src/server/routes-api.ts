@@ -309,7 +309,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   const alog = /^\/api\/agents\/([^/]+)\/activity-log$/.exec(p);
   if (alog && method === "GET") {
     const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
-    const rows = await db.select().from(schema.agentActivityLog).where(eq(schema.agentActivityLog.agentId, alog[1]!)).orderBy(desc(schema.agentActivityLog.ts)).limit(limit);
+    const rows = await db.select().from(schema.agentActivityLog).where(and(eq(schema.agentActivityLog.agentId, alog[1]!), eq(schema.agentActivityLog.serverId, serverId))).orderBy(desc(schema.agentActivityLog.ts)).limit(limit); // serverId scope: never leak another tenant's agent activity by raw agentId
     return (sendJson(res, 200, rows.reverse().map((r) => ({ timestamp: r.ts, entry: { kind: r.kind === "tool" ? "tool_start" : r.kind, activity: r.activity, detail: r.detail, text: r.text, toolName: r.toolName, toolInput: r.toolInput } }))), true);
   }
   // ── Agent Permissions (scopes) ── GET to read / PUT to replace entirely. Default mode = grant all.
@@ -341,10 +341,15 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   const adms = /^\/api\/agents\/([^/]+)\/agent-dms$/.exec(p);
   if (adms && method === "GET") {
     const agId = adms[1]!;
+    // serverId scope: confirm the agent belongs to this tenant before fanning out over its memberships
+    // (the inner channel query already filters by serverId, but pre-checking 404s a foreign agent id and
+    // avoids a cross-tenant channel_members scan). Mirrors the workspace-files / scopes ownership pre-check.
+    const own = (await db.select({ id: schema.agents.id }).from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
+    if (!own) return (sendErr(res, 404, "agent not found"), true);
     const mine = await db.select().from(schema.channelMembers).where(and(eq(schema.channelMembers.memberType, "agent"), eq(schema.channelMembers.memberId, agId)));
     const out: any[] = [];
     for (const cm of mine) {
-      const ch = (await db.select().from(schema.channels).where(and(eq(schema.channels.id, cm.channelId), eq(schema.channels.type, "dm"))))[0];
+      const ch = (await db.select().from(schema.channels).where(and(eq(schema.channels.id, cm.channelId), eq(schema.channels.type, "dm"), eq(schema.channels.serverId, serverId))))[0]; // serverId scope: don't surface another tenant's DM channels for this agent id
       if (!ch) continue;
       const peers = (await db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, ch.id))).filter((m) => !(m.memberType === "agent" && m.memberId === agId));
       const peer = peers.find((m) => m.memberType === "agent"); // only include agent↔agent DMs
@@ -627,6 +632,10 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   if (p === "/api/announcements/active" && method === "GET") return (sendJson(res, 200, { announcements: [] }), true);
   const cmem = /^\/api\/channels\/([^/]+)\/members$/.exec(p);
   if (cmem && method === "GET") {
+    // serverId scope: channel_members has no serverId column, so confirm the channel belongs to this tenant
+    // before enumerating its members — otherwise a foreign channel UUID leaks its roster.
+    const own = (await db.select({ id: schema.channels.id }).from(schema.channels).where(and(eq(schema.channels.id, cmem[1]!), eq(schema.channels.serverId, serverId))))[0];
+    if (!own) return (sendErr(res, 404, "channel not found"), true);
     const rows = await db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, cmem[1]!));
     const aIds = rows.filter((r) => r.memberType === "agent").map((r) => r.memberId);
     const uIds = rows.filter((r) => r.memberType === "user").map((r) => r.memberId);
@@ -705,7 +714,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   // Channel file list (attachments linked to messages)
   const cfiles = /^\/api\/channels\/([^/]+)\/files$/.exec(p);
   if (cfiles && method === "GET") {
-    const rows = await db.select().from(schema.attachments).where(and(eq(schema.attachments.channelId, cfiles[1]!), isNotNull(schema.attachments.messageId))).orderBy(desc(schema.attachments.createdAt)).limit(100);
+    const rows = await db.select().from(schema.attachments).where(and(eq(schema.attachments.channelId, cfiles[1]!), eq(schema.attachments.serverId, serverId), isNotNull(schema.attachments.messageId))).orderBy(desc(schema.attachments.createdAt)).limit(100); // serverId scope: don't list another tenant's channel files by raw channel UUID
     const aIds = rows.filter((r) => r.uploaderType === "agent" && r.uploaderId).map((r) => r.uploaderId!) as string[];
     const uIds = rows.filter((r) => r.uploaderType === "user" && r.uploaderId).map((r) => r.uploaderId!) as string[];
     const ags = aIds.length ? await db.select().from(schema.agents).where(inArray(schema.agents.id, aIds)) : [];
@@ -906,6 +915,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   // Connect a machine (add computer flow): generate sk_machine_* key + pre-create offline machine record
   // Key is returned in plaintext exactly once; daemon uses it to connect via /daemon/connect?key=; onReady claims this row by apiKeyHash
   if (mm && mm[1] === "machines" && method === "POST") {
+    if (!await requireCap(serverId, userId, "manageMachines")) return (sendErr(res, 403, "need manageMachines capability"), true);
     const b = await readJson(req).catch(() => ({}));
     const name = String(b.name ?? "").trim() || "new machine";
     const key = newKey("sk_machine_");
@@ -933,6 +943,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   // Delete machine: reject if agents are present, prompting removal of all agents first
   const dmach = /^\/api\/servers\/[^/]+\/machines\/([^/]+)$/.exec(p);
   if (dmach && method === "DELETE") {
+    if (!await requireCap(serverId, userId, "manageMachines")) return (sendErr(res, 403, "need manageMachines capability"), true);
     const mid = dmach[1]!;
     const m = (await db.select().from(schema.machines).where(and(eq(schema.machines.id, mid), eq(schema.machines.serverId, serverId))))[0];
     if (!m) return (sendErr(res, 404, "machine not found"), true);
@@ -965,7 +976,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   const cmsg = /^\/api\/messages\/channel\/([^/]+)$/.exec(p);
   if (cmsg && method === "GET") {
     const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
-    const msgs = await db.select().from(schema.messages).where(eq(schema.messages.channelId, cmsg[1]!)).orderBy(desc(schema.messages.seq)).limit(limit);
+    const msgs = await db.select().from(schema.messages).where(and(eq(schema.messages.serverId, serverId), eq(schema.messages.channelId, cmsg[1]!))).orderBy(desc(schema.messages.seq)).limit(limit); // serverId scope: a foreign channel UUID must not read another tenant's messages (cross-tenant read)
     return (sendJson(res, 200, { messages: (await attachMentions(msgs.reverse())) }), true);
   }
   if (p === "/api/messages" && method === "POST") {

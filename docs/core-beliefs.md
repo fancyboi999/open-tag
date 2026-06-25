@@ -9,7 +9,7 @@
 
 3. **Read the existing code before changing anything.** Before implementing a feature or fixing a bug, locate the relevant module in `ARCHITECTURE.md`, read the actual source, and confirm what is already implemented. Most core capabilities (channels / DM / tasks / threads / members / agent profiles / runtimes / idle-sleep) exist — understand them before touching them. Do not rebuild what is already there.
 
-4. **Three-plane auth must not bleed across planes.** Human users authenticate via JWT (+ `x-server-id`). Agents authenticate via machine key SHA-256 matched against `machines.apiKeyHash` (+ `x-agent-id`). Daemons authenticate via WS `/daemon/connect?key=` handshake. **Raw credentials** (`sk_agent_*` / JWT / machine key) travel only in DMs or private channels — never in public channels. Redact before any public post.
+4. **Three-plane auth must not bleed across planes.** Human users authenticate via JWT (+ `x-server-id`). Agents authenticate via a **per-agent token** (`sk_agent_*`) SHA-256 matched against `agents.agentTokenHash` (+ `x-agent-id`) — **not** the machine key. Daemons authenticate via the WS `/daemon/connect?key=` handshake (machine key). **Raw credentials** (`sk_agent_*` / JWT / machine key) travel only in DMs or private channels — never in public channels. Redact before any public post. **Full model + enforcement invariants + hardening roadmap: [`docs/authorization.md`](./authorization.md).**
 
 5. **Control-plane WebSocket is the backbone.** All daemon ↔ server commands and state changes flow over `/daemon/connect`. HTTP is for client requests only; daemon lifecycle events do not use HTTP polling.
 
