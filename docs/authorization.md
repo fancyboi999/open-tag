@@ -175,9 +175,11 @@ big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents fr
   check, distinct from channel access (now enforced), and has a product question — may any channel member
   move a task, or only its assignee/an admin? Decide the policy, then gate `setTaskStatus`/`unclaimTask`.
 
+### Fixed — auth primitives
+- **C10 [LOW] ✅ Fixed** `auth.ts`/`ws.ts` all secret/token comparisons now use `safeEqual` (constant-time
+  `crypto.timingSafeEqual`). `resolveAgent` (auth.ts), all three BOOTSTRAP_KEY comparisons in ws.ts. PR: sec-authhardening.
+
 ### Pending — auth primitives
-- **C10 [LOW]** `auth.ts` token compare uses `===`, not the existing `safeEqual` (timing side-channel,
-  largely mitigated by fixed-length hex but not guaranteed). Switch to `safeEqual`.
 - **C12 [DESIGN]** agent tokens have no TTL and no revoke endpoint. Consider an `expiresAt` + a rotate/revoke
   path; short-term, C4's hash-clear-on-delete is the main mitigation.
 

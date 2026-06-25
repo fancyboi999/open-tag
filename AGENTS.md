@@ -156,9 +156,14 @@ Three separate auth planes — do not conflate them (`src/server/auth.ts`):
 - **agent** → per-agent token (`Bearer sk_agent_*` + `x-agent-id`), `resolveAgent`, `/agent-api/*`.
 - **daemon** → bootstrap/machine key over WS `/daemon/connect?key=` (`ws.ts`).
 
+Required env vars — server **will not start** without these:
+- `JWT_SECRET` — signing key for human session JWTs. Generate: `openssl rand -hex 32`.
+- `DAEMON_BOOTSTRAP_KEY` — pre-shared key for daemon WS handshake. Generate: `openssl rand -hex 32`.
+  (These replaced the old weak fallbacks `dev-secret-change-me` / `poc-secret-key`.)
+
 Human-auth env flags (`.env` / `.env.prod`):
 - `ALLOW_DEV_LOGIN` — when `true`, `POST /api/auth/dev-login` mints a username→JWT with no
-  password. **Development only; leave unset in production** (the endpoint 404s when off). Defense in
+  password. **Development only; default is `false`.** The endpoint 404s when off. Defense in
   depth: `NODE_ENV=production` (set by the Dockerfile runtime stage) force-disables dev-login even if
   the flag is mistakenly set, so the env flag is not the only line of defense. The frontend never
   silently falls back to dev-login; an anonymous visitor to `/s/*` is redirected to `/login` by the
@@ -168,3 +173,9 @@ Human-auth env flags (`.env` / `.env.prod`):
   `curl -X POST $URL/api/auth/setup -d '{"token":"<token>","email":"admin@you","password":"<≥8>"}'`.
   It sets the owner's password and self-closes (`410 already initialized`) once a password exists.
   Disabled (`404`) when the token is unset.
+
+Transport-layer env flags:
+- `ALLOWED_ORIGIN` — comma-separated allowed browser origins for CORS. Dev default (unset): any
+  `localhost` / `127.0.0.1` origin. Production: must be set to frontend URL(s).
+- `TRUST_PROXY` — set to `true` only when a controlled reverse proxy unconditionally rewrites
+  `X-Forwarded-For`. Without this, `clientIp()` uses the TCP socket address (unforgeable).
