@@ -29,6 +29,8 @@
     "dropToSet": "Drop to set {{label}}",
     "viewBoard": "看板",
     "viewList": "列表",
+    "layoutColumns": "横向看板",
+    "layoutStack": "竖向堆叠",
     "filterByCreator": "按创建者筛选",
     "allCreators": "所有创建者",
     "myTasks": "我创建的",

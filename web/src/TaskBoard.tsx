@@ -1,7 +1,7 @@
 // Task board shared between the channel chatTab=tasks view and the global Tasks page.
-// Five-status columns + Board/List toggle (pure frontend) + Creator/Assignee filters (pure frontend, applied over the loaded array) + New Task (POST /api/tasks/channel/:id).
+// Five-status columns + Board/List toggle + Board layout toggle (horizontal columns ↔ vertical stack, persisted) (pure frontend) + Creator/Assignee filters (pure frontend, applied over the loaded array) + New Task (POST /api/tasks/channel/:id).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Trash2, ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { Trash2, ChevronDown, ChevronRight, Pencil, Columns3, Rows3 } from "lucide-react";
 import { DndContext, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "react-router-dom";
@@ -50,6 +50,9 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   // DONE and CLOSED columns are collapsed by default, with the state persisted to localStorage
   const [collapsed, setCollapsed] = useState<Set<string>>(() => { try { const s = localStorage.getItem("open-tag.tasks.collapsed"); return new Set<string>(s ? JSON.parse(s) : ["done", "closed"]); } catch { return new Set(["done", "closed"]); } });
   const toggleCol = (k: string) => setCollapsed((c) => { const n = new Set(c); n.has(k) ? n.delete(k) : n.add(k); try { localStorage.setItem("open-tag.tasks.collapsed", JSON.stringify([...n])); } catch { /* */ } return n; });
+  // Board layout: horizontal Kanban columns (default) vs the legacy vertical stack; persisted like `collapsed`.
+  const [boardLayout, setBoardLayout] = useState<"columns" | "stack">(() => { try { return localStorage.getItem("open-tag.tasks.boardLayout") === "stack" ? "stack" : "columns"; } catch { return "columns"; } });
+  const setLayout = (l: "columns" | "stack") => { setBoardLayout(l); try { localStorage.setItem("open-tag.tasks.boardLayout", l); } catch { /* */ } };
   const [creatorKey, setCreatorKey] = useState(""); // "" = all | "me" | "type:id"
   const [assigneeKey, setAssigneeKey] = useState(""); // "" = all | "unclaimed" | "type:id"
   const [mkOpen, setMkOpen] = useState(false);
@@ -181,6 +184,12 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
           <button className={view === "board" ? "on" : ""} onClick={() => setView("board")}>{t("tasks.viewBoard")}</button>
           <button className={view === "list" ? "on" : ""} onClick={() => setView("list")}>{t("tasks.viewList")}</button>
         </div>
+        {view === "board" && (
+          <div className="seg seg-icon">
+            <button className={boardLayout === "columns" ? "on" : ""} title={t("tasks.layoutColumns")} aria-label={t("tasks.layoutColumns")} onClick={() => setLayout("columns")}><Columns3 size={15} /></button>
+            <button className={boardLayout === "stack" ? "on" : ""} title={t("tasks.layoutStack")} aria-label={t("tasks.layoutStack")} onClick={() => setLayout("stack")}><Rows3 size={15} /></button>
+          </div>
+        )}
         <Select ariaLabel={t("tasks.filterByCreator")} value={creatorKey} onChange={setCreatorKey}
           options={[{ value: "", label: t("tasks.allCreators") }, ...(me ? [{ value: "me", label: t("tasks.myTasks") }] : []), ...creators.filter((c) => c.key !== `user:${me?.id}`).map((c) => ({ value: c.key, label: c.name }))]} />
         <Select ariaLabel={t("tasks.filterByAssignee")} value={assigneeKey} onChange={setAssigneeKey}
@@ -191,7 +200,9 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
       {filtered.length === 0 ? <div className="empty">{tasks.length ? t("tasks.emptyFiltered") : channelId ? t("tasks.emptyChannel") : t("tasks.emptyServer")}</div>
         : view === "board" ? (
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-            {TCOLS.map(([k, labelKey]) => <DroppableCol key={k} k={k} labelKey={labelKey} />)}
+            <div className={"task-board " + boardLayout}>
+              {TCOLS.map(([k, labelKey]) => <DroppableCol key={k} k={k} labelKey={labelKey} />)}
+            </div>
           </DndContext>
         ) : (
           <div className="task-list">
