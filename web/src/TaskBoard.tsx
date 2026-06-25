@@ -2,7 +2,7 @@
 // Five-status columns + Board/List toggle + Board layout toggle (horizontal columns ↔ vertical stack, persisted) (pure frontend) + Creator/Assignee filters (pure frontend, applied over the loaded array) + New Task (POST /api/tasks/channel/:id).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Trash2, ChevronDown, ChevronRight, Pencil, Columns3, Rows3, ListChecks } from "lucide-react";
-import { DndContext, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, MeasuringStrategy, type DragEndEvent } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -118,7 +118,10 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
     const root = boardRef.current;
     if (!root) return;
     const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    const animate = !reduce && lastSig.current === layoutSig;
+    // Animate only once we have prior positions: the first populate (empty map) just records, so the board
+    // doesn't flutter every card in on load (product UIs don't choreograph page loads); a card that appears
+    // later (realtime/create) still has no prior rect → it fades in; a moved card has one → it slides.
+    const animate = !reduce && lastSig.current === layoutSig && prevRects.current.size > 0;
     const next = new Map<string, DOMRect>();
     const moves: { el: HTMLElement; dx: number; dy: number; fresh: boolean }[] = [];
     root.querySelectorAll<HTMLElement>("[data-task-id]").forEach((el) => {
@@ -250,7 +253,8 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
       </div>
       {filtered.length === 0 ? <PaneEmpty icon={<ListChecks size={30} />} title={tasks.length ? t("tasks.emptyFiltered") : channelId ? t("tasks.emptyChannel") : t("tasks.emptyServer")} />
         : view === "board" ? (
-          <DndContext sensors={sensors} onDragStart={(e) => setActiveId(String(e.active.id))} onDragCancel={() => setActiveId(null)} onDragEnd={onDragEnd}>
+          // measuring=Always: while dragging, columns stretch to a full-height lane (.dragging); re-measure so dnd-kit uses the stretched rects, not the pre-stretch ones
+          <DndContext sensors={sensors} measuring={{ droppable: { strategy: MeasuringStrategy.Always } }} onDragStart={(e) => setActiveId(String(e.active.id))} onDragCancel={() => setActiveId(null)} onDragEnd={onDragEnd}>
             <div ref={boardRef} className={"task-board " + boardLayout + (activeId ? " dragging" : "")}>
               {TCOLS.map(([k, labelKey]) => <DroppableCol key={k} k={k} labelKey={labelKey} />)}
             </div>

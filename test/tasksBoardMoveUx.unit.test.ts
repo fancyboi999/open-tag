@@ -25,7 +25,12 @@ function assertDecl(body: string, prop: string, value: string): void {
 
 test("the whole column is a generous drop target while dragging", () => {
   assertDecl(ruleBody(".task-col-body"), "min-height", "8px"); // tidy when idle
-  assertDecl(ruleBody(".task-board.dragging .task-col-body"), "min-height", "96px"); // big target mid-drag
+  assertDecl(ruleBody(".task-col-body"), "flex", "1 1 auto");   // body fills the lane so the target covers the whole column
+  // columns layout: equal-height lanes while dragging → the whole column strip is droppable, not just the cards
+  assertDecl(ruleBody(".task-board.columns.dragging"), "align-items", "stretch");
+  assertDecl(ruleBody(".task-board.columns.dragging .task-col"), "min-height", "340px");
+  // stack layout: full-width columns get a generous body target instead
+  assertDecl(ruleBody(".task-board.stack.dragging .task-col-body"), "min-height", "96px");
 });
 
 test("drop indicator is an appended slot, not the old overlapping banner", () => {
