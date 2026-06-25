@@ -2,7 +2,7 @@
 # realtime pub/sub, and long polling. Non-default ports avoid local conflicts.
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16.3-alpine
     container_name: open-tag-pg
     environment:
       POSTGRES_USER: opentag
@@ -10,6 +10,7 @@ services:
       POSTGRES_DB: opentag
     ports: ["5433:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U opentag -d opentag"]
       interval: 5s
@@ -17,10 +18,17 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     container_name: open-tag-redis
+    # Default: no auth (suitable for a private network / single-host VPS behind a firewall).
+    # To enable Redis password auth, replace the default `image` line above with:
+    #   command: redis-server --requirepass ${REDIS_PASSWORD}
+    # then set REDIS_PASSWORD in .env.docker and update REDIS_URL to:
+    #   redis://:${REDIS_PASSWORD}@redis:6379
+    # See docs/self-host.md "Redis password hardening" for the full procedure.
     ports: ["6380:6379"]
     volumes: ["redisdata:/data"]
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

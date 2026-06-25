@@ -2,8 +2,11 @@
 
 `docker compose --profile app up` runs the **control plane** — Postgres + Redis + the
 API/web server — in containers. The **daemon (compute plane) stays on your host**: it runs
-your locally-installed agent CLIs (`claude`/`codex`/`gemini`/`opencode`) against your code and
-credentials, so it is not containerized. You connect it yourself after the stack is up.
+your locally-installed agent CLIs (`claude`/`codex`/`copilot`/`opencode`/`kimi`/`pi`/`cursor-agent`)
+against your code and credentials, so it is not containerized. You connect it yourself after the stack is up.
+
+> For the complete self-hosting guide (HTTPS, systemd, backup, secrets reference) see
+> **[`docs/self-host.md`](self-host.md)**.
 
 ## What is / isn't containerized
 
@@ -11,7 +14,7 @@ credentials, so it is not containerized. You connect it yourself after the stack
 |---|---|---|
 | Postgres + Redis | container | compose services `postgres`, `redis` |
 | API + web (control plane) | container | compose service `app` (this image) |
-| daemon + agents (compute plane) | **your host** | `npm run daemon` — connects over the published WS port |
+| daemon + agents (compute plane) | **your host** | `npx @fancyboi999/open-tag-daemon` — connects over the published WS port |
 
 ## First run
 
@@ -28,10 +31,11 @@ docker compose --profile app up -d --build
 curl -X POST http://localhost:7788/api/auth/setup \
   -H 'content-type: application/json' \
   -d '{"token":"<ADMIN_SETUP_TOKEN>","email":"you@example.com","password":"<min 8 chars>"}'
-#    then clear ADMIN_SETUP_TOKEN from .env.docker
+#    then clear ADMIN_SETUP_TOKEN from .env.docker and restart:
+#    docker compose --profile app restart app
 
 # 4. Connect your machine (host daemon → containerized server). --api-key MUST equal DAEMON_BOOTSTRAP_KEY.
-npx tsx src/daemon/index.ts --server-url http://localhost:7788 --api-key <DAEMON_BOOTSTRAP_KEY>
+npx @fancyboi999/open-tag-daemon@latest --server-url http://localhost:7788 --api-key <DAEMON_BOOTSTRAP_KEY>
 ```
 
 Open `http://localhost:7788`, sign in with the admin email/password, create an agent, and mention it in `#all`.
@@ -44,5 +48,7 @@ Open `http://localhost:7788`, sign in with the admin email/password, create an a
   point at the internal service DNS (`postgres:5432` / `redis:6379`), not host `localhost:5433/6380`.
 - Override the published port with `APP_PORT` (e.g. `APP_PORT=8080 docker compose --profile app up -d`).
   Stop any host-run server on the same port first.
-- Schema migration (`drizzle-kit push`) and seed run on every container start; both are idempotent.
+- Schema migration (`drizzle-kit push` without `--force`) and seed run on every container start; both are idempotent.
+  Additive-only schema changes apply automatically; destructive changes cause the container to fail rather than
+  silently drop data — see `docs/self-host.md` for the manual migration procedure.
 - Three auth planes and the `ALLOW_DEV_LOGIN` / `ADMIN_SETUP_TOKEN` flags are described in `AGENTS.md`.
