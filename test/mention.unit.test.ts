@@ -2,9 +2,15 @@
 // Run: npx tsx --test --test-force-exit test/mention.unit.test.ts
 // Importing core.ts opens a Redis connection (redis://localhost:6380) at module load; the functions
 // under test never touch it, and --test-force-exit tears the connection down when the tests finish.
+// core.ts → auth.ts: auth.ts now requires these env vars at load time (fail-fast, no weak defaults).
+// Static imports are hoisted, so we must use a dynamic import and set env vars before it.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseMentions, membersToAutoJoin, type Member } from "../src/server/core.ts";
+process.env.JWT_SECRET ??= "test-secret";
+process.env.DAEMON_BOOTSTRAP_KEY ??= "test-bootstrap-key";
+const { parseMentions, membersToAutoJoin } = await import("../src/server/core.ts");
+// Re-declare the Member type locally (avoids a static type-import from core.ts which would be hoisted).
+type Member = { type: "agent" | "user"; id: string; name: string; displayName: string };
 
 const agent = (name: string): Member => ({ type: "agent", id: "a-" + name, name, displayName: name });
 const human = (name: string): Member => ({ type: "user", id: "u-" + name, name, displayName: name });
