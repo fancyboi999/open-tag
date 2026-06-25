@@ -146,9 +146,11 @@ mark{background:var(--g-peach);color:var(--ink);padding:0 2px;border-radius:4px}
 .auth-alt{margin-top:14px;font-size:13px;color:var(--muted);text-align:center}
 .auth-alt a{color:var(--ink);cursor:pointer;text-decoration:underline}
 .logout-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:26px;padding-top:18px;border-top:1px solid var(--hair)}
-/* Language switcher: segmented control (settings account page) */
+/* Language switcher: segmented control (settings account page).
+   Uses .seg-pill (pill border-radius:9999px) to distinguish from the rect .seg
+   used in the task-toolbar Board/List toggle (border-radius:8px, defined below). */
 .lang-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:26px;padding-top:18px;border-top:1px solid var(--hair)}
-.seg{display:inline-flex;border:1px solid var(--hair-strong);border-radius:9999px;overflow:hidden;flex:0 0 auto}
+.seg-pill{display:inline-flex;border:1px solid var(--hair-strong);border-radius:9999px;overflow:hidden;flex:0 0 auto}
 .seg-opt{border:0;background:transparent;padding:6px 16px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;font-family:inherit;line-height:1.6}
 .seg-opt.on{background:var(--ink-2);color:var(--on-ink)}
 .seg-opt:not(.on):hover{color:var(--ink);background:var(--surface-strong)}
