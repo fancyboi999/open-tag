@@ -8,6 +8,51 @@ import { can, requireCap } from "../capabilities.js";
 import { readObject } from "../storage.js";
 import { bearer, sendErr, sendJson } from "../util.js";
 
+/**
+ * MIME types that are safe to serve inline in a browser without XSS risk.
+ *
+ * Exclusions (intentional):
+ *   - text/html, application/xhtml+xml → browser renders as HTML, executes scripts.
+ *   - image/svg+xml → SVG can contain inline <script> elements.
+ *   - text/javascript, application/javascript → browser executes directly.
+ *   - text/xml, application/xml → browsers may render with XSLT that loads resources.
+ *   - Any unlisted type → defaults to attachment + octet-stream (defense-in-depth).
+ */
+const SAFE_INLINE_TYPES = new Set<string>([
+  "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
+  "image/bmp", "image/tiff", "image/avif", "image/ico", "image/x-icon",
+  "application/pdf",
+  "video/mp4", "video/webm", "video/ogg", "video/quicktime",
+  "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm", "audio/aac",
+]);
+
+/**
+ * Compute safe HTTP response headers for an attachment download.
+ *
+ * - Types in SAFE_INLINE_TYPES are served with their declared MIME and
+ *   Content-Disposition: inline (e.g. images play in-page as expected).
+ * - ALL other types — including text/html, image/svg+xml, text/javascript —
+ *   are served as application/octet-stream with Content-Disposition: attachment.
+ *   The browser is forced to download the file; it cannot inline-render it on
+ *   the same origin and therefore cannot execute scripts in that file.
+ *
+ * This function is the primary XSS gate. It operates on stored MIME types, so
+ * it also protects legacy records written before sanitizeMimeType() was added.
+ */
+export function safeDownloadHeaders(storedMime: string, filename: string): Record<string, string> {
+  const encodedName = encodeURIComponent(filename);
+  if (storedMime && SAFE_INLINE_TYPES.has(storedMime)) {
+    return {
+      "content-type": storedMime,
+      "content-disposition": `inline; filename*=UTF-8''${encodedName}`,
+    };
+  }
+  return {
+    "content-type": "application/octet-stream",
+    "content-disposition": `attachment; filename*=UTF-8''${encodedName}`,
+  };
+}
+
 export async function handlePublicAttachmentGet(ctx: BaseCtx): Promise<boolean> {
   const { req, res, url, method, p } = ctx;
   // Attachment download/preview: browsers cannot set headers for anchor/img tags, so the token is passed as a query param (same approach as SSE). Placed before the auth check.
@@ -23,7 +68,7 @@ export async function handlePublicAttachmentGet(ctx: BaseCtx): Promise<boolean> 
       if (data.includes(0) || (a.sizeBytes ?? 0) > 256 * 1024) return (sendJson(res, 200, { kind: "binary" }), true);
       return (sendJson(res, 200, { kind: "text", text: data.toString("utf8") }), true);
     }
-    res.writeHead(200, { "content-type": a.mimeType || "application/octet-stream", "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(a.filename)}` });
+    res.writeHead(200, safeDownloadHeaders(a.mimeType || "", a.filename));
     res.end(data); return true;
   }
   return false;
