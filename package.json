@@ -62,7 +62,7 @@
     "postgres": "^3.4.5",
     "socket.io": "^4.8.3",
     "ws": "^8.21.0",
-    "zod": "^3.25.0"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",
