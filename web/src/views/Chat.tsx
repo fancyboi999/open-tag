@@ -143,6 +143,8 @@ export function Chat() {
   const prependRestoreRef = useRef<number | null>(null); // scrollHeight captured before a prepend; restored after so the viewport doesn't jump
   const trimmedRef = useRef(false); // a live-tail trim dropped the oldest in-memory messages → mark hasMore so they stay re-fetchable
   const cur = [...channels, ...dms].find((c) => c.id === channelId) || channels.find((c) => c.name === "all") || channels[0];
+  const curIdRef = useRef<string | undefined>(undefined);
+  curIdRef.current = cur?.id; // latest channel id for async guards: a loadOlder that resolves after a channel switch must drop its stale-channel result (no cross-channel prepend / hasMore clobber)
   const isDm = !!dms.find((d) => d.id === cur?.id);
   const dmPeer = dms.find((d) => d.id === cur?.id);
   const dmAgent = dmPeer?.peerType === "agent" ? agents.find((a) => a.id === dmPeer.peerId) : undefined; // DM peer agent → used for the live status indicator in the header
@@ -191,9 +193,11 @@ export function Chat() {
   // Fetch the previous (older) page via the `before` keyset cursor and prepend it; guarded so concurrent scroll events can't fire duplicate loads.
   const loadOlder = async () => {
     if (!cur || loadingOlderRef.current || !hasMore || !msgs.length) return;
+    const chId = cur.id; // pin the channel this fetch belongs to
     loadingOlderRef.current = true;
     try {
-      const d = await api("GET", `/api/messages/channel/${cur.id}?limit=${PAGE_SIZE}&before=${msgs[0]!.seq}`);
+      const d = await api("GET", `/api/messages/channel/${chId}?limit=${PAGE_SIZE}&before=${msgs[0]!.seq}`);
+      if (curIdRef.current !== chId) return; // channel switched mid-fetch → drop the stale result (finally still clears the in-flight flag)
       const older: Msg[] = d.messages || [];
       if (older.length) { const el = scrollRef.current; prependRestoreRef.current = el ? el.scrollHeight : null; setMsgs((m) => [...older, ...m]); } // capture height right before prepend; layout effect restores after
       setHasMore(!!d.hasMore);
@@ -204,15 +208,17 @@ export function Chat() {
     if (!msgParam || chatTab !== "chat") return;
     const el = document.getElementById("m-" + msgParam);
     if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("msg-hl"); const t = setTimeout(() => el.classList.remove("msg-hl"), 2200); return () => clearTimeout(t); }
-  }, [msgParam, msgs, chatTab]);
+    else if (hasMore && !loadingOlderRef.current) void loadOlder(); // target outside the loaded window → page older history (re-runs on each prepend via the msgs dep) until it appears or the channel start is reached
+  }, [msgParam, msgs, chatTab, hasMore]);
   useEffect(() => { // ?thread= auto-opens the thread panel: finds the parent message (full id or 8-char short id) in the loaded list and calls startThread; each threadParam is only opened once
     if (!threadParam || !msgs.length) return;
     if (thread) return; // panel already open, do not re-open
     const short = threadParam.includes(":") ? threadParam.split(":").pop()! : threadParam;
     const m = msgs.find((x) => x.id === threadParam || x.id.startsWith(short));
     if (m) startThread(m);
+    else if (hasMore && !loadingOlderRef.current) void loadOlder(); // parent outside the loaded window → page older history until it appears or the channel start is reached
     // eslint-disable-next-line
-  }, [threadParam, msgs]);
+  }, [threadParam, msgs, hasMore]);
 
   const setTab = (t: string) => { const n = new URLSearchParams(sp); if (t === "chat") n.delete("chatTab"); else n.set("chatTab", t); setSp(n, { replace: true }); };
   const doDM = async (agentId: string) => { const id = await openDM("agent", agentId); if (id) nav(`/s/${slug}/channel/${id}`); }; // used by AgentProfile onMessage callback
