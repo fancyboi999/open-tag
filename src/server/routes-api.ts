@@ -275,7 +275,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
     await stopAgent(serverId, am[1]!).catch(() => {}); // stop the local process before deleting
     await db.delete(schema.channelMembers).where(and(eq(schema.channelMembers.memberType, "agent"), eq(schema.channelMembers.memberId, am[1]!)));
-    await db.update(schema.agents).set({ deletedAt: new Date(), status: "inactive", activity: "offline" }).where(and(eq(schema.agents.id, am[1]!), eq(schema.agents.serverId, serverId))); // soft delete: row is kept so historical messages/DM names remain resolvable by id, no orphans
+    await db.update(schema.agents).set({ deletedAt: new Date(), status: "inactive", activity: "offline", agentTokenHash: null }).where(and(eq(schema.agents.id, am[1]!), eq(schema.agents.serverId, serverId))); // soft delete: row is kept so historical messages/DM names remain resolvable by id, no orphans; clear the token hash so a still-running deleted agent can no longer authenticate (C4, with resolveAgent's deletedAt filter)
     await publish(serverId, { type: "agent:deleted", id: am[1]! });
     return (sendJson(res, 200, { ok: true }), true);
   }
@@ -295,6 +295,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
   const awsList = /^\/api\/agents\/([^/]+)\/workspace-files$/.exec(p);
   const awsFile = /^\/api\/agents\/([^/]+)\/workspace-files\/read$/.exec(p);
   if ((awsList || awsFile) && method === "GET") {
+    if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true); // reading an agent's workspace (source / secrets / MEMORY.md) is owner/admin-only
     const agId = (awsList || awsFile)![1]!;
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
@@ -319,6 +320,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
     if (method === "GET") { const eff = effectiveScopes(a.scopes); return (sendJson(res, 200, { agentId: agId, ...eff, catalog: SCOPES }), true); }
+    if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true); // changing an agent's permission scopes is owner/admin-only (reading is fine for members)
     const b = await readJson(req);
     if (!Array.isArray(b.scopes) || !b.scopes.every(isScopeLiteral)) return (sendErr(res, 400, "scopes must be an array of scope literals"), true);
     const granted = [...new Set(b.scopes as string[])].filter((s) => ALL_SCOPE_KEYS.includes(s));
@@ -646,7 +648,10 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
       humans: usrs.map((u) => ({ userId: u.id, name: u.name, displayName: u.displayName, avatarUrl: u.avatarUrl })),
     }), true);
   }
-  if (cmem && method === "POST") { // add agent/user to channel (public = direct join, private = invite)
+  if (cmem && method === "POST") { // add agent/user to channel (managing channel membership = owner/admin)
+    if (!await requireCap(serverId, userId, "manageChannels")) return (sendErr(res, 403, "need manageChannels capability"), true); // members must not add anyone (incl. themselves) to a channel — this is the private-channel invite path
+    const own = (await db.select({ id: schema.channels.id }).from(schema.channels).where(and(eq(schema.channels.id, cmem[1]!), eq(schema.channels.serverId, serverId))))[0];
+    if (!own) return (sendErr(res, 404, "channel not found"), true); // and only this tenant's channels
     const b = await readJson(req);
     const mt = b.userId ? "user" : "agent"; const mid = b.userId || b.agentId;
     if (!mid) return (sendErr(res, 400, "agentId or userId required"), true);
@@ -654,7 +659,10 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     await publish(serverId, { type: "channel:members-updated", channelId: cmem[1]! }); // realtime: membership change → all clients refresh member/channel list and new member joins the room (G-E)
     return (sendJson(res, 200, { ok: true }), true);
   }
-  if (cmem && method === "DELETE") { // remove from channel
+  if (cmem && method === "DELETE") { // remove from channel (owner/admin only)
+    if (!await requireCap(serverId, userId, "manageChannels")) return (sendErr(res, 403, "need manageChannels capability"), true);
+    const own = (await db.select({ id: schema.channels.id }).from(schema.channels).where(and(eq(schema.channels.id, cmem[1]!), eq(schema.channels.serverId, serverId))))[0];
+    if (!own) return (sendErr(res, 404, "channel not found"), true);
     const b = await readJson(req).catch(() => ({}));
     const mt = b.userId ? "user" : "agent"; const mid = b.userId || b.agentId;
     if (mid) await db.delete(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, cmem[1]!), eq(schema.channelMembers.memberType, mt), eq(schema.channelMembers.memberId, mid)));

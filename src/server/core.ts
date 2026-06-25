@@ -245,7 +245,9 @@ export async function listSaved(serverId: string, memberType: "user" | "agent", 
 }
 
 export async function agentConfig(agentId: string) {
-  const a = (await db.select().from(schema.agents).where(eq(schema.agents.id, agentId)))[0];
+  // Skip soft-deleted agents (treated as non-existent → null, which every caller already handles): otherwise the
+  // mint branch below would re-set `agentTokenHash` on a deleted row, reverting the clear done on delete (C4).
+  const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agentId), isNull(schema.agents.deletedAt))))[0];
   if (!a) return null;
   // Per-agent independent token (sk_agent_* prefix, slice10):
   // cache hit → reuse; first time → mint + store hash + cache raw; agent already running (cache lost after server restart but agent still running) → do not re-mint or send new token (daemon ignores agent:start for running agents, agent continues using old token, server verifies via DB hash) → zero desync.

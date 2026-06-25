@@ -15,9 +15,11 @@
   (F4/F6/F7/F9/F10 + C9) + machine `manageMachines` (F1/F2) + C11; (2) the **agent-plane channel-access
   layer** (C1/C2/C3/C6/C7/C8 + server/info) via `canAgentReadChannel` — agents freely use public channels +
   their threads, but private/DM are invite-only (real agent-api E2E verified). This is the security boundary
-  the "agents join channels/threads" feature sits on. Remaining slices — each its own PR with a
-  cross-tenant/cross-channel test: human capability gates (F3/F5/F8); task-ownership (C5); auth primitives
-  (C4 deleted-agent token still valid → HIGH; C10/C12). **越权很危险 — verify each fix.**
+  the "agents join channels/threads" feature sits on; (3) **human capability gates** (F3/F5/F8 →
+  `manageAgents`/`manageChannels`) + **C4** deleted-agent-token hole (`resolveAgent` `isNull(deletedAt)` +
+  clear hash on delete) — real E2E member→403/owner→200, token rejected after delete. Remaining (each its own
+  PR with a test): task-ownership (C5 — product decision); auth primitives (C10 timing-safe compare, C12 token
+  TTL). **越权很危险 — verify each fix.**
 
 - **Harness engineering rollout** — ordered checklist: git init → slim CLAUDE.md → mechanically enforce invariants → independent evaluator loop → one-command instance start → plans in repo / doc-gardening → planner/generator/evaluator personas. Current state: `ARCHITECTURE.md` ✅, `docs/` skeleton ✅, `CLAUDE.md` slimmed ✅, git ✅; remaining items ⬜.
 

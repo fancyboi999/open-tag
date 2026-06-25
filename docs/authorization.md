@@ -125,6 +125,15 @@ gap: task *ownership* (§6 C5).
 | `GET /agent-api/attachment/view` | any attachment by id | uploader, or a member of the attachment's channel |
 | `GET /agent-api/server/info` | listed every non-DM channel | lists only public + joined (private name no longer leaks) |
 
+**Slice 3 — human capability gates + deleted-agent token:**
+
+| Endpoint | Was | Now |
+|---|---|---|
+| `GET /api/agents/:id/workspace-files[/read]` | member only | `manageAgents` |
+| `PUT /api/agents/:id/scopes` | member only | `manageAgents` (GET stays member-readable) |
+| `POST` / `DELETE /api/channels/:id/members` | member only (private-invite bypass + cross-tenant) | `manageChannels` + channel-ownership pre-check |
+| `resolveAgent` (all `/agent-api/*`) | accepted soft-deleted agents | filters `isNull(deletedAt)`; soft-delete also clears `agentTokenHash` |
+
 `POST /api/servers/:id/machines/:id/reconnect` was already correctly gated (`manageMachines` + online-guard).
 
 Verified live (two separate tenants): same-tenant reads still work; a foreign tenant reading another's
@@ -152,15 +161,13 @@ big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents fr
   (lists only public + joined channels — a private channel's name no longer leaks to a non-member). Real
   agent-api E2E: a non-member agent is blocked (404/403) on a private channel's send/read/task/join/resolve/
   thread/server-info, freely uses public channels, and gains access the moment it is added as a member.
-
-### Pending — capability gates (behavior change: members lose an over-permission)
-- **F3 [MED]** `GET /api/agents/:id/workspace-files[/read]` — member can read any agent's files (source,
-  secrets, `MEMORY.md`) via daemon RPC. Add `requireCap(manageAgents)`.
-- **F5 [MED]** `PUT /api/agents/:id/scopes` — member can change an agent's permission scopes. Add
-  `requireCap(manageAgents)`.
-- **F8 [MED-HIGH]** `POST/DELETE /api/channels/:id/members` — member can add/remove anyone to/from any
-  channel **including private** (bypasses invite-only) and from any tenant. Add `requireCap(manageChannels)`
-  + channel-ownership pre-check + a private-visibility rule.
+- **F3/F5/F8** human-plane capability gates — fixed (auth-caps PR). `GET /api/agents/:id/workspace-files[/read]`
+  + `PUT /api/agents/:id/scopes` now require `manageAgents`; `POST`/`DELETE /api/channels/:id/members` now
+  require `manageChannels` + a channel-ownership pre-check (so the private-channel invite path is owner/admin-
+  only and can't reach another tenant). GET scopes stays member-readable. Real E2E: member → 403, owner → 200.
+- **C4** deleted-agent token still valid — fixed (auth-caps PR). `resolveAgent` now filters `isNull(deletedAt)`
+  **and** soft-delete clears `agentTokenHash` (defense in depth). Real E2E: a deleted agent's token authenticates
+  before delete (200) and is rejected after (401); the `deletedAt` filter alone rejects even with the hash intact.
 
 ### Pending — agent-plane ownership (the channel-access layer above is done; this is a finer-grained check)
 - **C5 [MED]** `POST /agent/task/update`, `/task/unclaim` — an agent that can access the channel can still
@@ -169,13 +176,8 @@ big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents fr
   move a task, or only its assignee/an admin? Decide the policy, then gate `setTaskStatus`/`unclaimTask`.
 
 ### Pending — auth primitives
-- **C4 [HIGH]** `resolveAgent` does not filter `agents.deletedAt`, and soft-delete does not clear
-  `agentTokenHash` → a deleted agent's token keeps working until the next server restart. Add
-  `isNull(deletedAt)` to `resolveAgent` **and** null the hash on soft-delete.
 - **C10 [LOW]** `auth.ts` token compare uses `===`, not the existing `safeEqual` (timing side-channel,
   largely mitigated by fixed-length hex but not guaranteed). Switch to `safeEqual`.
-- **C11 [LOW]** `routes-agent.ts` file comment + the `401` message say "machine key" but the plane uses a
-  per-agent token — misleading. (Corrected alongside this PR.)
 - **C12 [DESIGN]** agent tokens have no TTL and no revoke endpoint. Consider an `expiresAt` + a rotate/revoke
   path; short-term, C4's hash-clear-on-delete is the main mitigation.
 

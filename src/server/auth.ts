@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 
 const SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
@@ -67,7 +67,9 @@ export const hashToken = (t: string) => crypto.createHash("sha256").update(t).di
  *  No shared bootstrap key; machine keys are not accepted as agent credentials (machine keys are used only for daemon WS connections, see ws.ts). */
 export async function resolveAgent(token: string | null, agentId: string | null) {
   if (!token || !agentId) return null;
-  const agent = (await db.select().from(schema.agents).where(eq(schema.agents.id, agentId)))[0];
+  // Reject soft-deleted agents: a deleted row keeps its id but must not authenticate (its token is cleared on
+  // delete too — defense in depth). Without this, a deleted agent's still-running process keeps full access.
+  const agent = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agentId), isNull(schema.agents.deletedAt))))[0];
   if (!agent || !agent.agentTokenHash) return null;
   if (hashToken(token) === agent.agentTokenHash) return agent;
   return null;
