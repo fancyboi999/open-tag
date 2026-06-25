@@ -10,6 +10,7 @@ const TASK_ICON: Record<string, typeof Circle> = { todo: Circle, in_progress: Pl
 import { IconWrench, IconFile, IconExternalLink, IconDownload } from "../icons.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { TaskBoard, ynOptions, ST_LABEL } from "../TaskBoard.tsx";
+import { PaneEmpty } from "../PaneEmpty.tsx";
 import { AgentProfile, HumanProfile, CreateAgentModal } from "./Members.tsx";
 import { ChatSidebar, CreateChannelModal } from "./ChatSidebar.tsx";
 import { AddComputerModal } from "./misc.tsx";
@@ -130,6 +131,7 @@ export function Chat() {
   const [hoverAgent, setHoverAgent] = useState<{ id: string; x: number; y: number } | null>(null); // hovering over an agent shows a quick-info hover card
   const [ctxMenu, setCtxMenu] = useState<{ m: Msg; x: number; y: number } | null>(null); // right-clicking a message opens the context action menu
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [loaded, setLoaded] = useState(false); // first fetch for the current channel done — gates the empty-channel state so it never flashes mid-load
   const [sub, setSub] = useState("");
   const [showMembers, setShowMembers] = useState(false);
   const [thread, setThread] = useState<{ channelId: string; parent: Msg } | null>(null); // currently open thread panel
@@ -151,8 +153,8 @@ export function Chat() {
   const closeProfile = () => { setProfile(null); setSp((prev) => { const n = new URLSearchParams(prev); n.delete("agentTab"); return n; }, { replace: true }); };
 
   useEffect(() => { if (!channelId && cur) nav(`/s/${slug}/channel/${cur.id}`, { replace: true }); }, [channelId, cur, slug, nav]);
-  useEffect(() => { if (!cur) return; setThread(null); setProfile(null); subscribeChannel(cur.id); (async () => { // switching channels closes any open thread + profile overlay from the previous channel (the live trace itself persists — accumulated in the store, see store.tsx); join the room while viewing so message:new arrives live (covers public non-member channels + channels relevant after connect)
-    const d = await api("GET", `/api/messages/channel/${cur.id}?limit=200`); const ms: Msg[] = d.messages || []; setMsgs(ms); markRead(cur.id);
+  useEffect(() => { if (!cur) return; setThread(null); setProfile(null); setLoaded(false); subscribeChannel(cur.id); (async () => { // switching channels closes any open thread + profile overlay from the previous channel (the live trace itself persists — accumulated in the store, see store.tsx); join the room while viewing so message:new arrives live (covers public non-member channels + channels relevant after connect)
+    const d = await api("GET", `/api/messages/channel/${cur.id}?limit=200`); const ms: Msg[] = d.messages || []; setMsgs(ms); setLoaded(true); markRead(cur.id);
     const ids = ms.map((m) => m.id);
     if (ids.length) { try { setThreadMeta(await api("GET", `/api/channels/${cur.id}/threads?parentMessageIds=${ids.join(",")}`) || {}); } catch { setThreadMeta({}); } } else setThreadMeta({});
   })(); }, [cur?.id]);
@@ -238,6 +240,7 @@ export function Chat() {
           : chatTab === "files" && cur ? <ChannelFiles channelId={cur.id} />
           : <>
             <div className="scroll" ref={scrollRef} onScroll={onScroll}>
+              {loaded && !msgs.length && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.channelEmpty")} />}
               {msgs.map((m) => {
                 const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // used for role description and avatar status dot
                 const tm = threadMeta[m.id];

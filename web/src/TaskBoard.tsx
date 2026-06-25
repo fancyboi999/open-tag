@@ -1,7 +1,7 @@
 // Task board shared between the channel chatTab=tasks view and the global Tasks page.
 // Five-status columns + Board/List toggle + Board layout toggle (horizontal columns ↔ vertical stack, persisted) (pure frontend) + Creator/Assignee filters (pure frontend, applied over the loaded array) + New Task (POST /api/tasks/channel/:id).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Trash2, ChevronDown, ChevronRight, Pencil, Columns3, Rows3 } from "lucide-react";
+import { Trash2, ChevronDown, ChevronRight, Pencil, Columns3, Rows3, ListChecks } from "lucide-react";
 import { DndContext, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useStore, type Msg } from "./store.tsx";
 import { Select } from "./Select.tsx";
 import { useEscClose } from "./ConfirmModal.tsx";
+import { PaneEmpty } from "./PaneEmpty.tsx";
 import i18n from "./i18n";
 
 const TCOLS: [string, string][] = [
@@ -197,7 +198,7 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
         <span className="grow" />
         {channelId && <button className="ok newtask" onClick={() => setMkOpen(true)}>{t("tasks.newTask")}</button>}
       </div>
-      {filtered.length === 0 ? <div className="empty">{tasks.length ? t("tasks.emptyFiltered") : channelId ? t("tasks.emptyChannel") : t("tasks.emptyServer")}</div>
+      {filtered.length === 0 ? <PaneEmpty icon={<ListChecks size={30} />} title={tasks.length ? t("tasks.emptyFiltered") : channelId ? t("tasks.emptyChannel") : t("tasks.emptyServer")} />
         : view === "board" ? (
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
             <div className={"task-board " + boardLayout}>
