@@ -24,13 +24,18 @@ git fetch origin main --quiet 2>/dev/null || true
 git worktree add "$WT" -b "feature/$NAME" "$BASE"
 docker compose exec -T postgres createdb -U opentag "$DB" 2>/dev/null || echo "  (db $DB already exists, reusing)"
 
+# Generate random secrets for each worktree — never reuse the weak defaults
+# (the server now fails fast on startup if these are missing or empty).
+WT_JWT_SECRET=$(openssl rand -hex 32)
+WT_BOOTSTRAP_KEY=$(openssl rand -hex 32)
+
 cat > "$WT/.env" <<EOF
 PORT=$SPORT
 VITE_PORT=$VPORT
 DATABASE_URL=postgres://opentag:opentag@localhost:5433/$DB
 REDIS_URL=redis://localhost:6380/$RDB
-JWT_SECRET=dev-secret-change-me
-DAEMON_BOOTSTRAP_KEY=poc-secret-key
+JWT_SECRET=$WT_JWT_SECRET
+DAEMON_BOOTSTRAP_KEY=$WT_BOOTSTRAP_KEY
 OPEN_TAG_HOME=$HOME/.open-tag-$SAFE
 ALLOW_DEV_LOGIN=true
 EOF
