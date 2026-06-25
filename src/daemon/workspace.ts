@@ -78,9 +78,41 @@ async function readSkillsDir(dir: string, sourcePath: string) {
   }
   return out;
 }
-export async function listSkills(agentId: string) {
-  const global = await readSkillsDir(path.join(os.homedir(), ".claude", "skills"), "~/.claude/skills");
-  const workspace = await readSkillsDir(path.join(DATA_DIR, agentId, ".claude", "skills"), "<workspace>/.claude/skills");
+// Per-runtime skills directories, ported from multica's localSkillRootsForProvider
+// (multica/server/internal/daemon/local_skills.go). Each CLI keeps its skills under its own
+// provider dir, so a codex/opencode/cursor agent must read *its* dir — not Claude's ~/.claude/skills,
+// which is what this used to hardcode regardless of runtime. Agents launch with the operator's real
+// $HOME (claudeRuntime/codexRuntime don't override HOME/CODEX_HOME), so the home provider dir is the
+// one the agent actually loads. Runtimes without an established skills dir (kimi) get the universal
+// ~/.agents/skills convention only.
+type SkillRoot = { dir: string; label: string };
+const HOME = os.homedir();
+const UNIVERSAL_SKILLS: SkillRoot = { dir: path.join(HOME, ".agents", "skills"), label: "~/.agents/skills" };
+// Home (global) provider skills dir per runtime.
+const PROVIDER_HOME_SKILLS: Record<string, SkillRoot> = {
+  claude: { dir: path.join(HOME, ".claude", "skills"), label: "~/.claude/skills" },
+  codex: { dir: path.join(process.env.CODEX_HOME || path.join(HOME, ".codex"), "skills"), label: "~/.codex/skills" },
+  copilot: { dir: path.join(HOME, ".copilot", "skills"), label: "~/.copilot/skills" },
+  opencode: { dir: path.join(HOME, ".config", "opencode", "skills"), label: "~/.config/opencode/skills" },
+  cursor: { dir: path.join(HOME, ".cursor", "skills"), label: "~/.cursor/skills" },
+  pi: { dir: path.join(HOME, ".pi", "agent", "skills"), label: "~/.pi/agent/skills" },
+};
+// Project-local (workspace) provider dir name per runtime, relative to the agent workspace/cwd.
+const PROVIDER_WS_DIR: Record<string, string> = { claude: ".claude", codex: ".codex", copilot: ".copilot", opencode: ".opencode", cursor: ".cursor", pi: ".pi" };
+
+/** Resolve which skills dirs to scan for an agent, by its runtime. Pure (no I/O) — unit-tested. */
+export function skillRootsFor(runtime: string, agentId: string): { global: SkillRoot[]; workspace: SkillRoot | null } {
+  const home = PROVIDER_HOME_SKILLS[runtime];
+  const global = home ? [home, UNIVERSAL_SKILLS] : [UNIVERSAL_SKILLS];
+  const wsName = PROVIDER_WS_DIR[runtime];
+  const workspace = wsName ? { dir: path.join(DATA_DIR, agentId, wsName, "skills"), label: `<workspace>/${wsName}/skills` } : null;
+  return { global, workspace };
+}
+
+export async function listSkills(agentId: string, runtime = "claude") {
+  const roots = skillRootsFor(runtime, agentId);
+  const global = (await Promise.all(roots.global.map((r) => readSkillsDir(r.dir, r.label)))).flat();
+  const workspace = roots.workspace ? await readSkillsDir(roots.workspace.dir, roots.workspace.label) : [];
   return { global, workspace };
 }
 

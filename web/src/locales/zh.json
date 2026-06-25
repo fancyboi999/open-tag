@@ -96,7 +96,7 @@
     "editProfile": "编辑资料",
     "scopeWorkspace": "工作区",
     "scopeGlobal": "全局",
-    "skillsEmpty": "这台机器没检测到 skills(~/.claude/skills 或工作区 .claude/skills),或 daemon 离线。",
+    "skillsEmpty": "这台机器没检测到该 runtime 的 skills，或 daemon 离线。",
     "skillInvocable": "可调用",
     "noDescription": "(无描述)",
     "permCustom": "已定制权限",
@@ -441,6 +441,7 @@
     "model": "模型",
     "session": "会话",
     "workspace": "工作区",
+    "created": "创建时间",
     "hostname": "主机名",
     "reasoning": "推理",
     "membersCount": "{{count}} 个成员"

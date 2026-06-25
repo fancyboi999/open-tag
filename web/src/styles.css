@@ -155,7 +155,10 @@ mark{background:var(--g-peach);color:var(--ink);padding:0 2px;border-radius:4px}
 .logout-title{font-size:14px;font-weight:600;color:var(--ink)}
 .logout-desc{font-size:12px;color:var(--muted);margin-top:2px}
 .logout-btn{font-size:13px;color:var(--error);background:var(--canvas);border:1px solid var(--error-line);padding:7px 16px;border-radius:9999px;cursor:pointer;flex:0 0 auto}
-.head-agent{display:flex;align-items:center;justify-content:space-between;gap:12px}
+/* Profile header (agent + human): compound selector outranks the later .head{align-items:baseline}
+   so avatar, name block and actions sit on one centered row; .head-id grows to push actions flush-right. */
+.head.head-agent{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.head-id{flex:1 1 auto;min-width:0}
 .agent-acts{display:flex;align-items:center;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
 .restart-opts{display:flex;flex-direction:column;gap:10px;margin:8px 0 4px}
 .restart-opt{text-align:left;border:1px solid var(--hair-strong);border-radius:8px;padding:12px 14px;background:var(--canvas);cursor:pointer}
