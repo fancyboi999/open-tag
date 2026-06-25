@@ -57,6 +57,10 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   const [creatorKey, setCreatorKey] = useState(""); // "" = all | "me" | "type:id"
   const [assigneeKey, setAssigneeKey] = useState(""); // "" = all | "unclaimed" | "type:id"
   const [mkOpen, setMkOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null); // id of the card being dragged → turns every column into a generous drop target
+  const boardRef = useRef<HTMLDivElement>(null);
+  const prevRects = useRef<Map<string, DOMRect>>(new Map()); // last-known card positions, for the FLIP move animation
+  const skipFlipId = useRef<string | null>(null); // the just-dropped card already moved with the cursor; don't double-animate it
 
   const path = channelId ? `/api/tasks/channel/${channelId}` : "/api/tasks/server";
   const load = async () => { const d = await api("GET", path); setTasks(d.tasks || []); };
@@ -70,6 +74,13 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   }), [channelId]);
 
   const act = async (task: Msg, action: string, body?: unknown) => { await api("PATCH", `/api/tasks/${task.id}/${action}`, body); load(); };
+  // Move a task to another column optimistically: update local state first so the FLIP animation fires instantly,
+  // then persist in the background; a failed PATCH reloads to revert. Realtime task:updated reconciles the rest.
+  const moveTask = (task: Msg, status: string) => {
+    if (status === (task.taskStatus || "todo")) return;
+    setTasks((cur) => cur.map((x) => (x.id === task.id ? { ...x, taskStatus: status } : x)));
+    api("PATCH", `/api/tasks/${task.id}/status`, { status }).catch(() => load());
+  };
   const delTask = async (task: Msg) => { await api("DELETE", `/api/tasks/${task.id}`); load(); }; // deleting a task reverts it to a plain message (clears task fields); the source message is preserved
   const nameOf = (type?: string | null, id?: string | null) => {
     if (!type || !id) return "";
@@ -97,6 +108,36 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   });
   const groups: Record<string, Msg[]> = { todo: [], in_progress: [], in_review: [], done: [], closed: [] };
   for (const task of filtered) (groups[task.taskStatus || "todo"] ||= []).push(task);
+
+  // FLIP move animation: when a card lands in a different column (click-move, realtime, or a non-drag reflow),
+  // slide it from its previous position to its new one. Layout/collapse/view toggles reflow everything at once —
+  // those are not "a card moved", so we refresh positions without animating. Honors prefers-reduced-motion.
+  const layoutSig = boardLayout + "|" + view + "|" + [...collapsed].sort().join(",");
+  const lastSig = useRef(layoutSig);
+  useLayoutEffect(() => {
+    const root = boardRef.current;
+    if (!root) return;
+    const reduce = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const animate = !reduce && lastSig.current === layoutSig;
+    const next = new Map<string, DOMRect>();
+    const moves: { el: HTMLElement; dx: number; dy: number; fresh: boolean }[] = [];
+    root.querySelectorAll<HTMLElement>("[data-task-id]").forEach((el) => {
+      const id = el.dataset.taskId!;
+      const rect = el.getBoundingClientRect();
+      next.set(id, rect);
+      if (!animate || id === skipFlipId.current) return;
+      const prev = prevRects.current.get(id);
+      if (prev) { const dx = prev.left - rect.left, dy = prev.top - rect.top; if (dx || dy) moves.push({ el, dx, dy, fresh: false }); }
+      else moves.push({ el, dx: 0, dy: 6, fresh: true });
+    });
+    // Invert (write), one reflow, then play (write) — batched so N cards don't thrash layout.
+    moves.forEach(({ el, dx, dy, fresh }) => { el.style.transition = "none"; el.style.transform = `translate(${dx}px,${dy}px)`; if (fresh) el.style.opacity = "0"; });
+    if (moves.length) void root.offsetWidth;
+    moves.forEach(({ el, fresh }) => { el.style.transition = ""; el.style.transform = ""; if (fresh) el.style.opacity = ""; });
+    prevRects.current = next;
+    lastSig.current = layoutSig;
+    skipFlipId.current = null;
+  }, [tasks, creatorKey, assigneeKey, boardLayout, view, collapsed]);
 
   const submit = async (titles: string[]) => { if (channelId && titles.length) { await createTasks(channelId, titles); setMkOpen(false); load(); } };
 
@@ -132,7 +173,7 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
       <span className="st-pill-wrap" onClick={(e) => e.stopPropagation()}>
         <button ref={btnRef} className="st-pill-btn" onClick={() => setOpen((v) => !v)}>{pill}</button>
         {open && pos && <div ref={menuRef} className="st-menu" style={{ right: pos.right, top: pos.top }}>
-          {opts.map((s) => <button key={s} className={s === status ? "on" : ""} onClick={() => { setOpen(false); if (s !== status) act(task, "status", { status: s }); }}><span className={"st-dot st-" + s} />{t(ST_LABEL[s])}</button>)}
+          {opts.map((s) => <button key={s} className={s === status ? "on" : ""} onClick={() => { setOpen(false); moveTask(task, s); }}><span className={"st-dot st-" + s} />{t(ST_LABEL[s])}</button>)}
         </div>}
       </span>
     );
@@ -158,9 +199,10 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   // Activation distance of 6px: plain clicks (open thread / status pill) do not trigger drag; only pointer movement beyond 6px starts a drag.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const onDragEnd = (e: DragEndEvent) => {
+    setActiveId(null);
     const task = e.active?.data?.current?.task as Msg | undefined;
     const col = e.over?.id as string | undefined;
-    if (task && col && col !== (task.taskStatus || "todo")) act(task, "status", { status: col });
+    if (task && col && col !== (task.taskStatus || "todo")) { skipFlipId.current = task.id; moveTask(task, col); } // the drag already carried it across; let it settle, don't re-FLIP
   };
   const DraggableCard = ({ t: task }: { t: Msg }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id, data: { task } });
@@ -169,11 +211,19 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   const DroppableCol = ({ k, labelKey }: { k: string; labelKey: string }) => {
     const { setNodeRef, isOver } = useDroppable({ id: k });
     const label = t(labelKey);
+    const isCollapsed = collapsed.has(k);
+    const dragging = activeId != null;
+    const showBody = !isCollapsed || dragging; // while a drag is in flight, even collapsed columns reveal a drop area so every status is reachable
     return (
-      <div ref={setNodeRef} className={"task-col" + (collapsed.has(k) ? " collapsed" : "") + (isOver ? " drop-over" : "")}>
-        <div className="sec" onClick={() => toggleCol(k)} style={{ cursor: "pointer" }}>{collapsed.has(k) ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{label} <span className="cnt">{groups[k]?.length || 0}</span></div>
-        {isOver && <div className="drop-hint">{t("tasks.dropToSet", { label })}</div>}
-        {!collapsed.has(k) && (groups[k] || []).map((task) => <DraggableCard key={task.id} t={task} />)}
+      <div ref={setNodeRef} className={"task-col" + (isCollapsed ? " collapsed" : "") + (isOver ? " drop-over" : "")}>
+        <div className="sec" onClick={() => toggleCol(k)} style={{ cursor: "pointer" }}>{isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}{label} <span className="cnt">{groups[k]?.length || 0}</span></div>
+        {showBody && (
+          <div className="task-col-body">
+            {!isCollapsed && (groups[k] || []).map((task) => <div key={task.id} data-task-id={task.id} className="tk-slot"><DraggableCard t={task} /></div>)}
+            {/* drop indicator appended after the cards (never overlaps them); fills an empty column on its own */}
+            {isOver && <div className="drop-slot">{t("tasks.dropToSet", { label })}</div>}
+          </div>
+        )}
       </div>
     );
   };
@@ -200,8 +250,8 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
       </div>
       {filtered.length === 0 ? <PaneEmpty icon={<ListChecks size={30} />} title={tasks.length ? t("tasks.emptyFiltered") : channelId ? t("tasks.emptyChannel") : t("tasks.emptyServer")} />
         : view === "board" ? (
-          <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-            <div className={"task-board " + boardLayout}>
+          <DndContext sensors={sensors} onDragStart={(e) => setActiveId(String(e.active.id))} onDragCancel={() => setActiveId(null)} onDragEnd={onDragEnd}>
+            <div ref={boardRef} className={"task-board " + boardLayout + (activeId ? " dragging" : "")}>
               {TCOLS.map(([k, labelKey]) => <DroppableCol key={k} k={k} labelKey={labelKey} />)}
             </div>
           </DndContext>

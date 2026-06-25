@@ -284,9 +284,15 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .st-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--muted-soft)}
 .st-dot.st-todo{background:var(--amber)} .st-dot.st-in_progress{background:var(--g-sky)} .st-dot.st-in_review{background:var(--g-lav)} .st-dot.st-done{background:var(--success)} .st-dot.st-closed{background:var(--muted-soft)}
 .tk-del-row{border:0;background:transparent;color:var(--muted-soft);cursor:pointer;padding:4px;border-radius:6px;flex:none} .tk-del-row:hover{color:var(--error)}
-/* D6 drag-and-drop: target column highlight + drop hint (editorial sky dashed) */
+/* Drag-and-drop + click-to-move: the whole column is the drop target (not just the title strip), and the
+   drop indicator is appended after the cards so it never overlaps them. Editorial sky dashed affordance. */
+.task-col-body{min-height:8px}
+.task-board.dragging .task-col-body{min-height:96px} /* while dragging, every column (incl. empty/collapsed) is a generous target */
 .task-col.drop-over{background:var(--surface-strong);border-radius:12px;outline:2px dashed var(--g-sky);outline-offset:-2px}
-.drop-hint{font-size:12px;font-weight:600;color:var(--tint-blue-ink);text-align:center;padding:9px;border:1px dashed var(--g-sky);border-radius:8px;margin-bottom:6px;background:var(--tint-blue)}
+.drop-slot{display:flex;align-items:center;justify-content:center;min-height:62px;font-size:12px;font-weight:600;color:var(--tint-blue-ink);text-align:center;padding:10px;border:1.5px dashed var(--g-sky);border-radius:12px;background:var(--tint-blue);margin-top:2px}
+/* FLIP move animation: a card slides from its old column to its new one (set imperatively in TaskBoard) */
+.tk-slot{transition:transform .22s cubic-bezier(.22,1,.36,1),opacity .22s ease}
+@media (prefers-reduced-motion:reduce){.tk-slot{transition:none}}
 .actlog{display:flex;flex-direction:column;gap:2px}
 .act{display:flex;align-items:baseline;gap:10px;padding:5px 6px;border-radius:6px;font-size:14px;line-height:1.5}
 .act:hover{background:var(--surface-strong)}
