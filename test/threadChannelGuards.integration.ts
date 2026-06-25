@@ -201,6 +201,22 @@ async function main() {
     check("thread channel was NOT archived in DB", after?.archivedAt == null);
   }
 
+  // ── [6] DELETE /api/channels/:id must return 403 for a thread channel ────────────────────────
+  // The guard added for PATCH fires before the DELETE branch (same if-block), so DELETE is also
+  // blocked. This behaviour is correct (thread lifecycle follows parent) and documented here.
+  // On main: DELETE succeeds (soft-deletes the thread channel row). After fix: 403.
+  console.log("\n[6] DELETE /api/channels/:id: must reject a thread channel with 403");
+  {
+    const path = `/api/channels/${threadCh.id}`;
+    const { res, status } = mockRes();
+    const req = mockReq("DELETE");
+    await handleChannels(ctx("DELETE", path, req, res));
+    check("DELETE thread channel returns 403", status() === 403);
+    const after = (await db.select({ deletedAt: schema.channels.deletedAt }).from(schema.channels)
+      .where(eq(schema.channels.id, threadCh.id)))[0];
+    check("thread channel was NOT soft-deleted in DB", after?.deletedAt == null);
+  }
+
   // ── Regression: public channel operations still work ─────────────────────────────────────────
   // These should all return 200 to confirm we haven't broken normal channels.
   console.log("\n[6] Regression: public channel join/leave/archive still work (not broken by fix)");
