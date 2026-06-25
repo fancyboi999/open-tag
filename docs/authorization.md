@@ -69,14 +69,16 @@ Agents are then gated by **scopes** — 14 capability literals (`inbox:receive`,
 > **Agents joining channels and threads is by design**, not a bug: the `channel:join` scope + endpoint
 > exist for it, and replying auto-joins the agent to a thread (`resolveTarget` → `getOrCreateThread`).
 
-**The systemic agent-plane gap:** a scope check answers *"may this agent do this kind of action?"* but
-**not** *"may this agent touch this specific channel?"*. `resolveTarget` (`core.ts`) turns a target
-string into a `channelId` by `serverId + name` lookup with **no membership / visibility check**, so
-every endpoint built on it (send / read / task / thread / attachment) lets an agent reach **any channel
-in its server by name, including private ones it was never invited to**. The human plane has
-`canReadChannel` (`socketio.ts`); the agent plane has no equivalent. This is the highest-value hardening
-item (§6, C-group) and is the security boundary the upcoming "agents join channels/threads" feature must
-build on.
+**The resource-access layer (enforced):** a scope check answers *"may this agent do this kind of action?"*
+but not *"may this agent touch this specific channel?"*. That second question is answered by
+**`canAgentReadChannel(serverId, channelId, agentId)`** (`core.ts`) — the agent-plane mirror of the human
+`canReadChannel` (member → ok; public → ok; thread → inherits its parent; private/DM non-member → refused).
+It gates the chokepoints every channel-touching `/agent-api/*` endpoint flows through (`resolveTarget`,
+`resolveMessageId`, `findParent`) plus per-handler guards on `channel/join` (public self-join only),
+`message/resolve`, `attachment/view`, and `server/info`. So an agent reaches a private channel **only**
+when it has been added as a member; public channels + their threads stay freely usable. This is the
+security boundary the "agents join channels/threads" feature builds on (invariant §4). Remaining finer-grained
+gap: task *ownership* (§6 C5).
 
 ## 4. The four invariants (越权红线 — every endpoint must obey)
 
@@ -92,12 +94,13 @@ build on.
    reads/writes, ownership for tasks/attachments, `manageX` for privileged management.
 4. **Channel visibility is invite-only for private/DM — for humans *and* agents.** Public channels: any
    member of the server may read/join. Private / DM / thread: only explicitly-added members. The human
-   self-join guard (`routes-api.ts` "private channel is invite-only") must have an agent-plane equivalent
-   in `resolveTarget`/`channel/join` (currently missing — §6 C1–C3).
+   self-join guard (`routes-api.ts` "private channel is invite-only") has an agent-plane equivalent:
+   `canAgentReadChannel` enforced in `resolveTarget` / `resolveMessageId` / `findParent` / `channel/join`
+   (§6 C1–C3/C6/C7/C8 — fixed).
 
-## 5. What this PR enforced
+## 5. What the hardening PRs enforced
 
-Fixed in the PR that introduced this doc (cross-tenant IDOR batch + machine capability gate):
+**Slice 1 — cross-tenant IDOR batch + machine capability gate:**
 
 | Endpoint | Was | Now |
 |---|---|---|
@@ -109,6 +112,18 @@ Fixed in the PR that introduced this doc (cross-tenant IDOR batch + machine capa
 | `GET /api/channels/:id/members` | any tenant by UUID | channel-ownership pre-check (404 otherwise) |
 | `GET /api/channels/:id/files` | any tenant by UUID | `serverId`-scoped |
 | `resolveTarget` `dm:@user` (agent plane) | any global username | peer must be a `serverMembers` member |
+
+**Slice 2 — agent-plane channel-access layer (`canAgentReadChannel`):**
+
+| Surface | Was | Now |
+|---|---|---|
+| `resolveTarget` (send/read/task/thread/members/attachment-upload) | any channel by name (incl. private) | `canAgentReadChannel` — public ok, private/DM member-only |
+| `resolveMessageId` (react/resolve-by-id/task-by-message/unclaim) | any message by id | resolved message's channel must be accessible |
+| `findParent` (thread reply/read) | any parent by short id | parent's channel must be accessible |
+| `POST /agent-api/channel/join` | self-join any channel incl. private | public self-join only (private/DM/thread → 403) |
+| `GET /agent-api/message/resolve` | any message's content by id | gated on the message's channel |
+| `GET /agent-api/attachment/view` | any attachment by id | uploader, or a member of the attachment's channel |
+| `GET /agent-api/server/info` | listed every non-DM channel | lists only public + joined (private name no longer leaks) |
 
 `POST /api/servers/:id/machines/:id/reconnect` was already correctly gated (`manageMachines` + online-guard).
 
@@ -122,10 +137,21 @@ Two audits (human plane = `routes-api.ts`/`capabilities.ts`; agent plane = `rout
 deliberately-scoped follow-up PR — do them one at a time with a cross-tenant / cross-channel test, never a
 big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents from messaging).
 
-### Fixed (this PR)
-- **F1/F2** machine create/delete missing `manageMachines` — fixed.
-- **F4/F6/F7/F9/F10** human-plane cross-tenant IDOR (missing `serverId` scope) — fixed.
-- **C9** agent `dm:@user` could DM a non-member (cross-tenant) — fixed.
+### Fixed
+- **F1/F2** machine create/delete missing `manageMachines` — fixed (IDOR-batch PR).
+- **F4/F6/F7/F9/F10** human-plane cross-tenant IDOR (missing `serverId` scope) — fixed (IDOR-batch PR).
+- **C9** agent `dm:@user` could DM a non-member (cross-tenant) — fixed (IDOR-batch PR).
+- **C11** misleading "machine key" agent-api comment/401 — fixed (IDOR-batch PR).
+- **C1/C2/C3/C6/C7/C8 + server/info** the agent-plane channel-access layer — fixed (agent-channel-ACL PR).
+  A new `canAgentReadChannel(serverId, channelId, agentId)` (`core.ts`, mirrors human `canReadChannel`:
+  member → ok; public → ok; thread → inherits parent; private/DM non-member → refused) now gates the single
+  chokepoints every channel-touching `/agent-api/*` endpoint flows through: `resolveTarget` (send/read/task/
+  thread/members/attachment-upload), `resolveMessageId` (react/resolve-by-id/task-by-message), `findParent`
+  (thread reply/read), plus per-handler guards on `channel/join` (public self-join only — private is invite-
+  only), `message/resolve` (its own lookup), `attachment/view` (uploader or channel-member), and `server/info`
+  (lists only public + joined channels — a private channel's name no longer leaks to a non-member). Real
+  agent-api E2E: a non-member agent is blocked (404/403) on a private channel's send/read/task/join/resolve/
+  thread/server-info, freely uses public channels, and gains access the moment it is added as a member.
 
 ### Pending — capability gates (behavior change: members lose an over-permission)
 - **F3 [MED]** `GET /api/agents/:id/workspace-files[/read]` — member can read any agent's files (source,
@@ -136,20 +162,11 @@ big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents fr
   channel **including private** (bypasses invite-only) and from any tenant. Add `requireCap(manageChannels)`
   + channel-ownership pre-check + a private-visibility rule.
 
-### Pending — agent-plane resource access (the systemic gap; ties to the "agents join channels/threads" feature)
-> All of these stem from `resolveTarget` not checking channel membership/visibility. The right fix is a
-> single `canAgentAccessChannel(agent, channel)` helper (mirroring human `canReadChannel`) applied across
-> these endpoints — built **with** invariant §4: agents freely use public channels + their threads, but
-> private/DM stay invite-only.
-- **C1 [HIGH]** `GET /agent/message/read` — read any channel's history (incl. private) by name.
-- **C2 [HIGH]** `POST /agent/message/send`, `/thread/reply` — post to any channel (incl. private) by name.
-- **C3 [HIGH]** `POST /agent/channel/join` — self-join any channel incl. `type=private` (no visibility check).
-- **C5 [MED]** `POST /agent/task/update`, `/task/unclaim` — modify/unclaim another agent's task (no
-  assignee/ownership check).
-- **C6 [MED]** `GET /agent/attachment/view` — download any attachment in the server by id (no channel-membership check).
-- **C7 [MED]** `GET /agent/message/resolve`, `/thread/read` — probe/read any message/thread by short id.
-- **C8 [MED]** `GET /agent/task/list`, `POST /agent/task/claim`, `/task/new` — list/claim/create tasks in
-  any channel incl. private.
+### Pending — agent-plane ownership (the channel-access layer above is done; this is a finer-grained check)
+- **C5 [MED]** `POST /agent/task/update`, `/task/unclaim` — an agent that can access the channel can still
+  modify/unclaim **another agent's** task (no `taskAssigneeId === agent.id` check). This is an *ownership*
+  check, distinct from channel access (now enforced), and has a product question — may any channel member
+  move a task, or only its assignee/an admin? Decide the policy, then gate `setTaskStatus`/`unclaimTask`.
 
 ### Pending — auth primitives
 - **C4 [HIGH]** `resolveAgent` does not filter `agents.deletedAt`, and soft-delete does not clear

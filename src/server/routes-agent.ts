@@ -4,7 +4,7 @@ import { and, eq, gt, lt, inArray, asc, desc, ilike, like, sql, isNull } from "d
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, agentIdHeader } from "./util.js";
 import { resolveAgent } from "./auth.js";
-import { createMessage, resolveTarget, channelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, descTooLong, DESC_TOO_LONG } from "./core.js";
+import { createMessage, resolveTarget, channelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG } from "./core.js";
 import { agentHasScope } from "./scopes.js";
 import { parseUpload } from "./attachments.js";
 import { readObject } from "./storage.js";
@@ -185,7 +185,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     const b = await readJson(req);
     const emoji = String(b.emoji ?? "").trim();
     if (!b.messageId || !emoji) return (sendErr(res, 400, "messageId + emoji required"), true);
-    const mid = await resolveMessageId(serverId, b.messageId); // Tolerates short id (agent reacts to the short id it sees); without this, querying uuid column with a short id → 500
+    const mid = await resolveMessageId(serverId, b.messageId, agent.id); // Tolerates short id (agent reacts to the short id it sees); without this, querying uuid column with a short id → 500
     if (!mid) return (sendErr(res, 404, "message not found"), true);
     const out = b.remove ? await removeReaction(serverId, mid, "agent", agent.id, emoji) : await addReaction(serverId, mid, "agent", agent.id, emoji);
     return (sendJson(res, 200, { ok: true, reactions: out?.reactions ?? [] }), true);
@@ -203,7 +203,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     let rows: (typeof schema.messages.$inferSelect)[];
     if (anchorParam) {
       let anchorSeq = /^\d+$/.test(anchorParam) ? Number(anchorParam) : null;
-      if (anchorSeq == null) { const aid = await resolveMessageId(serverId, anchorParam); const am = aid ? (await db.select({ seq: schema.messages.seq }).from(schema.messages).where(eq(schema.messages.id, aid)))[0] : null; anchorSeq = am?.seq ?? null; }
+      if (anchorSeq == null) { const aid = await resolveMessageId(serverId, anchorParam, agent.id); const am = aid ? (await db.select({ seq: schema.messages.seq }).from(schema.messages).where(eq(schema.messages.id, aid)))[0] : null; anchorSeq = am?.seq ?? null; }
       if (anchorSeq == null) return (sendErr(res, 404, "anchor message not found"), true);
       if (url.searchParams.get("after")) {
         rows = await db.select().from(schema.messages).where(and(cid, gt(schema.messages.seq, anchorSeq))).orderBy(asc(schema.messages.seq)).limit(limit);
@@ -228,7 +228,9 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     const memberRows = await db.select().from(schema.serverMembers).where(eq(schema.serverMembers.serverId, serverId));
     const humans = memberRows.length ? await db.select().from(schema.users).where(inArray(schema.users.id, memberRows.map((m) => m.userId))) : [];
     return (sendJson(res, 200, {
-      channels: chs.filter((c) => c.type !== "dm" && !c.deletedAt).map((c) => ({ name: c.name, description: c.description, joined: joined.has(c.id) })),
+      // Agent ACL: only surface public channels + channels the agent has joined — never reveal a private
+      // channel's name/description to a non-member (DMs are listed elsewhere). Keeps private channels invisible.
+      channels: chs.filter((c) => c.type !== "dm" && !c.deletedAt && (c.type === "channel" || joined.has(c.id))).map((c) => ({ name: c.name, description: c.description, joined: joined.has(c.id) })),
       agents: agents.map((a) => ({ name: a.name, status: a.status, description: a.description ?? null })),
       humans: humans.map((u) => ({ name: u.name, description: u.description ?? null })),
     }), true);
@@ -239,6 +241,10 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     const name = (b.target ?? "").replace(/^#/, "");
     const ch = (await db.select().from(schema.channels).where(and(eq(schema.channels.serverId, serverId), eq(schema.channels.name, name))))[0];
     if (!ch) return (sendErr(res, 404, "channel not found"), true);
+    // Agent ACL: self-join is for public channels only. Private / DM / thread are invite-only — an admin or an
+    // existing member must add the agent (mirrors the human self-join guard). Prevents an agent walking into a
+    // private channel by name.
+    if (ch.type !== "channel") return (sendErr(res, 403, "this channel is invite-only — an admin or member must add the agent"), true);
     await db.insert(schema.channelMembers).values({ channelId: ch.id, memberType: "agent", memberId: agent.id }).onConflictDoNothing();
     return (sendJson(res, 200, { ok: true, joined: name }), true);
   }
@@ -265,7 +271,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
       const tgt = await resolveTarget(serverId, String(b.channel), agent.id);
       if (tgt) mid = (await db.select({ id: schema.messages.id }).from(schema.messages).where(and(eq(schema.messages.channelId, tgt.channelId), eq(schema.messages.taskNumber, Number(b.number)))))[0]?.id ?? null;
     } else {
-      mid = await resolveMessageId(serverId, b.messageId); // Tolerates 8-character short id
+      mid = await resolveMessageId(serverId, b.messageId, agent.id); // Tolerates 8-character short id
     }
     if (!mid) return (sendErr(res, 404, "task not found"), true);
     await ensureTaskForAgent(mid); // claiming a plain message converts it to a task first (so it gets a number), then claims
@@ -286,7 +292,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
       const tgt = await resolveTarget(serverId, String(b.channel), agent.id);
       if (tgt) mid = (await db.select({ id: schema.messages.id }).from(schema.messages).where(and(eq(schema.messages.channelId, tgt.channelId), eq(schema.messages.taskNumber, Number(b.number)))))[0]?.id ?? null;
     } else {
-      mid = await resolveMessageId(serverId, b.messageId);
+      mid = await resolveMessageId(serverId, b.messageId, agent.id);
     }
     if (!mid) return (sendErr(res, 404, "message not found"), true);
     if (!(TASK_STATUSES as readonly string[]).includes(String(b.status))) return (sendErr(res, 400, `valid status is required (${TASK_STATUSES.join(", ")})`), true);
@@ -314,7 +320,11 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     const tgt = channel ? await resolveTarget(serverId, channel, agent.id) : null;
     const idCond = v.length >= 32 ? eq(schema.messages.id, v) : like(sql`${schema.messages.id}::text`, v + "%");
     const conds = [eq(schema.messages.serverId, serverId), idCond, ...(tgt ? [eq(schema.messages.channelId, tgt.channelId)] : [])];
-    return (await db.select().from(schema.messages).where(and(...conds)))[0] ?? null;
+    const parent = (await db.select().from(schema.messages).where(and(...conds)))[0] ?? null;
+    // Agent ACL: a bare parent short id (no channel given) skips resolveTarget, so gate on the found parent's
+    // channel — otherwise an agent could read/reply into a thread under a private channel it can't access.
+    if (parent && !(await canAgentReadChannel(serverId, parent.channelId, agent.id))) return null;
+    return parent;
   };
   if (p === "/agent-api/thread/reply" && method === "POST") {
     const b = await readJson(req);
@@ -374,6 +384,9 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     if (!raw) return (sendErr(res, 400, "id required"), true);
     const m = (await db.select().from(schema.messages).where(and(eq(schema.messages.serverId, serverId), raw.length >= 32 ? eq(schema.messages.id, raw) : like(sql`${schema.messages.id}::text`, raw.toLowerCase() + "%"))))[0];
     if (!m) return (sendErr(res, 404, "message not found", { code: "RESOLVE_FAILED" }), true);
+    // Agent ACL: resolve has its own message lookup (not resolveMessageId), so gate the resolved message's
+    // channel here too — otherwise it leaks any message's content by (short) id (C7).
+    if (!(await canAgentReadChannel(serverId, m.channelId, agent.id))) return (sendErr(res, 404, "message not found", { code: "RESOLVE_FAILED" }), true);
     const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, m.channelId)))[0];
     return (sendJson(res, 200, { ...serialize(m), text: fmt(m, ch ? await addressableTarget(ch, agent.id) : m.channelId) }), true);
   }
@@ -403,7 +416,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
   // task unclaim
   if (p === "/agent-api/task/unclaim" && method === "POST") {
     const b = await readJson(req);
-    const mid = await resolveMessageId(serverId, b.messageId);
+    const mid = await resolveMessageId(serverId, b.messageId, agent.id);
     if (!mid) return (sendErr(res, 404, "message not found"), true);
     const r = await unclaimTask(serverId, mid, { type: "agent", id: agent.id });
     return (r ? sendJson(res, 200, { ok: true, taskStatus: r.taskStatus }) : sendErr(res, 404, "task not found"), true);
@@ -414,6 +427,10 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     if (!id) return (sendErr(res, 400, "id required"), true);
     const a = (await db.select().from(schema.attachments).where(and(eq(schema.attachments.id, id), eq(schema.attachments.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "attachment not found"), true);
+    // Agent ACL: the agent may view an attachment only if it uploaded it, or it can access the channel the
+    // attachment was posted in — otherwise an attachment id leaks a private channel's file. 404 (don't reveal).
+    const canView = (a.uploaderType === "agent" && a.uploaderId === agent.id) || (!!a.channelId && await canAgentReadChannel(serverId, a.channelId, agent.id));
+    if (!canView) return (sendErr(res, 404, "attachment not found"), true);
     try {
       const buf = await readObject(a.storageKey);
       // Return bytes (base64) → CLI saves to agent's local workspace, agent inspects with its own tools.

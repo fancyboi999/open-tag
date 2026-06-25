@@ -362,6 +362,24 @@ export async function createMessage(opts: {
 
 /** Target resolution: #name / dm:@name / thread #name:shortid or dm:@name:shortid.
  *  Thread suffix shortid = 8-char short id of the parent message → resolve/create the thread channel for that parent message (thread = standalone channel, unified for human/agent). */
+// May this AGENT read/act in this channel? The agent-plane mirror of the human `canReadChannel` (socketio.ts):
+// a channel member, OR a public channel in the agent's server, OR a thread whose parent channel is accessible.
+// Private / DM channels the agent was never added to are refused → private content stays isolated on the agent
+// plane too (docs/authorization.md invariant 4). resolveTarget / resolveMessageId / findParent all gate on this,
+// so every channel-touching /agent-api/* endpoint inherits the boundary at once.
+export async function canAgentReadChannel(serverId: string, channelId: string, agentId: string): Promise<boolean> {
+  const member = (await db.select().from(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, channelId), eq(schema.channelMembers.memberType, "agent"), eq(schema.channelMembers.memberId, agentId))))[0];
+  if (member) return true;
+  const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, channelId)))[0];
+  if (!ch || ch.serverId !== serverId || ch.deletedAt) return false;
+  if (ch.type === "channel") return true;                                  // public channel: any agent in the server
+  if (ch.parentMessageId) {                                                // thread: visibility follows its parent message's channel
+    const parent = (await db.select().from(schema.messages).where(eq(schema.messages.id, ch.parentMessageId)))[0];
+    if (parent) return canAgentReadChannel(serverId, parent.channelId, agentId); // depth 1 (a parent channel is never itself a thread)
+  }
+  return false;                                                            // private / DM the agent is not a member of
+}
+
 export async function resolveTarget(serverId: string, target: string, selfAgentId: string): Promise<{ channelId: string; threadId: string | null } | null> {
   let t = target.trim();
   let threadShort: string | null = null;
@@ -386,6 +404,10 @@ export async function resolveTarget(serverId: string, target: string, selfAgentI
     baseChannelId = ch?.id ?? null;
   }
   if (!baseChannelId) return null;
+  // Agent ACL: the agent may only resolve a channel it can access (public, a DM it just (g)ot, or a private it
+  // was added to). Blocks resolving a private channel by name the agent was never invited to. A DM is created
+  // above with the agent as a participant, so it always passes here.
+  if (!(await canAgentReadChannel(serverId, baseChannelId, selfAgentId))) return null;
   // 2) No thread suffix → base channel; has suffix → find parent message (short id prefix) → thread channel of that parent message
   if (!threadShort) return { channelId: baseChannelId, threadId: null };
   const parent = (await db.select().from(schema.messages).where(and(eq(schema.messages.serverId, serverId), eq(schema.messages.channelId, baseChannelId), like(sql`${schema.messages.id}::text`, threadShort.toLowerCase() + "%"))))[0];
@@ -483,18 +505,23 @@ export async function convertMessageToTask(serverId: string, messageId: string, 
  * Full uuid → verify existence; short id (6+ hex) → prefix match; neither → null (caller returns 404, never 500).
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export async function resolveMessageId(serverId: string, idOrShort: string | undefined | null): Promise<string | null> {
+// Resolve a (short or full) message id within a server. ALWAYS pass `agentId` when called on the agent plane
+// (/agent-api/*): without it the channel ACL is skipped, so an agent could resolve a message in a channel it
+// cannot access. The optional default exists only for non-agent internal callers (there are none today).
+export async function resolveMessageId(serverId: string, idOrShort: string | undefined | null, agentId?: string): Promise<string | null> {
   const s = (idOrShort ?? "").trim().toLowerCase();
   if (!s) return null;
+  let m: { id: string; channelId: string } | undefined;
   if (UUID_RE.test(s)) {
-    const m = (await db.select({ id: schema.messages.id }).from(schema.messages).where(and(eq(schema.messages.id, s), eq(schema.messages.serverId, serverId))))[0];
-    return m?.id ?? null;
+    m = (await db.select({ id: schema.messages.id, channelId: schema.messages.channelId }).from(schema.messages).where(and(eq(schema.messages.id, s), eq(schema.messages.serverId, serverId))))[0];
+  } else if (/^[0-9a-f]{6,}$/.test(s)) {
+    m = (await db.select({ id: schema.messages.id, channelId: schema.messages.channelId }).from(schema.messages).where(and(like(sql`${schema.messages.id}::text`, s + "%"), eq(schema.messages.serverId, serverId))).limit(1))[0];
   }
-  if (/^[0-9a-f]{6,}$/.test(s)) {
-    const m = (await db.select({ id: schema.messages.id }).from(schema.messages).where(and(like(sql`${schema.messages.id}::text`, s + "%"), eq(schema.messages.serverId, serverId))).limit(1))[0];
-    return m?.id ?? null;
-  }
-  return null;
+  if (!m) return null;
+  // Agent ACL: on the agent plane (agentId passed), only resolve a message in a channel the agent can access —
+  // otherwise an agent could probe/react/claim any message in the server by its (short) id.
+  if (agentId && !(await canAgentReadChannel(serverId, m.channelId, agentId))) return null;
+  return m.id;
 }
 
 export async function claimTask(serverId: string, messageId: string, assigneeType: "user" | "agent", assigneeId: string) {
