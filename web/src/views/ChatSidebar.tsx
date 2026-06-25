@@ -66,7 +66,7 @@ export function ChatSidebar() {
         return (
         <button key={c.id} className={"item" + (c.id === channelId ? " active" : "")} onClick={() => nav(`/s/${slug}/channel/${c.id}`)}>
           <Avatar seed={c.peerDisplayName || c.peerName || c.peerId || c.id} url={avFor(c.peerAvatarUrl)} size={20} /><span className="grow">{c.peerDisplayName || c.peerName || t("sidebar.unknownUser")}</span>
-          {a?.activity && a.activity !== "offline" && <span className={"dot " + a.activity} title={a.activityDetail || a.activity} />}
+          {a && <span className={"dot " + (a.activity || "offline")} role="img" aria-label={t("members.statusLabel", { status: a.activity || "offline" })} title={a.activityDetail || a.activity || "offline"} />}
           {!!unread[c.id] && <span className="badge">{unread[c.id]}</span>}
         </button>
         );
