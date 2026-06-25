@@ -1,5 +1,5 @@
 // Pure query-param parsing for the channel-messages pagination route (GET /api/messages/channel/:id).
-// Dependency-free (no db) so it unit-tests in isolation; routes-api.ts is the only consumer.
+// Dependency-free (no db) so it unit-tests in isolation; routes-api/messages.ts is the only consumer.
 // `before` is a keyset cursor on the globally-monotonic message `seq` (Redis INCR per server): only messages
 // with seq < before are returned (the older page). A garbage/empty/non-positive cursor parses to null so the
 // route falls back to the latest page instead of applying a NaN filter that would return nothing.
