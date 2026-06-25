@@ -82,6 +82,6 @@ export async function resolveAgent(token: string | null, agentId: string | null)
   // delete too — defense in depth). Without this, a deleted agent's still-running process keeps full access.
   const agent = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agentId), isNull(schema.agents.deletedAt))))[0];
   if (!agent || !agent.agentTokenHash) return null;
-  if (hashToken(token) === agent.agentTokenHash) return agent;
+  if (safeEqual(hashToken(token), agent.agentTokenHash)) return agent;
   return null;
 }

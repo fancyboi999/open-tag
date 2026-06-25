@@ -3,7 +3,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import type { Server } from "node:http";
 import { and, desc, eq, notInArray } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
-import { BOOTSTRAP_KEY, hashToken } from "./auth.js";
+import { BOOTSTRAP_KEY, hashToken, safeEqual } from "./auth.js";
 import { registerDaemon, unregisterDaemon, resolveDaemonRequest, registerMachineConn, unregisterMachineConn } from "./daemonHub.js";
 import { publish } from "./realtime.js";
 import { createLogger } from "../log.js";
@@ -26,7 +26,7 @@ export function attachWs(server: Server): void {
 async function onDaemon(ws: WebSocket, key: string): Promise<void> {
   let serverId: string | null = null;
   let machineId: string | null = null;
-  if (key === BOOTSTRAP_KEY) {
+  if (safeEqual(key, BOOTSTRAP_KEY)) {
     serverId = (await db.select().from(schema.servers).where(eq(schema.servers.slug, "open-tag")))[0]?.id ?? null;
   } else {
     serverId = (await db.select().from(schema.machines).where(eq(schema.machines.apiKeyHash, hashToken(key))))[0]?.serverId ?? null;
@@ -35,7 +35,7 @@ async function onDaemon(ws: WebSocket, key: string): Promise<void> {
     // A missing sk_machine_* row is a permanent rejection (key deleted or never existed) → signal the daemon
     // to stop hammering and tell its operator. A missing bootstrap server row is a not-yet-seeded race, so a
     // plain close lets the daemon retry on its normal backoff once seeding completes.
-    if (key !== BOOTSTRAP_KEY) ws.close(MACHINE_REJECTED_CODE, "unknown or removed machine key");
+    if (!safeEqual(key, BOOTSTRAP_KEY)) ws.close(MACHINE_REJECTED_CODE, "unknown or removed machine key");
     else ws.close();
     return;
   }
@@ -84,7 +84,7 @@ async function onReady(serverId: string, key: string, msg: any): Promise<string>
   // falling back to hostname (os.hostname() flips between .local and IP on macOS, so it can't be the sole key, otherwise a restart spawns an orphan machine).
   const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   let existing: typeof schema.machines.$inferSelect | undefined;
-  if (key === BOOTSTRAP_KEY) {
+  if (safeEqual(key, BOOTSTRAP_KEY)) {
     if (typeof msg.machineId === "string" && uuidRe.test(msg.machineId)) {
       existing = (await db.select().from(schema.machines).where(and(eq(schema.machines.serverId, serverId), eq(schema.machines.id, msg.machineId))))[0];
     }
