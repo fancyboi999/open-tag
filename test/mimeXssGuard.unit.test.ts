@@ -164,3 +164,16 @@ test("safeDownloadHeaders: filename is RFC 5987 encoded in content-disposition",
   const h = safeDownloadHeaders("image/jpeg", "héllo wörld.jpg");
   assert.match(h["content-disposition"], /filename\*=UTF-8''h%C3%A9llo%20w%C3%B6rld\.jpg/);
 });
+
+// ── nosniff header always present ───────────────────────────────────────────
+
+test("safeDownloadHeaders: x-content-type-options: nosniff on safe inline type", () => {
+  const h = safeDownloadHeaders("image/jpeg", "photo.jpg");
+  assert.equal(h["x-content-type-options"], "nosniff",
+    "nosniff must prevent browser from sniffing a declared image/jpeg as text/html");
+});
+
+test("safeDownloadHeaders: x-content-type-options: nosniff on forced attachment type", () => {
+  const h = safeDownloadHeaders("text/html", "evil.html");
+  assert.equal(h["x-content-type-options"], "nosniff");
+});

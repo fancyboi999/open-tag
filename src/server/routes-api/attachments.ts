@@ -41,15 +41,21 @@ const SAFE_INLINE_TYPES = new Set<string>([
  */
 export function safeDownloadHeaders(storedMime: string, filename: string): Record<string, string> {
   const encodedName = encodeURIComponent(filename);
+  // nosniff: instruct browsers to strictly follow the declared content-type and not sniff the
+  // file bytes. This matters even for safe inline types — e.g. a JPEG slot being served to an
+  // older browser must not be MIME-sniffed as text/html if the bytes happen to look like HTML.
+  const nosniff = { "x-content-type-options": "nosniff" };
   if (storedMime && SAFE_INLINE_TYPES.has(storedMime)) {
     return {
       "content-type": storedMime,
       "content-disposition": `inline; filename*=UTF-8''${encodedName}`,
+      ...nosniff,
     };
   }
   return {
     "content-type": "application/octet-stream",
     "content-disposition": `attachment; filename*=UTF-8''${encodedName}`,
+    ...nosniff,
   };
 }
 
