@@ -6,7 +6,18 @@
     "tasks": "Tasks",
     "members": "Members",
     "computers": "Computers",
-    "settings": "Settings"
+    "settings": "Settings",
+    "alerts": "Alerts"
+  },
+  "alerts": {
+    "title": "Notifications",
+    "count": "{{count}} item(s)",
+    "view": "View",
+    "dismiss": "Dismiss",
+    "daemonOutdatedTitle": "Outdated daemon",
+    "daemonOutdatedBody": "{{names}} — stop the daemon and reconnect to update.",
+    "machineOfflineTitle": "{{name}} is offline",
+    "machineOfflineBody": "{{count}} agent(s) on this machine can't run until it reconnects."
   },
   "settings": {
     "title": "Settings",

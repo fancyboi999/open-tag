@@ -47,6 +47,24 @@ button{font-family:inherit}
 .rail a.t:hover{background:var(--canvas-soft);color:var(--ink)}
 .rail a.t.active{background:var(--surface);border-color:var(--hair-strong);color:var(--ink);box-shadow:0 1px 2px var(--shadow-1)}
 .rail .spacer{flex:1}
+.rail a.t.alert-tab{color:var(--amber)} /* warning button stands out from the neutral nav icons; hover/active still resolve to --ink */
+/* System alert center (alerts.tsx): rail warning button → fixed notification popover. Editorial style (our tokens),
+   mirroring .sw-pop's rail-anchored overlay; deliberately not a brutalist black-border card. */
+.alert-backdrop{position:fixed;inset:0;z-index:40}
+.alert-pop{position:fixed;z-index:41;width:320px;max-height:60vh;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;box-shadow:0 12px 36px var(--shadow-4);overflow:hidden}
+.alert-pop-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--hair);flex:none}
+.alert-pop-title{font-size:11px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
+.alert-pop-count{margin-left:auto;font-size:12px;color:var(--muted-soft)}
+.alert-list{list-style:none;margin:0;padding:0;overflow-y:auto;min-height:0}
+.alert-item{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--hair)}
+.alert-item:last-child{border-bottom:0}
+.alert-ic{flex:none;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--mention);color:var(--amber)}
+.alert-body{min-width:0;flex:1}
+.alert-item-title{font-size:14px;font-weight:600;color:var(--ink);line-height:1.35}
+.alert-item-desc{font-size:13px;color:var(--body);margin-top:2px;line-height:1.4}
+.alert-acts{display:flex;align-items:center;gap:8px;margin-top:9px}
+.alert-dismiss{border:0;background:transparent;color:var(--muted);font-size:11px;padding:3px 6px;cursor:pointer;border-radius:6px}
+.alert-dismiss:hover{color:var(--ink);background:var(--surface-strong)}
 
 /* sidebar = flex column: .sb-scroll (scrolls) above a pinned .live-bar footer. Height comes from the .app grid cell (desktop) or the fixed drawer's top/bottom:0 (mobile @820), so .sb-scroll needs no own height. */
 .sidebar{background:var(--canvas-soft);border-right:1px solid var(--hair);display:flex;flex-direction:column;min-height:0}

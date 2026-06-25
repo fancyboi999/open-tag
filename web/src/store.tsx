@@ -25,6 +25,7 @@ interface Store {
   createServer: (name: string, slug?: string) => Promise<void>;
   logout: () => void;
   channels: Channel[]; dms: Dm[]; unread: Record<string, number>; agents: Agent[]; machines: Machine[]; humans: Human[];
+  latestDaemonVersion: string;                                    // newest published daemon version (packages/daemon); online machines below it are flagged outdated in the system-alert center
   traj: TrajItem[];                                               // global Agent Live Trace ring buffer (newest TRAJ_CAP entries); survives channel/DM switch, fed by agent:activity
   api: (m: string, p: string, b?: unknown) => Promise<any>;
   reload: () => Promise<void>;
@@ -68,6 +69,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [agents, setAgents] = useState<Agent[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
+  const [latestDaemonVersion, setLatestDaemonVersion] = useState(""); // newest published daemon version from the machines endpoint; "" until first load (→ raises no outdated alert)
   const [humans, setHumans] = useState<Human[]>([]);
   const [traj, setTraj] = useState<TrajItem[]>([]); // global live-trace feed: bounded ring buffer held here (not per Chat view) so it persists across channel/DM switches
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
@@ -90,7 +92,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try { setDms(await api("GET", "/api/channels/dm")); } catch { setDms([]); }
     try { setUnread(await api("GET", "/api/channels/unread") || {}); } catch { setUnread({}); }
     setAgents(await api("GET", "/api/agents"));
-    try { const mc = await api("GET", `/api/servers/${sidRef.current}/machines`); setMachines(mc.machines || []); } catch { setMachines([]); }
+    try { const mc = await api("GET", `/api/servers/${sidRef.current}/machines`); setMachines(mc.machines || []); setLatestDaemonVersion(mc.latestDaemonVersion || ""); } catch { setMachines([]); }
     try { setHumans(await api("GET", `/api/servers/${sidRef.current}/members`)); } catch { setHumans([]); }
   };
   const onEvent = (cb: (e: Ev) => void) => { listeners.current.add(cb); return () => { listeners.current.delete(cb); }; };
@@ -254,7 +256,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Machine online/offline → reload machine list (DB is source of truth for status/daemon version/runtimes/new rows).
       // Note: machine:status payload omits id (only forwards {online,hostname,runtimes}), so targeted row update is not possible → full reload is safest.
       sock.on("machine:status", async (p: any) => {
-        try { const mc = await api("GET", `/api/servers/${sidRef.current}/machines`); setMachines(mc.machines || []); } catch { /* keep stale value on error */ }
+        try { const mc = await api("GET", `/api/servers/${sidRef.current}/machines`); setMachines(mc.machines || []); setLatestDaemonVersion(mc.latestDaemonVersion || ""); } catch { /* keep stale value on error */ }
         dispatch({ type: "machine", ...p });
       });
       sock.on("task:created", (p: any) => (p.tasks || []).forEach((t: any) => dispatch({ type: "task", op: "created", task: t }))); // payload={channelId,tasks:[]}
@@ -266,7 +268,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; sock?.close(); if (unreadTimer) clearTimeout(unreadTimer); };
   }, []);
 
-  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, humans, traj, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, latestDaemonVersion, humans, traj, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
 }
 
 export const fmtTime = (iso?: string) => { try { return iso ? new Date(iso).toLocaleTimeString("zh-CN", { hour12: false }) : ""; } catch { return ""; } };

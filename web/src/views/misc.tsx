@@ -272,7 +272,7 @@ function ConnectMachineModal({ onClose, machine }: { onClose: () => void; machin
   };
   // Auto-close once the just-added machine's daemon comes online (store refetches machines on the machine:status socket event).
   useEffect(() => { if (res && machines.some((m) => m.id === res.id && m.status === "online")) onClose(); }, [machines, res, onClose]);
-  const cmd = res ? `npx @fancyboi999/open-tag-daemon --server-url ${window.location.origin} --api-key ${res.key}` : "";
+  const cmd = res ? `npx @fancyboi999/open-tag-daemon@latest --server-url ${window.location.origin} --api-key ${res.key}` : "";
   const copy = (text: string, tag: string) => { navigator.clipboard?.writeText(text); setCopied(tag); setTimeout(() => setCopied(""), 1500); };
   return (
     <div className="modal-bg" onClick={onClose}>
