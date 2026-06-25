@@ -18,6 +18,11 @@ test("garbage limit falls back to 50 (never NaN)", () => {
   assert.equal(parseMsgPageParams(new URLSearchParams("limit=abc")).limit, 50);
 });
 
+test("non-positive limit (0 / negative) falls back to 50 (never an empty page with hasMore=true)", () => {
+  assert.equal(parseMsgPageParams(new URLSearchParams("limit=0")).limit, 50);
+  assert.equal(parseMsgPageParams(new URLSearchParams("limit=-5")).limit, 50);
+});
+
 test("before parses a numeric keyset cursor", () => {
   assert.equal(parseMsgPageParams(new URLSearchParams("before=1500")).before, 1500);
 });

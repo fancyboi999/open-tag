@@ -174,7 +174,7 @@ export function Chat() {
     // eslint-disable-next-line
   }, [agentPanelReq]);
   useEffect(() => onEvent((e) => {
-    if (e.type === "message" && e.channelId === cur?.id) { setMsgs((m) => { const { next, trimmed } = appendWithCap(m, e.message, atBottomRef.current); if (trimmed) trimmedRef.current = true; return next; }); markRead(cur.id); }
+    if (e.type === "message" && e.channelId === cur?.id) { setMsgs((m) => { const { next, trimmed } = appendWithCap(m, e.message, atBottomRef.current && !loadingOlderRef.current); if (trimmed) trimmedRef.current = true; return next; }); markRead(cur.id); } // don't trim mid-pagination: a trim's setHasMore(true) would race the in-flight loadOlder's setHasMore — suppressing it closes the window (the next message trims instead)
     else if (e.type === "message:updated" && e.message) setMsgs((m) => m.map((x) => (x.id === e.message.id ? { ...x, ...e.message } : x))); // sync reactions and task fields
     else if (e.type === "thread:updated" && e.parentMessageId) setThreadMeta((tm) => { // live reply count update; unreadCount is approximated from the replyCount delta (socket does not carry unreadCount; the authoritative value is corrected on channel switch via GET)
       const prev = tm[e.parentMessageId]; const delta = prev ? Math.max(0, e.replyCount - prev.replyCount) : 0;

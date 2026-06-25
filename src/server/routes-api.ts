@@ -992,8 +992,10 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, url: 
     const { limit, before } = parseMsgPageParams(url.searchParams); // `before` = keyset cursor on seq → the older page (frontend scroll-to-top "load more")
     const conds = [eq(schema.messages.serverId, serverId), eq(schema.messages.channelId, cmsg[1]!)]; // serverId scope: a foreign channel UUID must not read another tenant's messages (cross-tenant read)
     if (before != null) conds.push(lt(schema.messages.seq, before)); // hits messages_channel_idx (channelId, seq) — keyset, no offset drift
-    const rows = await db.select().from(schema.messages).where(and(...conds)).orderBy(desc(schema.messages.seq)).limit(limit);
-    return (sendJson(res, 200, { messages: (await attachMentions(rows.reverse())), hasMore: rows.length === limit }), true); // hasMore: a full page ⇒ older messages may remain
+    const rows = await db.select().from(schema.messages).where(and(...conds)).orderBy(desc(schema.messages.seq)).limit(limit + 1); // +1 sentinel row: detect a further page without the exact-page-boundary false positive (mirrors the search/mentions routes)
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    return (sendJson(res, 200, { messages: (await attachMentions(page.reverse())), hasMore }), true);
   }
   if (p === "/api/messages" && method === "POST") {
     const b = await readJson(req);
