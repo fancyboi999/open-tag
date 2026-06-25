@@ -5,7 +5,7 @@ import { db, schema } from "../../db/index.js";
 import { sendJson } from "../util.js";
 
 export async function handleReminders(ctx: ServerCtx): Promise<boolean> {
-  const { req, res, url, method, p, userId, serverId } = ctx;
+  const { res, url, method, p, serverId } = ctx;
   if (p === "/api/reminders" && method === "GET") {
     const ownerAgentId = url.searchParams.get("ownerAgentId") || url.searchParams.get("agentId");
     const status = url.searchParams.get("status"); // scheduled = not yet fired

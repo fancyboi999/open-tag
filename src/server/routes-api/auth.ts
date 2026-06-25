@@ -93,13 +93,11 @@ export async function handlePublicAuth(ctx: BaseCtx): Promise<boolean> {
     const inviter = link.createdByUserId ? (await db.select().from(schema.users).where(eq(schema.users.id, link.createdByUserId)))[0] : null;
     return (sendJson(res, 200, { valid: !expired && !exhausted && !!srv, serverName: srv?.name, serverSlug: srv?.slug, inviterName: inviter?.displayName || inviter?.name || null, role: link.role }), true);
   }
-
-  // Attachment download/preview: browsers cannot set headers for anchor/img tags, so the token is passed as a query param (same approach as SSE). Placed before the auth check.
   return false;
 }
 
 export async function handleAuthedAuth(ctx: UserCtx): Promise<boolean> {
-  const { req, res, url, method, p, userId } = ctx;
+  const { req, res, method, p, userId } = ctx;
   // Accept invite (requires auth): join a workspace via a join-link token. Idempotent.
   if (p === "/api/auth/accept-invite" && method === "POST") {
     const b = await readJson(req);

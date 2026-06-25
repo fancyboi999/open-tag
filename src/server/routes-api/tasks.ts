@@ -7,7 +7,7 @@ import { readJson, sendErr, sendJson } from "../util.js";
 import { attachMentions } from "./shared.js";
 
 export async function handleTasks(ctx: ServerCtx): Promise<boolean> {
-  const { req, res, url, method, p, userId, serverId } = ctx;
+  const { req, res, method, p, userId, serverId } = ctx;
   // ---- Tasks (messages as tasks) ----
   const tch = /^\/api\/tasks\/channel\/([^/]+)$/.exec(p);
   if (tch && method === "GET") {

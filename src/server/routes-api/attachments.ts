@@ -10,6 +10,7 @@ import { bearer, sendErr, sendJson } from "../util.js";
 
 export async function handlePublicAttachmentGet(ctx: BaseCtx): Promise<boolean> {
   const { req, res, url, method, p } = ctx;
+  // Attachment download/preview: browsers cannot set headers for anchor/img tags, so the token is passed as a query param (same approach as SSE). Placed before the auth check.
   const adl = /^\/api\/attachments\/([^/]+?)(\/preview)?$/.exec(p);
   if (adl && adl[1] !== "upload" && method === "GET") {
     const uid = verifyUser(url.searchParams.get("token") ?? bearer(req));
@@ -29,7 +30,7 @@ export async function handlePublicAttachmentGet(ctx: BaseCtx): Promise<boolean> 
 }
 
 export async function handleAttachments(ctx: ServerCtx): Promise<boolean> {
-  const { req, res, url, method, p, userId, serverId } = ctx;
+  const { req, res, method, p, userId, serverId } = ctx;
   if (p === "/api/attachments/upload" && method === "POST") {
     const { fields, files } = await parseUpload(req);
     const out: any[] = [];

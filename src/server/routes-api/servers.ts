@@ -9,7 +9,7 @@ import { publish } from "../realtime.js";
 import { readJson, sendErr, sendJson } from "../util.js";
 
 export async function handleServersUserScope(ctx: UserCtx): Promise<boolean> {
-  const { req, res, url, method, p, userId } = ctx;
+  const { req, res, method, p, userId } = ctx;
   if (p === "/api/servers" && method === "GET") {
     const mems = await db.select().from(schema.serverMembers).where(eq(schema.serverMembers.userId, userId));
     const ids = mems.map((m) => m.serverId);
@@ -61,7 +61,7 @@ export async function handleServersUserScope(ctx: UserCtx): Promise<boolean> {
 }
 
 export async function handleServersServerScope(ctx: ServerCtx): Promise<boolean> {
-  const { req, res, url, method, p, userId, serverId } = ctx;
+  const { req, res, method, p, userId, serverId } = ctx;
   const rm = /^\/api\/servers\/[^/]+\/machines\/[^/]+\/runtime-models\/([^/]+)$/.exec(p);
   if (rm && method === "GET") {
     // Model candidates: codex = slugs matching codex-rs + GPT-5.5 as default; claude = Claude Code aliases;

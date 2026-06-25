@@ -8,8 +8,11 @@
 //
 // Two things here are security-load-bearing and must not be reordered casually:
 //   1. Gate order — which gate a handler sits behind IS its auth level (see docs/authorization.md).
-//   2. Gate-2 dispatch order — reproduces the former monolith's top-to-bottom evaluation so
-//      first-match disambiguation (e.g. /api/channels/saved before /api/channels/:id) is preserved.
+//   2. Gate-2 dispatch order — preserves the former monolith's EFFECTIVE first-match resolution
+//      (not its physical line order: e.g. the `/api/channels/saved` routes now live in messages.ts
+//      and are reached only after handleChannels declines them — safe because no channels.ts guard
+//      matches those paths/methods). When adding a route, check it can't be shadowed by an
+//      earlier-dispatched module's guard for the same path+method.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
