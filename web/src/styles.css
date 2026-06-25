@@ -238,6 +238,10 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .composer .astask input{margin:0;cursor:pointer;accent-color:var(--ink-2)}
 .card{border:1px solid var(--hair);border-radius:16px;background:var(--surface);padding:18px;margin-bottom:14px}
 .card h3{margin:0 0 6px;font-size:16px;color:var(--ink)} .card .meta{font-size:13px;color:var(--muted)}
+/* Clickable member card (roster → profile): same hover/focus affordance as .card.task */
+.card.card-link{cursor:pointer;transition:transform .1s,border-color .1s}
+.card.card-link:hover{transform:translateY(-1px);border-color:var(--hair-strong)}
+.card.card-link:focus-visible{outline:2px solid var(--g-sky);outline-offset:2px}
 .composer .astask.on{color:var(--ink);font-weight:600}
 .task-col{margin-bottom:20px}
 /* Task card: #channel + #number + title + bottom-right status pill, no avatar/timestamp (editorial style) */

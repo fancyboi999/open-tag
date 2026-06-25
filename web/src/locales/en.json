@@ -57,7 +57,7 @@
     "close": "Close",
     "copied": "Copied",
     "copyLink": "Copy link",
-    "rosterEmpty": "No agents yet.",
+    "rosterEmpty": "No members yet.",
     "rosterEmptyCreate": "Click the + next to Agents on the left to create one.",
     "generalAgent": "General agent",
     "loading": "Loading…",
@@ -423,6 +423,6 @@
     "workspace": "Workspace",
     "hostname": "Hostname",
     "reasoning": "Reasoning",
-    "agentsCount": "{{count}} agents"
+    "membersCount": "{{count}} members"
   }
 }

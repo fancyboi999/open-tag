@@ -57,7 +57,7 @@
     "close": "关闭",
     "copied": "已复制",
     "copyLink": "复制链接",
-    "rosterEmpty": "还没有 agent。",
+    "rosterEmpty": "暂无成员。",
     "rosterEmptyCreate": "点左侧 Agents 的 + 创建。",
     "generalAgent": "通用 agent",
     "loading": "加载中…",
@@ -423,6 +423,6 @@
     "workspace": "工作区",
     "hostname": "主机名",
     "reasoning": "推理",
-    "agentsCount": "{{count}} 个 agent"
+    "membersCount": "{{count}} 个成员"
   }
 }

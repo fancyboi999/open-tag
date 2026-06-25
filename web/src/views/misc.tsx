@@ -20,11 +20,13 @@ export function Tasks() {
   return (
     <>
       <aside className="sidebar">
+        <div className="sb-scroll">
         <div className="sb-title">{t("nav.tasks")}</div>
         <div className="sec">{t("misc.tasksScope")}</div>
         <button className={"item" + (scope === "server" ? " active" : "")} onClick={() => nav(`/s/${slug}/tasks/server`)}><Star size={14} /><span className="grow">{t("misc.tasksAll")}</span></button>
         <div className="sec">{t("common.channels")}</div>
         {channels.filter((c) => c.type !== "dm").map((c) => <button key={c.id} className={"item" + (c.id === scope ? " active" : "")} onClick={() => nav(`/s/${slug}/tasks/${c.id}`)}># {c.name}</button>)}
+        </div>
       </aside>
       <main className="content-col">
         <div className="head"><h1>{t("nav.tasks")}</h1><small>{scope === "server" ? t("misc.tasksAllCross") : cur ? "# " + cur.name : ""}</small></div>
@@ -124,6 +126,7 @@ export function Inbox() {
   return (
     <>
       <aside className="sidebar">
+        <div className="sb-scroll">
         <div className="sb-title">{t("misc.inboxTitle")}</div>
         <div className="sec">{t("misc.inboxFilter")}</div>
         {INBOX_FILTERS.map((f) => (
@@ -131,6 +134,7 @@ export function Inbox() {
             <span className="grow">{t(f.label)}</span>
           </button>
         ))}
+        </div>
       </aside>
       <main className="content-col">
         <div className="head"><h1>{t("misc.inboxTitle")}</h1><small>{loading ? t("misc.inboxLoading") : t("misc.inboxSummary", { count: listCount, filter: curFilterLabel })}</small></div>
@@ -202,6 +206,7 @@ export function Computers() {
   return (
     <>
       <aside className="sidebar">
+        <div className="sb-scroll">
         <div className="sb-title">{t("misc.computersTitle")}</div>
         <div className="sec">{t("misc.computersMachines")} <span className="cnt">{machines.length}</span><button className="addbtn" title={t("misc.computersConnectBtn")} onClick={() => setConnect(true)}>+</button></div>
         {machines.length ? machines.map((m) => (
@@ -209,6 +214,7 @@ export function Computers() {
             <IconMonitor size={15} /><span className="grow">{m.name || m.hostname}</span><span className={"dot " + (m.status === "online" ? "online" : "")} />
           </button>
         )) : <div className="empty">{t("misc.computersNoMachine")}</div>}
+        </div>
       </aside>
       <main className="content-col">
         {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll"><div className="empty">{t("misc.computersNoMachineHint")}</div></div></>
@@ -351,7 +357,7 @@ export function Search() {
   }, [q]);
   return (
     <>
-      <aside className="sidebar"><div className="sb-title">{t("nav.search")}</div><div className="empty">{t("misc.searchSidebarHint")}</div></aside>
+      <aside className="sidebar"><div className="sb-scroll"><div className="sb-title">{t("nav.search")}</div><div className="empty">{t("misc.searchSidebarHint")}</div></div></aside>
       <main className="content-col">
         <div className="head"><h1>{t("nav.search")}</h1><small>{searched ? t("misc.searchResults", { count: results.length }) : ""}</small></div>
         <div className="scroll">
@@ -387,8 +393,10 @@ export function Settings() {
   return (
     <>
       <aside className="sidebar">
+        <div className="sb-scroll">
         <div className="sb-title">{t("nav.settings")}</div>
         <div className="settings-nav">{SETTINGS.map(([k, labelKey]) => <button key={k} className={"item" + (cur === k ? " active" : "")} onClick={() => nav(`/s/${slug}/settings/${k}`)}>{t(labelKey)}</button>)}</div>
+        </div>
       </aside>
       <main className="content-col">
         <div className="head"><h1>{t("misc.settingsTitle", { section: curLabel })}</h1></div>

@@ -36,6 +36,7 @@ export function Members() {
   return (
     <>
       <aside className="sidebar">
+        <div className="sb-scroll">
         <div className="sb-title">{t("nav.members")}</div>
         <div className="sec">{t("common.agents")} <span><span className="cnt">{agents.length}</span> {capabilities.manageAgents && <button className="addbtn" title={t("members.createAgent")} onClick={() => setModal(true)}>+</button>}</span></div>
         {Object.keys(byMachine).map((k) => (
@@ -54,9 +55,10 @@ export function Members() {
             <Avatar seed={u.name} url={avFor(u.avatarUrl)} size={20} /><span className="grow">{u.displayName || u.name}</span>
           </button>
         ))}
+        </div>
       </aside>
       <main className="content-col">
-        {userId ? <HumanProfile uid={userId} /> : agentId ? <AgentProfile id={agentId} onDeleted={() => nav(`/s/${slug}/agent`)} /> : <Roster agents={agents} onCreate={() => setModal(true)} canCreate={!!capabilities.manageAgents} />}
+        {userId ? <HumanProfile uid={userId} /> : agentId ? <AgentProfile id={agentId} onDeleted={() => nav(`/s/${slug}/agent`)} /> : <Roster agents={agents} humans={humans} onCreate={() => setModal(true)} canCreate={!!capabilities.manageAgents} />}
       </main>
       {modal && <CreateAgentModal onClose={() => setModal(false)} />}
       {inviteModal && <InviteHumanModal onClose={() => setInviteModal(false)} />}
@@ -94,22 +96,45 @@ function InviteHumanModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Roster({ agents, onCreate, canCreate }: { agents: any[]; onCreate: () => void; canCreate?: boolean }) {
+// Members roster: agents + humans as two labelled sections (mirrors the left sidebar order),
+// every card a navigable entry into that member's profile (agent → /agent/:id, human → /human/:userId).
+function Roster({ agents, humans, onCreate, canCreate }: { agents: any[]; humans: any[]; onCreate: () => void; canCreate?: boolean }) {
   const { t } = useTranslation();
-  const { attachmentUrl } = useStore();
+  const { attachmentUrl, slug } = useStore();
+  const nav = useNavigate();
+  const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
+  const total = agents.length + humans.length;
+  const goKey = (e: React.KeyboardEvent, to: string) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nav(to); } };
   return (
     <>
-      <div className="head"><h1>{t("nav.members")}</h1><small>{t("common.agentsCount", { count: agents.length })}</small></div>
+      <div className="head"><h1>{t("nav.members")}</h1><small>{t("common.membersCount", { count: total })}</small></div>
       <div className="scroll">
-        {agents.length === 0 ? <div className="empty">{t("members.rosterEmpty")}{canCreate && <> {t("members.rosterEmptyCreate")} <button className="addbtn" onClick={onCreate}>+</button></>}</div>
-          : agents.map((a) => (
-            <div className="card" key={a.id}>
-              <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={a.name} url={resolveAvatar(a.avatarUrl, attachmentUrl)} size={24} />{a.displayName || a.name} <small className="meta">@{a.name}</small></h3>
-              <div className="meta">{a.description || t("members.generalAgent")}</div>
-              <div className="kv"><b>{t("common.runtime")}</b> {a.runtime} · {a.model || ""}</div>
-              <div className="kv"><b>{t("common.status")}</b> {statusOf(a)}</div>
-            </div>
-          ))}
+        {total === 0 ? <div className="empty">{t("members.rosterEmpty")}{canCreate && <> {t("members.rosterEmptyCreate")} <button className="addbtn" onClick={onCreate}>+</button></>}</div>
+          : <>
+            {agents.length > 0 && <div className="sec">{t("common.agents")} <span className="cnt">{agents.length}</span></div>}
+            {agents.map((a) => {
+              const to = `/s/${slug}/agent/${a.id}`;
+              return (
+                <div className="card card-link" key={a.id} role="button" tabIndex={0} onClick={() => nav(to)} onKeyDown={(e) => goKey(e, to)}>
+                  <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={24} />{a.displayName || a.name} <small className="meta">@{a.name}</small></h3>
+                  <div className="meta">{a.description || t("members.generalAgent")}</div>
+                  <div className="kv"><b>{t("common.runtime")}</b> {a.runtime} · {a.model || ""}</div>
+                  <div className="kv"><b>{t("common.status")}</b> {statusOf(a)}</div>
+                </div>
+              );
+            })}
+            {humans.length > 0 && <div className="sec">{t("common.humans")} <span className="cnt">{humans.length}</span></div>}
+            {humans.map((u) => {
+              const to = `/s/${slug}/human/${u.userId}`;
+              return (
+                <div className="card card-link" key={u.userId} role="button" tabIndex={0} onClick={() => nav(to)} onKeyDown={(e) => goKey(e, to)}>
+                  <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={u.name} url={avFor(u.avatarUrl)} size={24} />{u.displayName || u.name} <small className="meta">@{u.name}</small></h3>
+                  <div className="meta">{u.description || t("members.noDescription")}</div>
+                  <div className="kv"><b>{t("members.role")}</b> {u.role || "member"}</div>
+                </div>
+              );
+            })}
+          </>}
       </div>
     </>
   );
