@@ -132,6 +132,8 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
     if (!emoji) return (sendErr(res, 400, "emoji required"), true);
     const m = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, react[1]!), eq(schema.messages.serverId, serverId))))[0];
     if (!m) return (sendErr(res, 404, "message not found"), true);
+    // invariant 3: non-members must not react to messages in private/DM channels (IDOR-B2)
+    if (!(await canUserReadChannel(serverId, m.channelId, userId))) return (sendErr(res, 404, "message not found"), true);
     const out = method === "POST" ? await addReaction(serverId, react[1]!, "user", userId, emoji) : await removeReaction(serverId, react[1]!, "user", userId, emoji);
     return (sendJson(res, 200, out), true);
   }

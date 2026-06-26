@@ -6,6 +6,7 @@ import { requireCap } from "../capabilities.js";
 import { getOrCreateDM, getOrCreateThread } from "../core.js";
 import { publish } from "../realtime.js";
 import { readJson, sendErr, sendJson } from "../util.js";
+import { canUserReadChannel } from "../channelAccess.js";
 import { userChannels } from "./shared.js";
 
 export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
@@ -180,6 +181,8 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     // before enumerating its members — otherwise a foreign channel UUID leaks its roster.
     const own = (await db.select({ id: schema.channels.id }).from(schema.channels).where(and(eq(schema.channels.id, cmem[1]!), eq(schema.channels.serverId, serverId))))[0];
     if (!own) return (sendErr(res, 404, "channel not found"), true);
+    // invariant 3: private/DM channel member list must not be accessible to non-members (IDOR-B2)
+    if (!(await canUserReadChannel(serverId, cmem[1]!, userId))) return (sendErr(res, 404, "channel not found"), true);
     const rows = await db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, cmem[1]!));
     const aIds = rows.filter((r) => r.memberType === "agent").map((r) => r.memberId);
     const uIds = rows.filter((r) => r.memberType === "user").map((r) => r.memberId);
@@ -214,6 +217,8 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   // Attachment upload (multipart, fields: files + channelId) → save to disk + insert attachment row (messageId is backfilled when the message is sent)
   const cfiles = /^\/api\/channels\/([^/]+)\/files$/.exec(p);
   if (cfiles && method === "GET") {
+    // invariant 3: private/DM channel file list must not be accessible to non-members (IDOR-B2)
+    if (!(await canUserReadChannel(serverId, cfiles[1]!, userId))) return (sendErr(res, 404, "channel not found"), true);
     const rows = await db.select().from(schema.attachments).where(and(eq(schema.attachments.channelId, cfiles[1]!), eq(schema.attachments.serverId, serverId), isNotNull(schema.attachments.messageId))).orderBy(desc(schema.attachments.createdAt)).limit(100); // serverId scope: don't list another tenant's channel files by raw channel UUID
     const aIds = rows.filter((r) => r.uploaderType === "agent" && r.uploaderId).map((r) => r.uploaderId!) as string[];
     const uIds = rows.filter((r) => r.uploaderType === "user" && r.uploaderId).map((r) => r.uploaderId!) as string[];
