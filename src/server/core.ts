@@ -60,6 +60,31 @@ export async function channelMembers(channelId: string): Promise<Member[]> {
   return out;
 }
 
+/** Highest message seq currently in a channel (0 if empty). seq is globally monotonic (Redis INCR), so this is
+ *  the channel's read "watermark" at this instant — any message that arrives later has a strictly higher seq. */
+export async function channelMaxSeq(channelId: string): Promise<number> {
+  const [r] = await db.select({ seq: schema.messages.seq }).from(schema.messages)
+    .where(eq(schema.messages.channelId, channelId)).orderBy(desc(schema.messages.seq)).limit(1);
+  return r?.seq ?? 0;
+}
+
+/** Add channel members. An AGENT joins "caught up" at the channel watermark (its lastReadSeq starts at the
+ *  channel's current max seq), so its first `open-tag message check` surfaces only messages sent AFTER it
+ *  joined — not the channel's pre-join backlog (which it can still pull on demand via `message read`). Without
+ *  this, a fresh member's lastReadSeq=0 makes every prior message "unread", flooding a newly created or newly
+ *  invited agent with the whole channel history it never needed. A USER keeps lastReadSeq=0 — the human UI
+ *  intentionally surfaces channel history as unread on join (unchanged behaviour). Pass `watermark` to override
+ *  the agent watermark (the @-mention path passes triggeringSeq-1 so the triggering message stays unread);
+ *  `watermark` is a no-op for an all-user batch (users are always pinned to 0). Idempotent via
+ *  onConflictDoNothing: re-adding an existing member never rewinds or fast-forwards a real read cursor. */
+export async function addChannelMembers(channelId: string, members: { type: "user" | "agent"; id: string }[], opts?: { watermark?: number }): Promise<void> {
+  if (!members.length) return;
+  const wm = members.some((m) => m.type === "agent") ? (opts?.watermark ?? await channelMaxSeq(channelId)) : 0;
+  await db.insert(schema.channelMembers)
+    .values(members.map((m) => ({ channelId, memberType: m.type, memberId: m.id, lastReadSeq: m.type === "agent" ? wm : 0 })))
+    .onConflictDoNothing();
+}
+
 export function parseMentions(content: string, members: Member[]) {
   const found = new Map<string, Member>();
   const re = /@([A-Za-z0-9_\u4e00-\u9fa5-]+)/g;
@@ -120,10 +145,12 @@ async function mentionAutoJoinPool(serverId: string, ch: typeof schema.channels.
 
 /** Add @-mentioned non-members to a channel, drawn from `pool` (its @-reach — see mentionAutoJoinPool); returns
  *  those added. Idempotent via onConflictDoNothing; broadcasts a membership update so every client refreshes. */
-async function autoJoinMentioned(serverId: string, channelId: string, content: string, current: Member[], pool: Member[]): Promise<Member[]> {
+async function autoJoinMentioned(serverId: string, channelId: string, content: string, current: Member[], pool: Member[], watermark: number): Promise<Member[]> {
   const toAdd = membersToAutoJoin(content, pool, current);
   if (!toAdd.length) return [];
-  await db.insert(schema.channelMembers).values(toAdd.map((m) => ({ channelId, memberType: m.type, memberId: m.id }))).onConflictDoNothing();
+  // watermark = triggeringSeq-1: the @ message that pulled them in stays unread (the agent must see the @), but
+  // the channel's prior backlog is marked read so an auto-joined agent isn't flooded with history on first check.
+  await addChannelMembers(channelId, toAdd.map((m) => ({ type: m.type, id: m.id })), { watermark });
   await publish(serverId, { type: "channel:members-updated", channelId });
   return toAdd;
 }
@@ -308,7 +335,7 @@ export async function createMessage(opts: {
   // so @-ing a teammate who hasn't replied in the thread yet still wakes them. Public channel → whole
   // workspace; private/dm (and their threads) → existing members only, so an @ to a non-member stays a no-op.
   if (ch && opts.senderType !== "system" && opts.content.includes("@")) {
-    const joined = await autoJoinMentioned(opts.serverId, opts.channelId, opts.content, members, await mentionAutoJoinPool(opts.serverId, ch));
+    const joined = await autoJoinMentioned(opts.serverId, opts.channelId, opts.content, members, await mentionAutoJoinPool(opts.serverId, ch), seq - 1);
     if (joined.length) members = [...members, ...joined];
   }
   const mentions = parseMentions(opts.content, members);
