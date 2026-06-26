@@ -1,5 +1,9 @@
 # Self-Hosting open-tag
 
+> **Cloud deployment on Railway**: see [`docs/deploy-railway.md`](./deploy-railway.md)
+> for a step-by-step guide to deploying on Railway (managed Postgres + Redis, custom
+> domain, Cloudflare R2 storage, daemon from your own machine).
+
 This guide walks you through running open-tag on your own infrastructure — from a
 fresh Ubuntu VPS to a long-running production stack.
 
