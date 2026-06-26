@@ -30,9 +30,9 @@ const MARKETING_ORIGINS = new Set(["https://getopentag.com", "https://www.getope
 const DIALOGUE_LOTTIE_URL = "https://cdn.prod.website-files.com/6889473510b50328dbb70ae6/69423930508a9aa8996cc590_Object-Dialogue.lottie";
 const DOT_LOTTIE_PLAYER_SRC = "https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs";
 
-type Lang = "en" | "zh";
+export type Lang = "en" | "zh";
 
-type FeatureCase = {
+export type FeatureCase = {
   id: string;
   nav: string;
   eyebrow: string;
@@ -81,11 +81,11 @@ function docsUrl(): string {
   return MARKETING_ORIGINS.has(origin) ? "https://docs.getopentag.com/" : `${origin}/docs/`;
 }
 
-function currentLang(language?: string): Lang {
+export function currentLang(language?: string): Lang {
   return language?.toLowerCase().startsWith("zh") ? "zh" : "en";
 }
 
-const COPY: Record<Lang, FeatureCopy> = {
+export const COPY: Record<Lang, FeatureCopy> = {
   en: {
     nav: {
       features: "Features",

@@ -498,9 +498,13 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .file-thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;flex:none;background:var(--surface-strong)}
 /* Message emoji reactions */
 .msg-rx{display:flex;align-items:center;gap:5px;margin-top:5px;flex-wrap:wrap}
-.rx-chip{display:inline-flex;align-items:center;gap:4px;font-size:13px;line-height:1;padding:3px 8px;border:1px solid var(--hair-strong);border-radius:9999px;background:var(--surface);color:var(--body);cursor:pointer}
+.rx-chip{position:relative;display:inline-flex;align-items:center;gap:4px;font-size:13px;line-height:1;padding:3px 8px;border:1px solid var(--hair-strong);border-radius:9999px;background:var(--surface);color:var(--body);cursor:pointer}
 .rx-chip:hover{background:var(--surface-strong)}
 .rx-chip.on{background:var(--tint-blue);border-color:var(--g-sky);color:var(--ink);font-weight:600}
+/* "who reacted" hover tooltip on a reaction chip — replaces the native title (slow/unstyled/absent on touch). Reuses the popover skin (.agent-hovercard / .rx-pop tokens). */
+.rx-tip{position:absolute;bottom:100%;left:50%;transform:translateX(-50%) translateY(2px);margin-bottom:7px;width:max-content;max-width:220px;white-space:normal;font-size:12px;line-height:1.35;font-weight:400;color:var(--ink-2);background:var(--surface);border:1px solid var(--hair-strong);border-radius:8px;box-shadow:0 8px 24px var(--shadow-3);padding:6px 9px;opacity:0;pointer-events:none;transition:opacity var(--dur-fast) var(--ease-quint),transform var(--dur-fast) var(--ease-quint);z-index:60}
+.rx-chip:hover .rx-tip,.rx-chip:focus-visible .rx-tip{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (prefers-reduced-motion:reduce){.rx-tip{transition:none}}
 .rx-add-wrap{position:relative;display:inline-flex}
 .rx-add{font-size:13px;line-height:1;padding:3px 7px;border:1px solid var(--hair);border-radius:9999px;background:var(--surface);color:var(--muted-soft);cursor:pointer;opacity:0;transition:opacity .12s}
 .msg:hover .rx-add,.rx-add:focus{opacity:1}

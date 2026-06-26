@@ -4,7 +4,7 @@ import { and, eq, ne, gt, lt, inArray, asc, desc, ilike, like, sql, isNull } fro
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, agentIdHeader } from "./util.js";
 import { resolveAgent } from "./auth.js";
-import { createMessage, resolveTarget, channelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG } from "./core.js";
+import { createMessage, resolveTarget, channelMembers, addChannelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG } from "./core.js";
 import { agentHasScope } from "./scopes.js";
 import { parseUpload } from "./attachments.js";
 import { readObject } from "./storage.js";
@@ -252,7 +252,9 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     // existing member must add the agent (mirrors the human self-join guard). Prevents an agent walking into a
     // private channel by name.
     if (ch.type !== "channel") return (sendErr(res, 403, "this channel is invite-only — an admin or member must add the agent"), true);
-    await db.insert(schema.channelMembers).values({ channelId: ch.id, memberType: "agent", memberId: agent.id }).onConflictDoNothing();
+    // Join at the channel watermark so a self-joining agent's next `message check` sees only new messages, not
+    // the channel's pre-join backlog (it can pull history on demand via `message read`).
+    await addChannelMembers(ch.id, [{ type: "agent", id: agent.id }]);
     return (sendJson(res, 200, { ok: true, joined: name }), true);
   }
 

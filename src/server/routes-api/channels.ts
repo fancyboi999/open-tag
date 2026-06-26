@@ -3,7 +3,7 @@ import type { ServerCtx } from "./ctx.js";
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { requireCap } from "../capabilities.js";
-import { getOrCreateDM, getOrCreateThread } from "../core.js";
+import { addChannelMembers, getOrCreateDM, getOrCreateThread } from "../core.js";
 import { publish } from "../realtime.js";
 import { readJson, sendErr, sendJson } from "../util.js";
 import { canUserReadChannel } from "../channelAccess.js";
@@ -225,7 +225,9 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     const b = await readJson(req);
     const mt = b.userId ? "user" : "agent"; const mid = b.userId || b.agentId;
     if (!mid) return (sendErr(res, 400, "agentId or userId required"), true);
-    await db.insert(schema.channelMembers).values({ channelId: cmem[1]!, memberType: mt, memberId: mid }).onConflictDoNothing();
+    // An agent invited into an existing channel joins at its watermark (no pre-join backlog flood on first
+    // `message check`); a user keeps lastReadSeq=0 so the UI still shows channel history as unread. See addChannelMembers.
+    await addChannelMembers(cmem[1]!, [{ type: mt, id: mid }]);
     await publish(serverId, { type: "channel:members-updated", channelId: cmem[1]! }); // realtime: membership change → all clients refresh member/channel list and new member joins the room (G-E)
     return (sendJson(res, 200, { ok: true }), true);
   }
@@ -268,7 +270,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     const type = (b.visibility === "private" || b.type === "private") ? "private" : "channel";
     const [ch] = await db.insert(schema.channels).values({ serverId, name, description: b.description ?? null, type }).returning();
     // Initial members: creator + body.agentIds/userIds (validated against the same server before inserting into channel_members)
-    const rows: { channelId: string; memberType: string; memberId: string }[] = [{ channelId: ch!.id, memberType: "user", memberId: userId }];
+    const rows: { channelId: string; memberType: "user" | "agent"; memberId: string }[] = [{ channelId: ch!.id, memberType: "user", memberId: userId }];
     const agentIds = Array.isArray(b.agentIds) ? b.agentIds.filter(Boolean) : [];
     const userIds = Array.isArray(b.userIds) ? b.userIds.filter(Boolean) : [];
     if (agentIds.length) {
@@ -279,7 +281,10 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
       const valid = await db.select().from(schema.serverMembers).where(and(eq(schema.serverMembers.serverId, serverId), inArray(schema.serverMembers.userId, userIds)));
       for (const m of valid) if (m.userId !== userId) rows.push({ channelId: ch!.id, memberType: "user", memberId: m.userId });
     }
-    await db.insert(schema.channelMembers).values(rows).onConflictDoNothing();
+    // Channel is brand-new (no messages yet → watermark is 0), but route through the same helper so every
+    // agent membership insert shares one watermark-aware path instead of a raw insert that could drift.
+    // Pass watermark:0 explicitly (it IS 0 on an empty channel) to skip a pointless channelMaxSeq roundtrip.
+    await addChannelMembers(ch!.id, rows.map((r) => ({ type: r.memberType, id: r.memberId })), { watermark: 0 });
     return (sendJson(res, 200, { id: ch!.id, name: ch!.name, type: ch!.type }), true);
   }
   if (p === "/api/channels/dm" && method === "POST") {

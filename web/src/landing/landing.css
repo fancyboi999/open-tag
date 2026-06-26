@@ -202,6 +202,25 @@
 .lp-browser__addr span { font-family: var(--lp-font-mono); font-size: 12px; color: var(--lp-muted); background: var(--lp-surface); border: 1px solid var(--lp-border-soft); border-radius: var(--lp-radius-pill); padding: 3px 16px; }
 .lp-browser__body { height: 756px; overflow: hidden; }
 
+.lp-hero-cases { position: relative; left: 50%; transform: translateX(-50%); width: 100vw; margin: 42px 0 0; overflow: hidden; padding: 32px 0 42px; }
+.lp-hero-cases__rail { display: flex; align-items: center; gap: 0; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 16px max(72px, calc((100vw - 1080px) / 2)); }
+.lp-hero-cases__rail::-webkit-scrollbar { display: none; }
+.lp-hero-case-card { scroll-snap-align: center; flex: 0 0 min(1080px, 76vw); margin-right: -220px; border: 1px solid color-mix(in oklab, var(--lp-border), transparent 8%); border-radius: 28px; background: color-mix(in oklab, var(--lp-surface), white 24%); box-shadow: 0 24px 80px rgba(42, 35, 28, 0.18); overflow: hidden; transform-origin: center bottom; transition: transform var(--lp-motion-base) var(--lp-ease), box-shadow var(--lp-motion-base) var(--lp-ease); }
+.lp-hero-case-card--0 { transform: rotate(-1.2deg); }
+.lp-hero-case-card--1 { transform: translateY(18px) rotate(1.6deg); }
+.lp-hero-case-card--2 { transform: translateY(-8px) rotate(-1.8deg); }
+.lp-hero-case-card--3 { transform: translateY(14px) rotate(1.1deg); margin-right: 0; }
+.lp-hero-case-card:hover { transform: translateY(-4px) rotate(0deg); box-shadow: 0 28px 90px rgba(42, 35, 28, 0.22); }
+.lp-hero-case-card__copy { min-height: 86px; display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(260px, 0.64fr); align-items: center; gap: 18px; padding: 18px 24px; border-bottom: 1px solid var(--lp-border-soft); background: color-mix(in oklab, var(--lp-bg-2), white 28%); }
+.lp-hero-case-card__copy span { display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 4px 10px; border: 1px solid #c8b8e0; border-radius: var(--lp-radius-pill); background: color-mix(in oklab, #c8b8e0, white 84%); color: #6b5aa0; font-size: 12px; font-weight: 800; }
+.lp-hero-case-card__copy strong { min-width: 0; color: var(--lp-fg); font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-hero-case-card__copy p { margin: 0; color: var(--lp-muted); font-size: 13px; line-height: 1.45; }
+.lp-hero-case-card__mock { pointer-events: none; }
+.lp-hero-case-card .lp-product-shell { border-radius: 0; box-shadow: none; }
+.lp-hero-case-card .lp-product-bar { display: none; }
+.lp-hero-case-card .lp-product-app { height: 560px; }
+.lp-hero-case-card .lp-product-thread { top: 0; }
+
 /* Channel page mock: rail + channel sidebar + chat main */
 .lp-app { display: grid; grid-template-columns: 64px 224px 1fr; height: 100%; font-size: 14px; background: var(--lp-bg); text-align: left; }
 
