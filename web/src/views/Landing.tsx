@@ -167,8 +167,8 @@ export function Landing() {
           </div>
 
           {/* Product showcase: static mock, visually matched to the real open-tag app shell. */}
-          <div className="lp-browser" aria-hidden="true">
-            <ProductMock />
+          <div className="lp-browser lp-browser--static" aria-hidden="true">
+            <ProductMock threadOpen={false} />
           </div>
         </div>
       </section>

@@ -178,6 +178,7 @@
 
 /* —— Hero product showcase: macOS browser shell + recreated channel page (chat view) —— */
 .lp-browser { width: calc(100% - 40px); max-width: 1200px; margin: 64px auto 0; background: var(--lp-surface); border: 1px solid var(--lp-border); border-radius: var(--lp-radius-lg); box-shadow: var(--lp-elev-raised); overflow: hidden; }
+.lp-browser--static { pointer-events: none; }
 .lp-browser__bar { display: flex; align-items: center; gap: var(--lp-space-3); height: 42px; padding-inline: var(--lp-space-4); border-bottom: 1px solid var(--lp-border-soft); background: var(--lp-bg-2); }
 .lp-browser__dots { display: flex; gap: 7px; }
 .lp-browser__dot { width: 11px; height: 11px; border-radius: 50%; }
