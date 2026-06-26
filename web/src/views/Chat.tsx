@@ -262,13 +262,13 @@ export function Chat() {
       <ChatSidebar />
       <main className="content-col">
         <div className="head">
-          <h1>{isDm ? "@ " + (cur?.name || "") : "# " + (cur?.name || "…")}</h1>
+          <h1>{isDm ? "@ " + (cur?.name || "") : cur?.type === "showcase" ? <><Eye size={16} style={{ verticalAlign: "-3px", opacity: 0.7 }} /> {cur?.name || "…"}</> : "# " + (cur?.name || "…")}</h1>
           {dmAgent
             ? <span className="head-status"><span className={"dot " + (dmAgent.activity || "offline")} />{dmAgent.activityDetail || dmAgent.activity || "offline"}</span>
             : <small>{sub || cur?.description || ""}</small>}
           {cur && <div className="chtabs">{(isDm ? ["chat", "tasks"] : ["chat", "tasks", "files"]).map((tt) => <button key={tt} className={chatTab === tt ? "on" : ""} onClick={() => setTab(tt)}>{tt === "chat" ? t("nav.channel") : tt === "tasks" ? t("nav.tasks") : t("common.files")}</button>)}</div>}
-          {!isDm && cur && <button className="joinbtn" style={{ marginLeft: "auto" }} title={t("chat.channelMembers")} onClick={() => setShowMembers(true)}>{t("chat.members")}</button>}
-          {!isDm && cur && capabilities.manageChannels && (
+          {!isDm && cur && cur.type !== "showcase" && <button className="joinbtn" style={{ marginLeft: "auto" }} title={t("chat.channelMembers")} onClick={() => setShowMembers(true)}>{t("chat.members")}</button>}
+          {!isDm && cur && cur.type !== "showcase" && capabilities.manageChannels && (
             <button className="joinbtn" title={t("chat.channelSettings")} onClick={() => setShowEdit(true)}>⋯</button>
           )}
         </div>
@@ -284,7 +284,13 @@ export function Chat() {
                 // action card (agent proposal card) → rendered by dedicated ActionCardMsg component
                 if (m.messageType === "action" && m.actionMetadata?.kind === "action-card") return <ActionCardMsg m={m} key={m.id} />;
                 // system messages (task lifecycle events, etc.) → centered grey bar (no avatar, no full message block)
-                if (m.senderType === "system") return <div className="msg-sys" id={"m-" + m.id} key={m.id}>{m.content}</div>;
+                // If the system message has thread replies (e.g. showcase case anchors), render a thread-pill below the bar so it's clickable.
+                if (m.senderType === "system") return (
+                  <div className="msg-sys" id={"m-" + m.id} key={m.id}>
+                    <MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} />
+                    {tm?.replyCount ? <button className="thread-pill" onClick={() => startThread(m)}><MessageCircle size={12} /> {t("chat.replyCount", { count: tm.replyCount })}</button> : null}
+                  </div>
+                );
                 const staggerIdx = newMsgOrderRef.current.get(m.id);
                 const isNewMsg = staggerIdx !== undefined;
                 return (
@@ -318,14 +324,15 @@ export function Chat() {
                     <div className="msg-meta">
                         {m.taskStatus && (() => {
                           const TI = TASK_ICON[m.taskStatus] || Circle;
-                          const claimable = !m.taskAssigneeId && m.taskStatus === "todo";
+                          const isShowcase = cur?.type === "showcase";
+                          const claimable = !isShowcase && !m.taskAssigneeId && m.taskStatus === "todo";
                           const claimedByMe = m.taskAssigneeType === "user" && m.taskAssigneeId === me?.id;
                           const opts = ynOptions(m.taskStatus, manageServer, claimedByMe);
-                          const open = taskMenu === m.id;
+                          const open = !isShowcase && taskMenu === m.id;
                           return (
                             <span className="task-pill-wrap">
-                              {/* clicking the badge changes status (does not open thread; use the reply / thread button for that) */}
-                              <button className={"task-pill st-" + m.taskStatus} onClick={(e) => { e.stopPropagation(); setTaskMenu(open ? null : m.id); }} title={t("chat.taskChangeStatus", { number: m.taskNumber })}><TI size={11} /> #{m.taskNumber} {t(ST_LABEL[m.taskStatus] ?? m.taskStatus)}{taskAssignee(m)}</button>
+                              {/* clicking the badge changes status; in showcase channels the pill is a read-only label */}
+                              <button className={"task-pill st-" + m.taskStatus} onClick={(e) => { e.stopPropagation(); if (!isShowcase) setTaskMenu(open ? null : m.id); }} title={isShowcase ? undefined : t("chat.taskChangeStatus", { number: m.taskNumber })} style={isShowcase ? { cursor: "default" } : undefined}><TI size={11} /> #{m.taskNumber} {t(ST_LABEL[m.taskStatus] ?? m.taskStatus)}{taskAssignee(m)}</button>
                               {open && <div className="st-menu" onMouseLeave={() => setTaskMenu(null)}>
                                 {claimable && <button onClick={() => { setTaskMenu(null); doTask(m, "claim"); }}>{t("chat.claim")}</button>}
                                 {opts.map((s) => <button key={s} className={s === m.taskStatus ? "on" : ""} onClick={() => { setTaskMenu(null); if (s !== m.taskStatus) doTask(m, "status", { status: s }); }}><span className={"st-dot st-" + s} />{t(ST_LABEL[s])}</button>)}
@@ -342,12 +349,14 @@ export function Chat() {
               })}
             </div>
             {showJump && <button className="jump-bottom" onClick={toBottom}><ArrowDown size={14} /> {t("chat.backToBottom")}</button>}
-            <Composer
-              channelId={cur?.id ?? ""}
-              placeholder={isDm ? t("chat.dmPlaceholder", { name: cur?.name }) : t("chat.channelPlaceholder")}
-              allowAsTask
-              dmAgent={isDm ? dmAgent : undefined}
-            />
+            {cur?.type === "showcase"
+              ? <div className="showcase-readonly"><Eye size={14} />{t("chat.showcaseReadOnly")}</div>
+              : <Composer
+                  channelId={cur?.id ?? ""}
+                  placeholder={isDm ? t("chat.dmPlaceholder", { name: cur?.name }) : t("chat.channelPlaceholder")}
+                  allowAsTask
+                  dmAgent={isDm ? dmAgent : undefined}
+                />}
           </>}
       </main>
       {/* Right column = one base layer (thread, else trajectory) with a profile overlay on top. Priority: profile > thread > trajectory, so a profile opened from anywhere ("click X → show X") covers the thread; closing it reveals the thread again. */}
@@ -519,7 +528,9 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
         <div className="thread-sep">{t("chat.replyCount", { count: msgs.length })}</div>
         {msgs.map(row)}
       </div>
-      <Composer channelId={channelId} placeholder={t("chat.threadReplyPlaceholder")} className="thread-composer" />
+      {channels.find((c) => c.id === parent.channelId)?.type === "showcase"
+        ? <div className="showcase-readonly"><Eye size={14} />{t("chat.showcaseReadOnly")}</div>
+        : <Composer channelId={channelId} placeholder={t("chat.threadReplyPlaceholder")} className="thread-composer" />}
     </aside>
   );
 }
