@@ -127,6 +127,19 @@ may not have yet — once a merged-but-unmigrated partial unique index made agen
 normal deploy migrates the DB before the new code serves. **Don't hand-restart the prod server and
 skip it.** (`db:push` is additive-safe and prompts before any destructive change.)
 
+## Dependency updates (Dependabot) — keep the PR list clean, don't make the human triage
+
+Dependabot is tuned in `.github/dependabot.yml` to open **grouped, patch/minor-only** PRs
+(npm **majors are ignored**; `open-pull-requests-limit: 5`). Handle them yourself so they never pile up:
+
+- **Patch/minor groups with green CI → merge them.** This is the safe steady state; merge once
+  CI passes. Don't leave a wall of dependency PRs for the human to deal with.
+- **Major upgrades are deliberate, never auto-merged.** A green CI (typecheck/build/unit) does
+  **not** prove a major lib bump is runtime-safe (e.g. `react-router` 6→7, `zod` 3→4, `vite` 5→8).
+  Do majors in a dedicated, tested PR, or **close** the Dependabot PR with a one-line reason.
+- **One pass, list clean:** merge the safe green ones and close/defer the rest in the same sweep —
+  never blind-merge a major just because CI is green.
+
 ## Code quality (load-bearing — full text in `docs/code-quality.md`)
 
 Three rules gate every change. The **why** + full detail live in
