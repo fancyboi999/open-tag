@@ -1,6 +1,6 @@
 // Auto-extracted from the former routes-api.ts monolith — bodies are verbatim.
 import type { UserCtx, ServerCtx } from "./ctx.js";
-import { and, count, eq, gt, inArray, isNull, ne } from "drizzle-orm";
+import { and, count, eq, gt, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { hashToken, newKey } from "../auth.js";
 import { can, capabilitiesFor, requireCap } from "../capabilities.js";
@@ -243,16 +243,34 @@ export async function handleServersServerScope(ctx: ServerCtx): Promise<boolean>
     await db.update(schema.machines).set({ apiKeyHash: hashToken(key), apiKeyPrefix: key.slice(0, 14) }).where(eq(schema.machines.id, mid));
     return (sendJson(res, 200, { id: m.id, name: m.name, apiKeyPrefix: key.slice(0, 14), key }), true);
   }
-  // Delete machine: reject if agents are present, prompting removal of all agents first
+  // Delete machine: reject if live agents are present, then release soft-deleted agent FK refs
+  // before deleting. Wrapped in a transaction to reduce (but not fully eliminate under READ
+  // COMMITTED) the TOCTOU window between the live-agent check and the delete.
+  //
+  // Bug (I66): agents.machineId → machines.id FK has no onDelete action (= RESTRICT). Soft-
+  // deleted agent rows (deletedAt IS NOT NULL) still physically reference the machine. The
+  // original guard only counted WHERE deletedAt IS NULL — zero live agents → guard passed →
+  // db.delete(machines) hit FK constraint → PG 23503 → 500 "internal". Fix: null out machineId
+  // on any remaining soft-deleted agents inside the transaction before deleting the machine.
   const dmach = /^\/api\/servers\/[^/]+\/machines\/([^/]+)$/.exec(p);
   if (dmach && method === "DELETE") {
     if (!await requireCap(serverId, userId, "manageMachines")) return (sendErr(res, 403, "need manageMachines capability"), true);
     const mid = dmach[1]!;
     const m = (await db.select().from(schema.machines).where(and(eq(schema.machines.id, mid), eq(schema.machines.serverId, serverId))))[0];
     if (!m) return (sendErr(res, 404, "machine not found"), true);
-    const onIt = await db.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), eq(schema.agents.machineId, mid), isNull(schema.agents.deletedAt)));
-    if (onIt.length) return (sendErr(res, 409, `This machine still has ${onIt.length} agent(s) attached. Please remove them before deleting the machine.`, { agentCount: onIt.length }), true);
-    await db.delete(schema.machines).where(eq(schema.machines.id, mid));
+    let liveAgentCount = 0;
+    await db.transaction(async (tx) => {
+      // Re-check inside the transaction to reduce TOCTOU exposure: an agent bound between the
+      // outer machine-exists check and here will be caught by this SELECT in most cases.
+      const onIt = await tx.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), eq(schema.agents.machineId, mid), isNull(schema.agents.deletedAt)));
+      if (onIt.length) { liveAgentCount = onIt.length; return; }
+      // At this point only soft-deleted agent rows (if any) still reference this machine.
+      // Null out their machineId to release the FK before the DELETE. The `isNotNull` predicate
+      // is defensive (the SELECT above confirmed zero live agents) but makes the intent explicit.
+      await tx.update(schema.agents).set({ machineId: null }).where(and(eq(schema.agents.serverId, serverId), eq(schema.agents.machineId, mid), isNotNull(schema.agents.deletedAt)));
+      await tx.delete(schema.machines).where(eq(schema.machines.id, mid));
+    });
+    if (liveAgentCount) return (sendErr(res, 409, `This machine still has ${liveAgentCount} agent(s) attached. Please remove them before deleting the machine.`, { agentCount: liveAgentCount }), true);
     await publish(serverId, { type: "machine", online: false, machineId: mid, removed: true });
     return (sendJson(res, 200, { ok: true }), true);
   }
