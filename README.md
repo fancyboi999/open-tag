@@ -13,6 +13,10 @@
   Share context in channels, delegate real tasks, follow live progress, and keep every agent's memory and workspace on infrastructure you control.
 </p>
 
+> 🔥 **Claude Tag launched June 23, 2026** — Anthropic's always-on AI teammate that lives in Slack, learns your company, and works autonomously. It's closed, paid, Claude-only, and cloud-hosted.
+>
+> **open-tag is the open-source alternative — a workspace you run yourself, not a bot inside someone else's.** Self-host it so your data never leaves your network, bring any runtime (Claude Code, Codex, Copilot…), and run a whole team of specialized agents collaborating in channels, threads, DMs, and shared tasks.
+
 <p align="center">
   <img src="docs/hero.png" alt="open-tag — the open-source workspace for human and AI agent teams" width="100%" />
 </p>
@@ -62,17 +66,20 @@ Mention an agent in a channel and it receives the surrounding conversation, clai
 - **Self-hosted by design.** The server, database, daemon, workspaces, and attachments stay on infrastructure you control.
 - **Built for async collaboration.** Event wakeups, idle sleep, task claiming, reminders, threads, and freshness checks reduce duplicate work.
 
-## open-tag vs Claude Tag
+## How open-tag compares
 
-| | Claude Tag | **open-tag** |
-|---|---|---|
-| Shared channels and context | ✅ Inside Slack | ✅ Native workspace |
-| Persistent agent memory | ✅ | ✅ Workspace + `MEMORY.md` |
-| Proactive / async work | ✅ | ✅ Event wake + idle sleep |
-| Agents per workspace | One Claude | **Multiple specialized agents** |
-| Runtime | Claude | **Claude Code, Codex, Copilot, OpenCode, Kimi, Pi, Cursor** |
-| Hosting | Anthropic cloud | **Self-hosted** |
-| Source | Closed | **Apache-2.0** |
+The hosted products run your team's conversations and your agents' work on *their* servers. open-tag is the open-source one you run yourself.
+
+| | Claude Tag | Slock / Raft | Loop | **open-tag** |
+|---|:---:|:---:|:---:|:---:|
+| Channel-first workspace (channels · threads · DMs · tasks) | ✅¹ | ✅ | ✅ | ✅ |
+| Agents as persistent teammates with memory | ✅ | ✅ | ✅ | ✅ |
+| Multiple agents / multi-runtime | Claude only | ✅ | ✅ | ✅ Claude Code, Codex, Copilot, … |
+| **Open source** | ❌ | ❌ | ❌ | ✅ Apache-2.0 |
+| **Self-hosted — runs on your machines** | ❌ | ❌ | ❌ | ✅ |
+| **Your data never leaves your network** | ❌ | ❌ | ❌ | ✅ |
+
+¹ inside Slack. *Comparison based on each product's public site/docs (June 2026); corrections welcome.*
 
 ## How it works
 

@@ -13,6 +13,10 @@
   你可以在频道里共享上下文、把真实任务交给 agent、跟踪实时进展，并把每个 agent 的记忆和工作区留在自己控制的基础设施上。
 </p>
 
+> 🔥 **Claude Tag 于 2026 年 6 月 23 日发布** —— Anthropic 常驻 Slack 的 AI 队友，学习你的公司、自主工作。但它闭源、收费、锁定 Claude、只能跑在云端。
+>
+> **open-tag 是它的开源替代 —— 一个你自己掌控的工作区，而不是别人地盘里的一个 bot。** 自托管，数据永不出网；自带任意 runtime（Claude Code、Codex、Copilot…）；运行一整队各司其职、互相协作的 agent，在频道、话题、私信和共享任务里完成交付。
+
 <p align="center">
   <img src="docs/hero.png" alt="open-tag — 人类和 AI agent 团队的开源工作区" width="100%" />
 </p>
@@ -61,17 +65,20 @@
 - **按自托管设计。** Server、数据库、daemon、工作区和附件都留在你控制的基础设施上。
 - **为异步协作而生。** 事件唤醒、空闲休眠、任务认领、提醒、thread 和 freshness checks 可以减少重复劳动。
 
-## open-tag vs Claude Tag
+## open-tag 横向对比
 
-| | Claude Tag | **open-tag** |
-|---|---|---|
-| 共享频道和上下文 | ✅ 在 Slack 内 | ✅ 原生工作区 |
-| 持久 agent 记忆 | ✅ | ✅ 工作区 + `MEMORY.md` |
-| 主动 / 异步工作 | ✅ | ✅ 事件唤醒 + 空闲休眠 |
-| 每个工作区的 agents | 一个 Claude | **多个专门化 agents** |
-| Runtime | Claude | **Claude Code、Codex、Copilot、OpenCode、Kimi、Pi、Cursor** |
-| 托管方式 | Anthropic cloud | **自托管** |
-| 源码 | 闭源 | **Apache-2.0** |
+托管产品把你团队的对话和 agent 的工作跑在**它们的**服务器上。open-tag 是你自己跑的那个开源选项。
+
+| | Claude Tag | Slock / Raft | Loop | **open-tag** |
+|---|:---:|:---:|:---:|:---:|
+| Channel-first 工作区（频道 · 话题 · 私信 · 任务） | ✅¹ | ✅ | ✅ | ✅ |
+| Agent 作为有记忆的持久队友 | ✅ | ✅ | ✅ | ✅ |
+| 多 agent / 多 runtime | 仅 Claude | ✅ | ✅ | ✅ Claude Code、Codex、Copilot… |
+| **开源** | ❌ | ❌ | ❌ | ✅ Apache-2.0 |
+| **自托管 —— 跑在你自己的机器上** | ❌ | ❌ | ❌ | ✅ |
+| **数据永不出网** | ❌ | ❌ | ❌ | ✅ |
+
+¹ 在 Slack 内。*对比基于各产品官网/文档（2026 年 6 月），欢迎纠正。*
 
 ## 工作原理
 
