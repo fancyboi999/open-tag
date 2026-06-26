@@ -7,6 +7,7 @@ import { parseMsgPageParams } from "../messagePage.js";
 import { publish } from "../realtime.js";
 import { readJson, sendErr, sendJson } from "../util.js";
 import { attachMentions, userChannels } from "./shared.js";
+import { canUserReadChannel } from "../channelAccess.js";
 
 export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
   const { req, res, url, method, p, userId, serverId } = ctx;
@@ -102,6 +103,7 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
   }
   const cmsg = /^\/api\/messages\/channel\/([^/]+)$/.exec(p);
   if (cmsg && method === "GET") {
+    if (!(await canUserReadChannel(serverId, cmsg[1]!, userId))) return (sendErr(res, 403, "forbidden"), true); // invariant 3: private/DM channels non-members are refused
     const { limit, before } = parseMsgPageParams(url.searchParams); // `before` = keyset cursor on seq → the older page (frontend scroll-to-top "load more")
     const conds = [eq(schema.messages.serverId, serverId), eq(schema.messages.channelId, cmsg[1]!)]; // serverId scope: a foreign channel UUID must not read another tenant's messages (cross-tenant read)
     if (before != null) conds.push(lt(schema.messages.seq, before)); // hits messages_channel_idx (channelId, seq) — keyset, no offset drift
@@ -114,6 +116,7 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
     const b = await readJson(req);
     const hasAtt = Array.isArray(b.attachmentIds) && b.attachmentIds.length > 0;
     if (!b.channelId || (!b.content && !hasAtt)) return (sendErr(res, 400, "channelId + content (or attachmentIds) required"), true);
+    if (!(await canUserReadChannel(serverId, b.channelId, userId))) return (sendErr(res, 403, "forbidden"), true); // invariant 3: non-members must not write to private/DM channels
     const u = (await db.select().from(schema.users).where(eq(schema.users.id, userId)))[0];
     const msg = await createMessage({ serverId, channelId: b.channelId, senderType: "user", senderId: userId, senderName: u!.name, content: b.content || "", asTask: !!b.asTask, attachmentIds: hasAtt ? b.attachmentIds : undefined });
     return (sendJson(res, 200, { ok: true, id: msg.id, seq: msg.seq }), true);
