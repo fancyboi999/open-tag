@@ -1,7 +1,11 @@
 // Custom dropdown (replaces native <select>: the native expanded list is OS-rendered, unstyled by CSS, and visually inconsistent inside modals).
-// Uses fixed positioning + getBoundingClientRect to escape overflow clipping from modal containers (avoid absolute inside overflow containers).
+// The menu is portaled to <body> (createPortal) with fixed positioning + getBoundingClientRect. This escapes BOTH overflow clipping AND an
+// ancestor transform's containing block: a CSS enter-animation with fill-mode:both leaves .modal holding an identity matrix() transform
+// (its computed value is a matrix, NOT "none"), and ANY non-none transform makes that ancestor the containing block of a fixed descendant —
+// which would re-anchor the menu to .modal instead of the viewport and drift it off its trigger. Portaling to <body> sidesteps it entirely.
 // Supports: click to open/close, option selection, click-outside to close, Escape to close, arrow-key highlight + Enter to confirm.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -45,7 +49,7 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
         <span className="grow">{cur?.label ?? <span className="sel-ph">{placeholder ?? t("select.placeholder")}</span>}</span>
         <svg className="sel-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
       </button>
-      {open && pos && (
+      {open && pos && createPortal(
         <div ref={menuRef} className="sel-menu" role="listbox" style={{ left: pos.left, top: pos.top, minWidth: pos.width }} onKeyDown={onKey} tabIndex={-1}>
           {options.length === 0 ? <div className="sel-empty">{t("select.empty")}</div> : options.map((o, i) => (
             <button key={o.value} type="button" role="option" aria-selected={o.value === value}
@@ -55,7 +59,8 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
               {o.value === value && <Check size={14} className="sel-check" />}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
