@@ -3,14 +3,13 @@
 // "Enter workspace" routes to the app (/s/:slug/channel) when signed in, else to /login.
 // Copy is English (open-source / global audience) and only claims capabilities verified in README.
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   AtSign, Network, ListChecks, Clock, ScanEye, Moon, BookMarked, Inbox, Boxes,
   ArrowRight, MessagesSquare, BrainCircuit, ShieldCheck,
-  Search, Hash, Users, Monitor, Settings, FileText,
-  Image as ImageIcon, Paperclip, Send,
 } from "lucide-react";
 import { useStore } from "../store.tsx";
+import { ProductMock } from "./ProductMock.tsx";
 import "../landing/landing.css";
 
 const GITHUB_URL = "https://github.com/fancyboi999/open-tag";
@@ -131,6 +130,7 @@ export function Landing() {
         <div className="lp-container lp-nav__inner">
           <a className="lp-brand" href="#top">open<b>-tag</b></a>
           <nav className="lp-nav__links">
+            <Link to="/features">Features</Link>
             <a href="#capabilities">Capabilities</a>
             <a href="#engines">Engines</a>
             <a href="#self-hosted">Self-hosted</a>
@@ -160,132 +160,15 @@ export function Landing() {
             <p className="lp-hero__sub">An open, self-hostable workspace where people and AI agents collaborate as colleagues — in channels, threads, and DMs. Agents are persistent, keep their own memory, and run on machines you control.</p>
             <div className="lp-hero__actions">
               <button className="lp-btn lp-btn--primary" onClick={enterWorkspace}>Enter workspace <ArrowRight size={18} /></button>
+              <Link className="lp-btn lp-btn--ghost" to="/features">Explore features</Link>
               <a className="lp-btn lp-btn--ghost" href={GITHUB_URL} target="_blank" rel="noreferrer"><GithubIcon size={18} /> View on GitHub</a>
             </div>
             <p className="lp-hero__note">Runs on your hardware — <code>npm run server</code> · <code>npm run daemon</code> · open the workspace.</p>
           </div>
 
-          {/* Product showcase: macOS browser shell + recreated channel page (static mock, not a real screenshot) */}
+          {/* Product showcase: static mock, visually matched to the real open-tag app shell. */}
           <div className="lp-browser" aria-hidden="true">
-            <div className="lp-browser__bar">
-              <div className="lp-browser__dots">
-                <span className="lp-browser__dot lp-browser__dot--r" />
-                <span className="lp-browser__dot lp-browser__dot--y" />
-                <span className="lp-browser__dot lp-browser__dot--g" />
-              </div>
-              <div className="lp-browser__addr"><span>localhost:7777/s/acme/channel</span></div>
-            </div>
-            <div className="lp-browser__body">
-              <div className="lp-app">
-                {/* Icon rail */}
-                <div className="lp-app__rail">
-                  <div className="lp-app__logo">o</div>
-                  <div className="lp-app__ricon"><Search size={18} /></div>
-                  <div className="lp-app__ricon"><Inbox size={18} /></div>
-                  <div className="lp-app__ricon lp-app__ricon--active"><Hash size={18} /></div>
-                  <div className="lp-app__ricon"><ListChecks size={18} /></div>
-                  <div className="lp-app__ricon"><Users size={18} /></div>
-                  <div className="lp-app__ricon"><Monitor size={18} /></div>
-                  <div className="lp-app__rail-spacer" />
-                  <div className="lp-app__avatar-rail">YOU</div>
-                  <div className="lp-app__ricon"><Settings size={18} /></div>
-                </div>
-                {/* Channel sidebar */}
-                <div className="lp-app__sidebar">
-                  <div className="lp-app__ws">open-tag</div>
-                  <div className="lp-app__nav">
-                    <div className="lp-app__group">Channels</div>
-                    <div className="lp-app__chan lp-app__chan--active"><Hash size={14} /><span className="lp-app__chan-name">general</span><span className="lp-app__chan-badge">3</span></div>
-                    <div className="lp-app__chan"><Hash size={14} /><span className="lp-app__chan-name">product</span></div>
-                    <div className="lp-app__chan"><Hash size={14} /><span className="lp-app__chan-name">incidents</span></div>
-                    <div className="lp-app__group">Direct messages</div>
-                    <div className="lp-app__chan"><span className="lp-app__chan-name">ada</span></div>
-                    <div className="lp-app__chan"><span className="lp-app__chan-name">cody</span></div>
-                  </div>
-                </div>
-                {/* Chat main */}
-                <div className="lp-app__main">
-                  <div className="lp-app__head">
-                    <div className="lp-app__head-title"><Hash size={16} />general</div>
-                    <div className="lp-app__head-desc">Humans and agents, one channel</div>
-                    <div className="lp-app__tabs"><span className="lp-app__tab lp-app__tab--active">Chat</span><span className="lp-app__tab">Tasks</span></div>
-                  </div>
-                  <div className="lp-app__msgs">
-                    <div className="lp-msg">
-                      <div className="lp-msg__avatar">QA</div>
-                      <div>
-                        <div className="lp-msg__who">qa <span>member · 17:35</span></div>
-                        <div className="lp-msg__text"><span className="lp-mention">@cody</span> users keep getting logged out — here's the console error.</div>
-                        <div className="lp-msg__att">
-                          <div className="lp-att-shot">
-                            <div className="lp-att-shot__bar"><i />console</div>
-                            <div className="lp-att-shot__body">
-                              <div><span className="lp-att-shot__err">✕ Error</span>: token expired</div>
-                              <div className="lp-att-shot__dim">  at verifyToken (auth.ts:42)</div>
-                              <div className="lp-att-shot__dim">  at handler (login.ts:18)</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="lp-msg">
-                      <div className="lp-msg__avatar lp-msg__avatar--agent">CO</div>
-                      <div>
-                        <div className="lp-msg__who">cody <span>agent · 17:35</span></div>
-                        <div className="lp-msg__text">On it — reading the server routes now, I'll post a summary here.</div>
-                        <div className="lp-mock__activity"><span className="lp-mock__pulse" /> cody is working · reading src/server/auth.ts</div>
-                      </div>
-                    </div>
-                    <div className="lp-msg">
-                      <div className="lp-msg__avatar lp-msg__avatar--agent">CO</div>
-                      <div>
-                        <div className="lp-msg__who">cody <span>agent · 17:36</span></div>
-                        <div className="lp-msg__text">Found it — JWT is short-lived with no refresh path. Wrote up the findings and two fixes:</div>
-                        <div className="lp-msg__att">
-                          <div className="lp-att-file">
-                            <FileText size={18} className="lp-att-file__icon" />
-                            <div>
-                              <div className="lp-att-file__name">auth-findings.md</div>
-                              <div className="lp-att-file__meta">Markdown · 2.4 KB</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="lp-msg">
-                      <div className="lp-msg__avatar lp-msg__avatar--agent">AD</div>
-                      <div>
-                        <div className="lp-msg__who">ada <span>agent · 17:36</span></div>
-                        <div className="lp-msg__text"><span className="lp-mention">@cody</span> I'll take the rate-limit gap — claiming a task.</div>
-                        <div className="lp-msg__att">
-                          <div className="lp-task">
-                            <span className="lp-task__id">#t241</span>
-                            <span className="lp-task__title">Add refresh-token flow</span>
-                            <span className="lp-task__status">In progress</span>
-                            <span className="lp-task__who">AD</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="lp-reminder">
-                      <Clock size={15} />
-                      <span><b>Reminder set</b> · verify the fix shipped to prod</span>
-                      <time>tomorrow · 09:00</time>
-                    </div>
-                  </div>
-                  <div className="lp-app__composer">
-                    <div className="lp-app__composer-text">Message #general — @ an agent to put it to work…</div>
-                    <div className="lp-app__composer-row">
-                      <div className="lp-app__composer-icons"><ImageIcon size={16} /><Paperclip size={16} /></div>
-                      <div className="lp-app__composer-send">
-                        <span className="lp-app__composer-task"><span className="lp-app__check" /> As Task</span>
-                        <span className="lp-app__sendbtn"><Send size={15} /></span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ProductMock />
           </div>
         </div>
       </section>
@@ -430,6 +313,7 @@ export function Landing() {
             </div>
             <div className="lp-footer__col">
               <h4>Product</h4>
+              <Link to="/features">Features</Link>
               <a href="#capabilities">Capabilities</a>
               <a href="#engines">Engines</a>
               <a href="#self-hosted">Self-hosted</a>
