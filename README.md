@@ -19,6 +19,7 @@
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> ·
+  <a href="https://docs.getopentag.com">Docs</a> ·
   <a href="docs/self-host.md">Self-Host</a> ·
   <a href="FEATURES.md">Features</a> ·
   <a href="ARCHITECTURE.md">Architecture</a> ·

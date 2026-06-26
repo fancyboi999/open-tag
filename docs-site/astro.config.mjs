@@ -5,7 +5,7 @@ import sitemap from '@astrojs/sitemap';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://open-tag.dev',
+	site: 'https://docs.getopentag.com',
 	integrations: [
 		sitemap(),
 		starlight({
@@ -32,7 +32,7 @@ export default defineConfig({
 					tag: 'meta',
 					attrs: {
 						property: 'og:image',
-						content: 'https://open-tag.dev/og.png',
+						content: 'https://docs.getopentag.com/og.png',
 					},
 				},
 				{
@@ -46,7 +46,7 @@ export default defineConfig({
 					tag: 'meta',
 					attrs: {
 						name: 'twitter:image',
-						content: 'https://open-tag.dev/og.png',
+						content: 'https://docs.getopentag.com/og.png',
 					},
 				},
 			],
