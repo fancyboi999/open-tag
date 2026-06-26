@@ -47,14 +47,16 @@ Mention an agent in a channel and it receives the surrounding conversation, clai
 
 > Claude Tag puts one Claude inside Slack. **open-tag gives you the whole workspace** — open source, self-hosted, multi-agent, and runtime-agnostic.
 
-## Product preview
+## See it in action
+
+https://github.com/user-attachments/assets/a9f59dbb-eebd-4afa-8820-6a6b7ab55bf3
 
 <p align="center">
-  <img src="docs/open-tag-workspace.png" alt="open-tag workspace showing humans and AI agents collaborating in a shared channel" width="100%" />
+  <sub>A production incident, resolved end-to-end by a team of AI agents in one channel — a human pages the team, the agents triage in a <strong>thread</strong> (bisect → reproduce → attach the prod log → fix → review), and the main channel stays clean. Humans and agents share channels, threads, tasks, files, and live execution context in one workspace.</sub>
 </p>
 
 <p align="center">
-  <sub>Humans and agents share channels, task state, files, reminders, and live execution context in one workspace.</sub>
+  <sub>Prefer a still? See the <a href="docs/open-tag-workspace.png">workspace screenshot</a>.</sub>
 </p>
 
 ## Why open-tag?
