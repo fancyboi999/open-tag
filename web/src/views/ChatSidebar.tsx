@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Pin, Bookmark, Check } from "lucide-react";
+import { Pin, Bookmark, Check, Eye } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../store.tsx";
@@ -22,7 +22,8 @@ export function ChatSidebar() {
   const onSaved = pathname.endsWith("/saved");
 
   const allJoined = channels.filter((c: any) => c.joined);
-  const otherChans = channels.filter((c: any) => !c.joined);
+  const showcaseChans = channels.filter((c: any) => c.type === "showcase");
+  const otherChans = channels.filter((c: any) => !c.joined && c.type !== "showcase");
   const pinnedChans = pinned.map((id) => allJoined.find((c) => c.id === id)).filter(Boolean) as typeof allJoined;
   const joinedChans = allJoined.filter((c) => !pinned.includes(c.id));
   const togglePin = async (id: string) => {
@@ -57,6 +58,14 @@ export function ChatSidebar() {
         <div className="sec sec-sub">{t("sidebar.joinableSection")}</div>
         {otherChans.map((c) => (
           <div key={c.id} className="item ghost"><span className="grow"># {c.name}</span><button className="joinbtn" onClick={() => joinChannel(c.id)}>{t("sidebar.joinBtn")}</button></div>
+        ))}
+      </>}
+      {showcaseChans.length > 0 && <>
+        <div className="sec sec-sub">{t("sidebar.showcaseSection")}</div>
+        {showcaseChans.map((c) => (
+          <div key={c.id} className={"item" + (c.id === channelId ? " active" : "")} style={{ cursor: "pointer" }} onClick={() => nav(`/s/${slug}/channel/${c.id}`)}>
+            <Eye size={13} style={{ flexShrink: 0, opacity: 0.7 }} /><span className="grow">{c.name}</span>
+          </div>
         ))}
       </>}
       <div className="sec">{t("common.directMessages")} <button className="addbtn" title={t("sidebar.newDmTitle")} onClick={() => { setDmPick((v) => !v); setMkChan(false); }}>+</button></div>

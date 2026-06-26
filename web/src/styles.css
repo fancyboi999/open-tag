@@ -223,6 +223,7 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .md blockquote{border-left:1px solid var(--hair-strong);margin:.4em 0;padding-left:12px;color:var(--muted)}
 .mention{color:var(--ink);font-weight:600;background:var(--mention);border-radius:4px;padding:0 3px}
 .composer{position:relative;padding:16px 28px 22px;border-top:1px solid var(--hair)}
+.showcase-readonly{display:flex;align-items:center;gap:8px;padding:14px 28px 18px;border-top:1px solid var(--hair);font-size:13px;color:var(--muted);font-style:italic}
 .wake-hint{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:0 2px 9px;line-height:1.4}
 .wake-hint svg{color:var(--g-sky);flex:0 0 auto}
 .wake-hint.wh-off svg{color:var(--muted-soft)}

@@ -1,0 +1,9 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [
+      "/Users/nowcoder/Desktop/auto-code-work/open-tag-showcase/src/server/showcaseSeed.ts"
+    ],
+    "ignoreValues": []
+  }
+}
