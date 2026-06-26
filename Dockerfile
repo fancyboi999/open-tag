@@ -3,25 +3,28 @@
 # The daemon (compute plane) is intentionally NOT in this image — it runs on the user's own host with their
 # CLIs/credentials/code and connects back over the published WS port. See docs/docker.md.
 
-# ---- build stage: install deps + build the web client (Vite → web/dist) ----
+# ---- build stage: install deps + build the web client and docs ----
 FROM node:22-slim AS build
 WORKDIR /app
 ENV NODE_ENV=development
 # Root deps first (server runs via tsx and pushes schema via drizzle-kit at runtime, so full deps are needed).
 COPY package.json package-lock.json ./
 RUN npm ci
-# Web deps, then build.
+# Web/docs deps, then build.
 COPY web/package.json web/package-lock.json ./web/
 RUN npm --prefix web ci
+COPY docs-site/package.json docs-site/package-lock.json ./docs-site/
+RUN npm --prefix docs-site ci
 COPY . .
-RUN npm run web:build
+RUN npm run site:build
 
-# ---- runtime stage: source + root node_modules + built client, run with tsx ----
+# ---- runtime stage: source + root node_modules + built client/docs, run with tsx ----
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/web/dist ./web/dist
+COPY --from=build /app/docs-site/dist ./docs-site/dist
 COPY --from=build /app/src ./src
 # daemon package.json: read at runtime for latestDaemonVersion (system-alert "outdated daemon" check); only the manifest is needed.
 COPY --from=build /app/packages/daemon/package.json ./packages/daemon/package.json

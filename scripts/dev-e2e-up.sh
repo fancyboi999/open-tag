@@ -24,8 +24,8 @@ echo "→ schema + bootstrap seed (idempotent)…"
 npm run db:push >/dev/null 2>&1 || true
 npm run seed    >/dev/null 2>&1 || true
 
-echo "→ building web (served by the server on :$PORT)…"
-npm run build --prefix web >/dev/null
+echo "→ building site (served by the server on :$PORT)…"
+npm run site:build >/dev/null
 
 echo "→ starting server (:$PORT)…"
 nohup npx tsx src/server/index.ts > "$RUN/logs/dev-e2e-server.log" 2>&1 & echo $! > "$RUN/dev-e2e-server.pid"

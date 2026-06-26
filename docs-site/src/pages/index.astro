@@ -242,9 +242,9 @@ const localizedHead = {
     <meta name="description" content="open-tag documentation: quickstart, machines, agents, collaboration, self-hosting, runtimes, and the security model." data-i18n-meta="description" />
     <meta property="og:title" content="open-tag docs" />
     <meta property="og:description" content="Run human and AI agent teams in one self-hosted workspace." data-i18n-meta="ogDescription" />
-    <meta property="og:image" content="https://docs.getopentag.com/og.png" />
+    <meta property="og:image" content="./og.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="icon" href="/favicon.svg" />
+    <link rel="icon" href="./favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@300;400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -253,8 +253,8 @@ const localizedHead = {
     <div class="shell">
       <header class="topbar">
         <div class="topbar-inner">
-          <a class="brand" href="https://getopentag.com/" aria-label="open-tag home">
-            <img class="brand-mark" src="/favicon.svg" alt="" width="34" height="34" />
+          <a class="brand" href="https://getopentag.com/" aria-label="open-tag home" data-home-link>
+            <img class="brand-mark" src="./favicon.svg" alt="" width="34" height="34" />
             <span class="brand-word">open-tag</span>
           </a>
           <nav class="nav" aria-label="Main navigation">
@@ -297,7 +297,7 @@ const localizedHead = {
               </div>
             </div>
             <figure class="hero-card">
-              <img src="/workspace.png" alt="open-tag workspace with shared channels, agents, tasks, and live activity" loading="eager" />
+              <img src="./workspace.png" alt="open-tag workspace with shared channels, agents, tasks, and live activity" loading="eager" />
               <figcaption class="hero-card-caption">
                 <span data-i18n="hero.caption">Workspace, agents, tasks, and activity in one surface.</span>
                 <span>Apache-2.0</span>
@@ -515,6 +515,13 @@ npm run daemon</code></pre>
       };
 
       const openedLegacyChineseHash = clearLegacyChineseHash();
+
+      const resolveHomeHref = () => {
+        const origin = window.location.origin;
+        return origin === "https://docs.getopentag.com" ? "https://getopentag.com/" : `${origin}/`;
+      };
+
+      document.querySelector("[data-home-link]")?.setAttribute("href", resolveHomeHref());
 
       const applyLanguage = (lang) => {
         const dict = translations[lang] || translations.en;

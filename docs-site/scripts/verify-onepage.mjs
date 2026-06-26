@@ -34,10 +34,10 @@ if (existsSync(join(root, "src/pages/index.astro"))) {
   if (!page.includes("data-lang-toggle")) {
     fail("docs one-page source is missing the language toggle button.");
   }
-  if (!page.includes('href="https://getopentag.com/"')) {
-    fail("docs one-page brand link must point to the landing page.");
+  if (!page.includes("data-home-link") || !page.includes("resolveHomeHref")) {
+    fail("docs one-page brand link must resolve to the app landing page.");
   }
-  if (!page.includes('src="/favicon.svg"')) {
+  if (!page.includes('src="./favicon.svg"')) {
     fail("docs one-page brand mark must use the existing SVG logo.");
   }
   if (!page.includes("data-i18n-meta")) {

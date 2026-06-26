@@ -421,7 +421,8 @@ ADMIN_SETUP_TOKEN=<openssl rand -hex 32>
 ```bash
 npm install
 npm --prefix web install
-npm run web:build
+npm --prefix docs-site install
+npm run site:build
 
 # Push schema (additive-safe; prompts on destructive changes)
 npm run db:push:prod
@@ -482,7 +483,8 @@ The server logs also land in `$OPEN_TAG_HOME/logs/` (default `~/.open-tag/logs/`
 git pull --ff-only origin main
 npm install
 npm --prefix web install
-npm run web:build
+npm --prefix docs-site install
+npm run site:build
 npm run db:push:prod     # migrate schema BEFORE restarting the server
 sudo systemctl restart open-tag-server
 # Daemon stays running; it reconnects automatically after the server restarts.

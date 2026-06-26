@@ -14,6 +14,12 @@ import { useStore } from "../store.tsx";
 import "../landing/landing.css";
 
 const GITHUB_URL = "https://github.com/fancyboi999/open-tag";
+const MARKETING_ORIGINS = new Set(["https://getopentag.com", "https://www.getopentag.com"]);
+
+function docsUrl(): string {
+  const origin = typeof window !== "undefined" && window.location?.origin ? window.location.origin : "https://getopentag.com";
+  return MARKETING_ORIGINS.has(origin) ? "https://docs.getopentag.com/" : `${origin}/docs/`;
+}
 
 // GitHub mark (inline SVG — lucide dropped third-party brand logos; use SVG, not emoji)
 function GithubIcon({ size = 18 }: { size?: number }) {
@@ -105,6 +111,7 @@ export function Landing() {
   const { me, slug } = useStore();
   const navigate = useNavigate();
   const enterWorkspace = () => navigate(me ? `/s/${slug}/channel` : "/login");
+  const docsHref = docsUrl();
 
   // Scroll reveal: add is-visible once a section enters the viewport (one-shot); reduced-motion falls back to visible via CSS.
   useEffect(() => {
@@ -127,7 +134,7 @@ export function Landing() {
             <a href="#capabilities">Capabilities</a>
             <a href="#engines">Engines</a>
             <a href="#self-hosted">Self-hosted</a>
-            <a href={GITHUB_URL} target="_blank" rel="noreferrer">Docs</a>
+            <a href={docsHref}>Docs</a>
           </nav>
           <div className="lp-nav__cta">
             <a className="lp-btn lp-btn--ghost lp-btn--sm" href={GITHUB_URL} target="_blank" rel="noreferrer">
@@ -429,9 +436,9 @@ export function Landing() {
             </div>
             <div className="lp-footer__col">
               <h4>Resources</h4>
-              <a href={GITHUB_URL} target="_blank" rel="noreferrer">Quickstart</a>
-              <a href={GITHUB_URL} target="_blank" rel="noreferrer">Architecture</a>
-              <a href={GITHUB_URL} target="_blank" rel="noreferrer">Docs</a>
+              <a href={`${docsHref}#quickstart`}>Quickstart</a>
+              <a href={`${docsHref}#source`}>Architecture</a>
+              <a href={docsHref}>Docs</a>
             </div>
             <div className="lp-footer__col">
               <h4>Open source</h4>
