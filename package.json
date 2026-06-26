@@ -55,7 +55,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "busboy": "^1.6.0",
-    "commander": "^12.1.0",
+    "commander": "^15.0.0",
     "drizzle-orm": "^0.45.2",
     "helmet": "^8.2.0",
     "ioredis": "^5.4.0",
