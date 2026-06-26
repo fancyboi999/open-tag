@@ -28,6 +28,13 @@ jobs:
         run: npm run typecheck
 
       - name: Unit tests (node:test + tsx)
+        # Dummy secrets so modules that import auth.ts (which fail-fasts on missing
+        # JWT_SECRET/DAEMON_BOOTSTRAP_KEY at load) can be loaded by the test runner.
+        # authFailFast.unit.test.ts spawns a subprocess with these explicitly unset,
+        # so the fail-fast behavior is still verified independently of this env.
+        env:
+          JWT_SECRET: ci-test-secret
+          DAEMON_BOOTSTRAP_KEY: ci-test-bootstrap-key
         run: npx tsx --test --test-force-exit test/*.unit.test.ts src/daemon/*.test.ts
 
       - name: Security audit (prod deps, high+)
