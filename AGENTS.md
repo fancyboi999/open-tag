@@ -191,8 +191,12 @@ Transport-layer env flags:
 - `ALLOWED_ORIGIN` — comma-separated allowed browser origins for CORS. Dev default (unset): any
   `localhost` / `127.0.0.1` origin. Production: must be set to frontend URL(s).
 - `TRUST_PROXY` — set to `true` only when a single controlled reverse proxy (Railway, nginx,
-  Caddy) appends the real client IP to `X-Forwarded-For`. `clientIp()` takes the **rightmost**
-  XFF value (the hop the proxy appended — unforgeable by the client). Taking the leftmost
-  would let clients spoof the IP and bypass rate-limiting. Assumes exactly **one trusted hop**;
-  multi-hop deployments (CDN → nginx → app) need hop-count-aware parsing instead. Without this
-  flag, `clientIp()` uses the TCP socket address (unforgeable).
+  Caddy) **rewrites** the client-IP headers. `clientIp()` prefers **`X-Real-IP`** (a single clean
+  value the proxy sets and overwrites if forged), falling back to the **first** `X-Forwarded-For`
+  hop (the proxy prepends the real client and strips client-supplied XFF). Both verified against
+  Railway: a forged `X-Real-IP`+`X-Forwarded-For` arrive overwritten, real IP leftmost. **Do not
+  use the rightmost XFF entry** — on Railway that is the proxy's *rotating* edge IP, which gives
+  every request a fresh rate-limit bucket and defeats the limit. Assumes exactly **one trusted hop**
+  that overwrites/prepends; a proxy that blindly *appends* leaves the leftmost spoofable, and
+  multi-hop chains (CDN → nginx → app) need hop-count-aware parsing (e.g. `proxy-addr`). Without
+  this flag, `clientIp()` uses the TCP socket address (unforgeable).
