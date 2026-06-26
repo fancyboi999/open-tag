@@ -440,7 +440,7 @@ function AccountSettings({ api }: { api: any }) {
       <div className="setrow"><button className="ok" onClick={save}>{t("misc.accountSave")}</button>{saved && <span className="saved">{t("misc.accountSaved")}</span>}</div>
       <div className="lang-row">
         <div><div className="logout-title">{t("settings.language")}</div><div className="logout-desc">{t("settings.languageDesc")}</div></div>
-        <div className="seg" role="group" aria-label={t("settings.language")}>
+        <div className="seg-pill" role="group" aria-label={t("settings.language")}>
           <button className={"seg-opt" + (i18n.language.startsWith("en") ? " on" : "")} onClick={() => setLang("en")}>{t("settings.langEnglish")}</button>
           <button className={"seg-opt" + (i18n.language.startsWith("zh") ? " on" : "")} onClick={() => setLang("zh")}>{t("settings.langChinese")}</button>
         </div>

@@ -1,6 +1,6 @@
 name: CI
 
-# Keep types clean and the web app buildable on every push / PR.
+# Keep types clean, tests green, and the web app buildable on every push / PR.
 on:
   push:
     branches: [main]
@@ -26,6 +26,12 @@ jobs:
 
       - name: Typecheck (root + web)
         run: npm run typecheck
+
+      - name: Unit tests (node:test + tsx)
+        run: npx tsx --test --test-force-exit test/*.unit.test.ts src/daemon/*.test.ts
+
+      - name: Security audit (prod deps, high+)
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build web
         run: npm run build --prefix web
