@@ -353,9 +353,9 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .tk-slot{transition:transform .22s cubic-bezier(.22,1,.36,1),opacity .22s ease}
 @media (prefers-reduced-motion:reduce){.tk-slot{transition:none}}
 /* DragOverlay: the moving copy of the card lifts off the board — soft shadow + slight scale, never clipped (it's portaled to <body>). */
-.card-overlay{cursor:grabbing;transform:scale(1.03);box-shadow:0 16px 36px rgba(12,10,9,.20)}
-.card-overlay .card.task{margin-bottom:0;border-color:var(--hair-strong)}
-@media (prefers-reduced-motion:reduce){.card-overlay{transform:none}}
+.card-overlay{cursor:grabbing;box-shadow:0 16px 36px rgba(12,10,9,.20)}
+.card-overlay .card.task{margin-bottom:0;border-color:var(--hair-strong);transform:scale(1.03)}
+@media (prefers-reduced-motion:reduce){.card-overlay .card.task{transform:none}}
 .actlog{display:flex;flex-direction:column;gap:2px}
 .act{display:flex;align-items:baseline;gap:10px;padding:5px 6px;border-radius:6px;font-size:14px;line-height:1.5}
 .act:hover{background:var(--surface-strong)}

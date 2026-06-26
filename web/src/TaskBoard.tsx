@@ -256,14 +256,17 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
       </div>
       {filtered.length === 0 ? <PaneEmpty icon={<ListChecks size={30} />} title={tasks.length ? t("tasks.emptyFiltered") : channelId ? t("tasks.emptyChannel") : t("tasks.emptyServer")} />
         : view === "board" ? (
-          // DragOverlay renders the moving card in a top-level portal (never clipped / never painted behind a column)
           <DndContext sensors={sensors} onDragStart={(e) => setActiveId(String(e.active.id))} onDragCancel={() => setActiveId(null)} onDragEnd={onDragEnd}>
             <div ref={boardRef} className={"task-board " + boardLayout + (activeId ? " dragging" : "")}>
               {TCOLS.map(([k, labelKey]) => <DroppableCol key={k} k={k} labelKey={labelKey} />)}
             </div>
-            <DragOverlay dropAnimation={null}>
-              {activeTask ? <div className="card-overlay"><Card t={activeTask} /></div> : null}
-            </DragOverlay>
+            {/* Body-portal the overlay so dnd-kit's fixed-position wrapper is not re-based by .board-scroll's enter-animation transform. */}
+            {createPortal(
+              <DragOverlay dropAnimation={null}>
+                {activeTask ? <div className="card-overlay"><Card t={activeTask} /></div> : null}
+              </DragOverlay>,
+              document.body,
+            )}
           </DndContext>
         ) : (
           <div className="task-list">
