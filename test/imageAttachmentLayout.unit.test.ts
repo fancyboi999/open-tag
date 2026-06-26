@@ -11,6 +11,8 @@ import fs from "node:fs";
 
 const css = fs.readFileSync(new URL("../web/src/styles.css", import.meta.url), "utf8");
 const chatSrc = fs.readFileSync(new URL("../web/src/views/Chat.tsx", import.meta.url), "utf8");
+// The lightbox now lives in a shared module (web/src/Lightbox.tsx) reused by both Chat and the Showcase demo.
+const lightboxSrc = fs.readFileSync(new URL("../web/src/Lightbox.tsx", import.meta.url), "utf8");
 
 function ruleBody(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -41,21 +43,27 @@ test("image attachment stack does not stretch image preview buttons to the messa
 });
 
 test("lightbox has a real dialog panel instead of a bare image floating on the scrim", () => {
-  assert.match(chatSrc, /className="lightbox-panel"/);
-  assert.match(chatSrc, /role="dialog"/);
-  assert.match(chatSrc, /aria-modal="true"/);
-  assert.match(chatSrc, /closeRef\.current\?\.focus/);
-  assert.match(chatSrc, /prevFocus\.current\?\.focus/);
-  assert.match(chatSrc, /e\.key === "Tab"/);
+  assert.match(lightboxSrc, /className="lightbox-panel"/);
+  assert.match(lightboxSrc, /role="dialog"/);
+  assert.match(lightboxSrc, /aria-modal="true"/);
+  assert.match(lightboxSrc, /closeRef\.current\?\.focus/);
+  assert.match(lightboxSrc, /prevFocus\.current\?\.focus/);
+  assert.match(lightboxSrc, /e\.key === "Tab"/);
 });
 
 test("lightbox is portaled to body so fixed positioning is viewport-relative, not message-transform-relative", () => {
-  assert.match(chatSrc, /import\s*\{\s*createPortal\s*\}\s*from\s*"react-dom"/);
+  assert.match(lightboxSrc, /import\s*\{\s*createPortal\s*\}\s*from\s*"react-dom"/);
   assert.match(
-    chatSrc,
+    lightboxSrc,
     /createPortal\(\s*[\s\S]*?className="lightbox-bg"[\s\S]*?,\s*document\.body\s*,?\s*\)/,
     ".lightbox-bg must render through createPortal(..., document.body); new messages carry transform animations that otherwise make position:fixed relative to the message instead of the viewport",
   );
+});
+
+test("Chat view wires up the shared Lightbox module rather than a private copy", () => {
+  assert.match(chatSrc, /import\s*\{\s*Lightbox\s*\}\s*from\s*"\.\.\/Lightbox/);
+  // The old private definition is gone — Chat must not re-declare its own Lightbox.
+  assert.doesNotMatch(chatSrc, /function Lightbox\(/);
 });
 
 test("lightbox media height subtracts overlay padding so tall images are not clipped", () => {

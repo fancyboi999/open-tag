@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Eye, CheckCircle2, MessageCircle, X } from "lucide-react";
 import { Avatar } from "../Avatar.tsx";
+import { Lightbox } from "../Lightbox.tsx";
 import { MessageContent } from "../messageRender.tsx";
 import { ChatSidebar } from "./ChatSidebar.tsx";
 import { IconFile, IconDownload } from "../icons.tsx";
@@ -33,14 +34,19 @@ function roleOf(name: string): { role: string; title: string } {
   return { role: m ? m[1]! : "", title: a.description };
 }
 
-// One attachment under a case anchor: image → thumbnail + download card; csv (any file) → download card.
+// One attachment under a case anchor: image → clickable thumbnail (opens the in-app Lightbox, like Chat —
+// never a new-tab navigation to the raw asset) + download card; csv (any file) → download card.
 function ShowcaseAtt({ att }: { att: ShowcaseAttachment }) {
+  const [lb, setLb] = useState(false);
   return (
     <div className="msg-atts">
       {att.kind === "image" && (
-        <a className="msg-att-img" href={att.href} target="_blank" rel="noreferrer">
-          <img src={att.href} alt={att.filename} loading="lazy" />
-        </a>
+        <>
+          <button className="msg-att-img" title={att.filename} onClick={() => setLb(true)}>
+            <img src={att.href} alt={att.filename} loading="lazy" />
+          </button>
+          {lb && <Lightbox src={att.href} alt={att.filename} onClose={() => setLb(false)} />}
+        </>
       )}
       <a className="msg-att" href={att.href} download={att.filename}>
         <IconFile size={14} />
