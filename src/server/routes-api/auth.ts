@@ -4,7 +4,7 @@ import { and, eq, or } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { devLoginEnabled, hashPassword, isValidEmail, passwordError, safeEqual, setupToken, signUser, verifyPassword } from "../auth.js";
 import { DESC_TOO_LONG, createServer, descTooLong } from "../core.js";
-import { clientIp, rateLimit } from "../ratelimit.js";
+import { REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW_MS, clientIp, rateLimit } from "../ratelimit.js";
 import { readJson, sendErr, sendJson } from "../util.js";
 
 export async function handlePublicAuth(ctx: BaseCtx): Promise<boolean> {
@@ -58,8 +58,8 @@ export async function handlePublicAuth(ctx: BaseCtx): Promise<boolean> {
     return (sendJson(res, 200, { token: signUser(admin.id), user: { id: admin.id, name: admin.name, email: (patch.email as string) ?? admin.email } }), true);
   }
   if (p === "/api/auth/register" && method === "POST") {
-    const rl = rateLimit("auth:register", clientIp(req));
-    if (!rl.ok) return (sendErr(res, 429, "too many requests", { retryAfter: rl.retryAfter }), true);
+    const rl = rateLimit("auth:register", clientIp(req), REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW_MS);
+    if (!rl.ok) return (sendErr(res, 429, "too many registrations from this IP — please try again later", { retryAfter: rl.retryAfter }), true);
     const b = await readJson(req);
     const name = typeof b.name === "string" ? b.name.trim() : "";
     if (!name || name.length > 64) return (sendErr(res, 400, "invalid name"), true);
