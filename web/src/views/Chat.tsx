@@ -262,13 +262,13 @@ export function Chat() {
       <ChatSidebar />
       <main className="content-col">
         <div className="head">
-          <h1>{isDm ? "@ " + (cur?.name || "") : "# " + (cur?.name || "…")}</h1>
+          <h1>{isDm ? "@ " + (cur?.name || "") : cur?.type === "showcase" ? <><Eye size={16} style={{ verticalAlign: "-3px", opacity: 0.7 }} /> {cur?.name || "…"}</> : "# " + (cur?.name || "…")}</h1>
           {dmAgent
             ? <span className="head-status"><span className={"dot " + (dmAgent.activity || "offline")} />{dmAgent.activityDetail || dmAgent.activity || "offline"}</span>
             : <small>{sub || cur?.description || ""}</small>}
           {cur && <div className="chtabs">{(isDm ? ["chat", "tasks"] : ["chat", "tasks", "files"]).map((tt) => <button key={tt} className={chatTab === tt ? "on" : ""} onClick={() => setTab(tt)}>{tt === "chat" ? t("nav.channel") : tt === "tasks" ? t("nav.tasks") : t("common.files")}</button>)}</div>}
-          {!isDm && cur && <button className="joinbtn" style={{ marginLeft: "auto" }} title={t("chat.channelMembers")} onClick={() => setShowMembers(true)}>{t("chat.members")}</button>}
-          {!isDm && cur && capabilities.manageChannels && (
+          {!isDm && cur && cur.type !== "showcase" && <button className="joinbtn" style={{ marginLeft: "auto" }} title={t("chat.channelMembers")} onClick={() => setShowMembers(true)}>{t("chat.members")}</button>}
+          {!isDm && cur && cur.type !== "showcase" && capabilities.manageChannels && (
             <button className="joinbtn" title={t("chat.channelSettings")} onClick={() => setShowEdit(true)}>⋯</button>
           )}
         </div>
@@ -342,12 +342,14 @@ export function Chat() {
               })}
             </div>
             {showJump && <button className="jump-bottom" onClick={toBottom}><ArrowDown size={14} /> {t("chat.backToBottom")}</button>}
-            <Composer
-              channelId={cur?.id ?? ""}
-              placeholder={isDm ? t("chat.dmPlaceholder", { name: cur?.name }) : t("chat.channelPlaceholder")}
-              allowAsTask
-              dmAgent={isDm ? dmAgent : undefined}
-            />
+            {cur?.type === "showcase"
+              ? <div className="showcase-readonly"><Eye size={14} />{t("chat.showcaseReadOnly")}</div>
+              : <Composer
+                  channelId={cur?.id ?? ""}
+                  placeholder={isDm ? t("chat.dmPlaceholder", { name: cur?.name }) : t("chat.channelPlaceholder")}
+                  allowAsTask
+                  dmAgent={isDm ? dmAgent : undefined}
+                />}
           </>}
       </main>
       {/* Right column = one base layer (thread, else trajectory) with a profile overlay on top. Priority: profile > thread > trajectory, so a profile opened from anywhere ("click X → show X") covers the thread; closing it reveals the thread again. */}

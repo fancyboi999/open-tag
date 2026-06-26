@@ -3,17 +3,24 @@
 import "../env.js"; // must be first: loads .env / ENV_FILE (.env.prod) → DATABASE_URL, before the db connection (required when running seed standalone)
 import { db, schema, sql } from "./index.js";
 import { eq } from "drizzle-orm";
+import { seedShowcase } from "../server/showcaseSeed.js";
 
 async function main() {
   const { users, servers, serverMembers, channels, channelMembers } = schema;
 
   // Idempotent, with a one-time migration for installs created before the default slug was renamed.
-  const existing = await db.select().from(servers).where(eq(servers.slug, "open-tag"));
-  if (existing.length) { console.log("[seed] open-tag workspace already exists, skipping"); await sql.end(); return; }
   const legacy = await db.select().from(servers).where(eq(servers.slug, "demo"));
   if (legacy.length) {
     await db.update(servers).set({ slug: "open-tag", name: "open-tag" }).where(eq(servers.id, legacy[0]!.id));
     console.log("[seed] migrated workspace slug demo -> open-tag");
+    await sql.end();
+    return;
+  }
+
+  const existing = await db.select({ id: servers.id, ownerId: servers.ownerId }).from(servers).where(eq(servers.slug, "open-tag"));
+  if (existing.length) {
+    console.log("[seed] open-tag workspace already exists, ensuring showcase is seeded");
+    await seedShowcase(existing[0]!.id, existing[0]!.ownerId);
     await sql.end();
     return;
   }
@@ -35,6 +42,8 @@ async function main() {
   await db.insert(channelMembers).values({
     channelId: all!.id, memberType: "user", memberId: you!.id,
   });
+
+  await seedShowcase(server!.id, you!.id);
 
   console.log("[seed] done:");
   console.log("  server:", server!.id, "(slug=open-tag)");
