@@ -191,6 +191,30 @@ big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents fr
   the §F-REST fix) and return 404 on failure. Integration test `test/channelAccessB2.integration.ts`: 8
   non-member cases fail on main, all pass after fix; public-channel + DM regression checks included.
 
+- **IDOR-B3 [HIGH]** attachment download + thread list/create IDOR — fixed (sec-idor3 PR #103).
+  Two endpoints had no channel-membership check: (a) `GET /api/attachments/:id` (Gate 0 — called before
+  the member-gate middleware) fetched an attachment by UUID with no check that the caller may access the
+  attachment's channel — a same-tenant non-member who knew an attachment UUID could download a private
+  channel's file. Fix: after verifying the JWT, check `canUserReadChannel(a.serverId, a.channelId, uid)`
+  if the attachment has a `channelId`, else verify server membership (for avatar-style null-channelId
+  attachments); return 404 on denial (not 403, to avoid leaking existence). (b) `GET/POST /api/channels/:id/threads`:
+  neither checked that the caller was a member of the channel whose threads were being listed/created —
+  a non-member could enumerate thread metadata (reply count, last-reply time) and create threads on
+  private-channel messages (auto-joining the thread, bypassing channel privacy). Fixed by adding
+  `canUserReadChannel` at the top of the GET handler (using the URL's channel id) and immediately after
+  the parent-message lookup in the POST handler (using `parent.channelId`); both return 403 on denial.
+  Integration test `test/channelAccessB3.integration.ts`: 4 cases fail on main (attachment non-member
+  200, threads GET 200+data, threads POST 200), all pass after fix; public-channel + avatar regressions
+  included. Typecheck clean.
+
+### Pending — human-plane task/action-card write endpoints (finer-grained; require prior message UUID)
+- **IDOR-B4 [LOW-MED]** `PATCH /api/tasks/:id/(claim|unclaim|status)`, `DELETE /api/tasks/:id`,
+  `POST /api/tasks/convert-message`, `POST /api/actions/:id/mark-executed` — these write endpoints do
+  not call `canUserReadChannel`. Exploitability is lower than B1/B2/B3 because task/message UUIDs are
+  only returned by already-gated read endpoints; a non-member would need to have obtained the UUID
+  prior to being removed. Fix: add `canUserReadChannel(serverId, task.channelId, userId)` after the
+  message/task fetch in each handler. Kept out of this PR (sec-idor3) to keep the diff surgical.
+
 ### Pending — agent-plane ownership (the channel-access layer above is done; this is a finer-grained check)
 - **C5 [MED]** `POST /agent/task/update`, `/task/unclaim` — an agent that can access the channel can still
   modify/unclaim **another agent's** task (no `taskAssigneeId === agent.id` check). This is an *ownership*

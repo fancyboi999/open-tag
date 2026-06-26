@@ -50,6 +50,8 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     if (!b.parentMessageId) return (sendErr(res, 400, "parentMessageId required"), true);
     const parent = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, b.parentMessageId), eq(schema.messages.serverId, serverId))))[0];
     if (!parent) return (sendErr(res, 404, "parent message not found"), true);
+    // Channel visibility gate — non-members must not create threads on private/DM channels (IDOR-B3)
+    if (!(await canUserReadChannel(serverId, parent.channelId, userId))) return (sendErr(res, 403, "forbidden"), true);
     // Showcase channel is read-only — threads may not be created on its messages
     const parentCh = (await db.select({ type: schema.channels.type }).from(schema.channels).where(eq(schema.channels.id, parent.channelId)))[0];
     if (parentCh?.type === "showcase") return (sendErr(res, 403, "showcase channel is read-only"), true);
@@ -59,6 +61,8 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     return (sendJson(res, 200, { threadChannelId: th.id, parentMessageId: b.parentMessageId, replyCount: replies.length, lastReplyAt: replies.at(-1)?.createdAt ?? null, participantIds: parts.map((pp) => pp.memberId) }), true);
   }
   if (cthreads && method === "GET") {
+    // Channel visibility gate — non-members must not enumerate thread metadata on private/DM channels (IDOR-B3)
+    if (!(await canUserReadChannel(serverId, cthreads[1]!, userId))) return (sendErr(res, 403, "forbidden"), true);
     const pids = (url.searchParams.get("parentMessageIds") || "").split(",").map((s) => s.trim()).filter(Boolean);
     if (!pids.length) return (sendJson(res, 200, {}), true);
     const threads = await db.select().from(schema.channels).where(and(eq(schema.channels.serverId, serverId), eq(schema.channels.type, "thread"), inArray(schema.channels.parentMessageId, pids)));

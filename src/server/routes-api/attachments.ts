@@ -5,6 +5,7 @@ import { db, schema } from "../../db/index.js";
 import { parseUpload } from "../attachments.js";
 import { verifyUser } from "../auth.js";
 import { can, requireCap } from "../capabilities.js";
+import { canUserReadChannel } from "../channelAccess.js";
 import { readObject } from "../storage.js";
 import { bearer, sendErr, sendJson } from "../util.js";
 
@@ -97,6 +98,18 @@ export async function handlePublicAttachmentGet(ctx: BaseCtx): Promise<boolean> 
     if (!uid) return (sendErr(res, 401, "unauthorized"), true);
     const a = (await db.select().from(schema.attachments).where(eq(schema.attachments.id, adl[1]!)))[0];
     if (!a) return (sendErr(res, 404, "attachment not found"), true);
+    // Channel/server access gate — invariant 3: non-members of private/DM channels must not
+    // access their attachments via direct UUID (IDOR-B3). Use 404 (not 403) to avoid leaking
+    // whether the attachment exists at all.
+    if (a.channelId) {
+      // Attachment linked to a channel: apply the same channel-visibility logic as message reads.
+      if (!(await canUserReadChannel(a.serverId, a.channelId, uid))) return (sendErr(res, 404, "attachment not found"), true);
+    } else {
+      // No channelId (server-scoped attachment such as an avatar): require server membership.
+      const mem = (await db.select({ id: schema.serverMembers.userId }).from(schema.serverMembers)
+        .where(and(eq(schema.serverMembers.serverId, a.serverId), eq(schema.serverMembers.userId, uid))))[0];
+      if (!mem) return (sendErr(res, 404, "attachment not found"), true);
+    }
     let data: Buffer;
     try { data = await readObject(a.storageKey); } catch { return (sendErr(res, 404, "file missing"), true); }
     if (adl[2]) { // /preview: text preview
