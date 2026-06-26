@@ -226,6 +226,10 @@ export async function listModels(runtime: string): Promise<DiscoveredModel[] | n
       const models = parseCodexModels(r.stdout);
       return models.length ? models : null;
     }
+    case "demo":
+      // No-op: the demo runtime is in-process and has exactly one pseudo-model. Return it
+      // instantly — no subprocess, no network, no probe needed.
+      return [{ id: "demo", label: "Demo", provider: "demo", default: true }];
     default:
       return null;
   }

@@ -8,6 +8,86 @@ import { can, requireCap } from "../capabilities.js";
 import { readObject } from "../storage.js";
 import { bearer, sendErr, sendJson } from "../util.js";
 
+/**
+ * MIME types safe for inline display with no additional restrictions.
+ * Raster images, audio, video, and PDF cannot execute scripts even when
+ * navigated to directly — browsers parse them as media, not as documents.
+ *
+ * Intentional exclusions:
+ *   - text/html, application/xhtml+xml → HTML execution.
+ *   - image/svg+xml → handled separately in SAFE_INLINE_WITH_CSP_TYPES.
+ *   - text/javascript, application/javascript → direct execution.
+ *   - text/xml, application/xml → XSLT may load external resources.
+ *   - Any unlisted type → attachment + octet-stream (defense-in-depth).
+ */
+const SAFE_INLINE_TYPES = new Set<string>([
+  "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
+  "image/bmp", "image/tiff", "image/avif", "image/ico", "image/x-icon",
+  "application/pdf",
+  "video/mp4", "video/webm", "video/ogg", "video/quicktime",
+  "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm", "audio/aac",
+]);
+
+/**
+ * MIME types that need inline display (e.g. for browser image-element rendering) but carry
+ * script-execution risk when navigated to directly as a same-origin document.
+ *
+ * These are served inline with their declared content-type AND a hardened
+ * Content-Security-Policy that sandboxes the browsing context:
+ *   - `sandbox` → treats the document as a unique origin, blocks scripts,
+ *     blocks form submission, blocks popups; the SVG renders as an image
+ *     but cannot reach the parent page's localStorage or cookies.
+ *   - `default-src 'none'` → no external resources loaded.
+ *   - `style-src 'unsafe-inline'` → inline SVG styles still render correctly.
+ *
+ * When loaded via <img src="..."> the CSP of this response is irrelevant
+ * (browsers already forbid scripts in SVG images), so the sandbox is the
+ * backstop for direct URL navigation.
+ */
+const SAFE_INLINE_WITH_CSP_TYPES = new Set<string>([
+  "image/svg+xml",
+]);
+
+const SVG_SANDBOX_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+
+/**
+ * Compute safe HTTP response headers for an attachment download.
+ *
+ * Three tiers:
+ *  1. SAFE_INLINE_TYPES        → inline, declared MIME, nosniff.
+ *  2. SAFE_INLINE_WITH_CSP_TYPES (SVG) → inline, declared MIME, nosniff +
+ *     CSP sandbox (neutralises same-origin script execution on direct nav).
+ *  3. Everything else          → application/octet-stream, attachment, nosniff.
+ *
+ * Tier 3 covers legacy DB records too (operates on stored value, not upload-time
+ * declared value), so old records with dangerous MIMEs are also protected.
+ */
+export function safeDownloadHeaders(storedMime: string, filename: string): Record<string, string> {
+  const encodedName = encodeURIComponent(filename);
+  // nosniff: prevent browsers from sniffing the bytes and overriding the declared type.
+  const nosniff = { "x-content-type-options": "nosniff" };
+  if (storedMime && SAFE_INLINE_TYPES.has(storedMime)) {
+    return {
+      "content-type": storedMime,
+      "content-disposition": `inline; filename*=UTF-8''${encodedName}`,
+      ...nosniff,
+    };
+  }
+  if (storedMime && SAFE_INLINE_WITH_CSP_TYPES.has(storedMime)) {
+    return {
+      "content-type": storedMime,
+      "content-disposition": `inline; filename*=UTF-8''${encodedName}`,
+      "content-security-policy": SVG_SANDBOX_CSP,
+      ...nosniff,
+    };
+  }
+  return {
+    "content-type": "application/octet-stream",
+    "content-disposition": `attachment; filename*=UTF-8''${encodedName}`,
+    ...nosniff,
+  };
+}
+
 export async function handlePublicAttachmentGet(ctx: BaseCtx): Promise<boolean> {
   const { req, res, url, method, p } = ctx;
   // Attachment download/preview: browsers cannot set headers for anchor/img tags, so the token is passed as a query param (same approach as SSE). Placed before the auth check.
@@ -23,7 +103,7 @@ export async function handlePublicAttachmentGet(ctx: BaseCtx): Promise<boolean> 
       if (data.includes(0) || (a.sizeBytes ?? 0) > 256 * 1024) return (sendJson(res, 200, { kind: "binary" }), true);
       return (sendJson(res, 200, { kind: "text", text: data.toString("utf8") }), true);
     }
-    res.writeHead(200, { "content-type": a.mimeType || "application/octet-stream", "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(a.filename)}` });
+    res.writeHead(200, safeDownloadHeaders(a.mimeType || "", a.filename));
     res.end(data); return true;
   }
   return false;

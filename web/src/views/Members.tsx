@@ -440,9 +440,26 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
   const [machineId, setMachineId] = useState(machines[0]?.id || "");
   const [runtime, setRuntime] = useState("claude"); const [model, setModel] = useState("");
   const [models, setModels] = useState<{ id: string; label?: string; thinking?: { levels: { value: string; label: string; description?: string }[]; default?: string } }[]>([]); const [fast, setFast] = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const [reasoning, setReasoning] = useState(""); // reasoning effort (""=Default/no override); shown when selected model has thinking levels
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
-  useEffect(() => { (async () => { try { const d = await api("GET", `/api/servers/${serverId}/machines/${machineId || "none"}/runtime-models/${runtime}`); const ms = d.models || []; setModels(ms); setModel(ms[0]?.id || ""); setReasoning(ms[0]?.thinking?.default ?? ""); } catch { setModels([]); } })(); }, [runtime, machineId]);
+  useEffect(() => {
+    let cancelled = false;
+    setModelsLoading(true);
+    (async () => {
+      try {
+        const d = await api("GET", `/api/servers/${serverId}/machines/${machineId || "none"}/runtime-models/${runtime}`);
+        if (cancelled) return;
+        const ms: typeof models = d.models || [];
+        setModels(ms);
+        // Preserve the current selection if it still exists in the new list; otherwise fall back to the first option.
+        setModel((prev) => { const kept = ms.find((m) => m.id === prev); return kept ? prev : (ms[0]?.id || ""); });
+        setReasoning((prev) => { const kept = ms.find((m) => m.id === model); return kept ? prev : (ms[0]?.thinking?.default ?? ""); });
+      } catch { if (!cancelled) setModels([]); }
+      finally { if (!cancelled) setModelsLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [runtime, machineId]);
   const create = async () => {
     const nm = name.trim();
     if (!nm) { setErr(t("members.nameRequired")); return; }
@@ -451,11 +468,12 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
     try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model || null, reasoning: thinkingLevels.length ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) { if (r.started === false) toast.info(t("members.agentCreatedOffline")); onCreated?.({ id: r.id, name: r.name ?? nm }); } onClose(); }
     catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
-  const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "opencode", label: "OpenCode" }, { value: "kimi", label: "Kimi Code" }, { value: "pi", label: "Pi" }, { value: "cursor", label: "Cursor" }];
+  const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "opencode", label: "OpenCode" }, { value: "kimi", label: "Kimi Code" }, { value: "pi", label: "Pi" }, { value: "cursor", label: "Cursor" }, { value: "demo", label: "Demo", hint: t("members.demoRuntimeHint") }];
   const machineOpts = machines.length ? machines.map((m) => ({ value: m.id, label: m.name || m.hostname || m.id, hint: m.status === "online" ? t("members.machineOnline") : t("members.machineOffline") })) : [];
   const selModel = models.find((m) => m.id === model);
   const thinkingLevels = selModel?.thinking?.levels ?? [];
   const modelOpts = (models.length ? models : [{ id: "default", label: "Default" }]).map((m) => ({ value: m.id, label: m.label || m.id }));
+  const modelLoadingOpts = [{ value: "", label: "Detecting models…" }];
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -467,7 +485,11 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
         <label>Runtime</label>
         <Select ariaLabel="Runtime" value={runtime} options={RUNTIMES} onChange={setRuntime} />
         <label>{t("common.model")}</label>
-        <Select ariaLabel="Model" value={model} options={modelOpts} onChange={(v) => { setModel(v); const m = models.find((m) => m.id === v); setReasoning(m?.thinking?.default ?? ""); }} />
+        {/* During probe flight: disable interaction + show "Detecting models…" placeholder.
+            fieldset[disabled] disables all descendant buttons without modifying Select.tsx. */}
+        <fieldset disabled={modelsLoading} style={{ border: 0, padding: 0, margin: 0, opacity: modelsLoading ? 0.6 : 1 }}>
+          <Select ariaLabel="Model" value={modelsLoading ? "" : model} options={modelsLoading ? modelLoadingOpts : modelOpts} onChange={(v) => { setModel(v); const m = models.find((m) => m.id === v); setReasoning(m?.thinking?.default ?? ""); }} />
+        </fieldset>
         {thinkingLevels.length > 0 && <>
           <label>{t("members.reasoningLabel")}</label>
           <Select ariaLabel="Reasoning" value={reasoning} onChange={setReasoning}

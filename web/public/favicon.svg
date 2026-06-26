@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- rounded square background, dark -->
+  <rect width="32" height="32" rx="7" fill="#111827"/>
+  <!-- tag / label shape pointing right (open-tag brand concept) -->
+  <path d="M5 9h15l7 7-7 7H5z" fill="#22c55e"/>
+  <!-- hole in tag -->
+  <circle cx="10" cy="16" r="2.5" fill="#111827"/>
+</svg>

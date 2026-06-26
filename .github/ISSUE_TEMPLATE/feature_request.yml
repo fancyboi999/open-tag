@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest a new capability or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest an improvement.
+        Please search existing issues and discussions first.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Motivation
+      description: >
+        What problem are you trying to solve, or what workflow would this
+        improve? Concrete examples help.
+      placeholder: "When I do X with Y agents, I have to manually Z every time…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: >
+        Describe the change you'd like to see. Be as specific as you can —
+        API shape, UI flow, config option, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: >
+        Other approaches you tried or thought about, and why you prefer the
+        proposed solution.
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: >
+        Mockups, links to related issues, prior art in other tools, or
+        anything else relevant.
+    validations:
+      required: false
