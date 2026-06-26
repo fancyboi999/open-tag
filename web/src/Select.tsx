@@ -26,11 +26,16 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
     if (!open) return;
     setHi(Math.max(0, options.findIndex((o) => o.value === value)));
     const onDown = (e: MouseEvent) => { const t = e.target as Node; if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false); };
-    const onScroll = () => setOpen(false);
+    const close = () => setOpen(false);
+    // Close on scroll EXCEPT when the scroll happens inside the menu itself. The menu is a fixed,
+    // viewport-positioned overlay, so an outer/page scroll drifts it off its trigger → close it. But a
+    // long option list scrolling within its own max-height must NOT dismiss the menu (capture-phase
+    // listener sees that inner scroll too, so we have to exclude it explicitly).
+    const onScroll = (e: Event) => { if (menuRef.current?.contains(e.target as Node)) return; setOpen(false); };
     document.addEventListener("mousedown", onDown);
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", close);
     window.addEventListener("scroll", onScroll, true);
-    return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("resize", onScroll); window.removeEventListener("scroll", onScroll, true); };
+    return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("resize", close); window.removeEventListener("scroll", onScroll, true); };
   }, [open, options, value]);
 
   const pick = (v: string) => { onChange(v); setOpen(false); btnRef.current?.focus(); };
