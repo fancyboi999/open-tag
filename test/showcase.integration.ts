@@ -1,5 +1,5 @@
 // Integration test: #showcase channel read access + write intercepts.
-// Tests five write blocks (403) and three read passthroughs (200).
+// Tests seven write blocks (403) and three read passthroughs (200).
 //
 // EXPECTED BEHAVIOUR (goal contract):
 //   Read  paths: any server member may read the showcase channel.
@@ -23,6 +23,7 @@ let serverId = "";
 let userId = "";
 let showcaseChId = "";
 let anchorMsgId = "";
+let taskMsgId = "";   // a task message seeded in the showcase channel (for W6/W7)
 let userToken = "";
 let agentId = "";
 let agentToken = "";
@@ -124,6 +125,14 @@ async function setup() {
   const [msg] = await db.insert(schema.messages).values({ serverId, channelId: showcaseChId, senderType: "user", senderId: userId, senderName: `sc_user_${ts}`, content: "Case 1 anchor", seq: 1 }).returning();
   anchorMsgId = msg!.id;
 
+  // Seed a task message in the showcase channel (for W6 / W7)
+  const [taskMsg] = await db.insert(schema.messages).values({
+    serverId, channelId: showcaseChId, senderType: "user", senderId: userId, senderName: `sc_user_${ts}`,
+    content: "Ship CSV export", seq: 2, taskStatus: "done", taskNumber: 1,
+    taskCompletedAt: new Date(),
+  }).returning();
+  taskMsgId = taskMsg!.id;
+
   // Create a test agent with a known token
   const rawToken = `sk_agent_sc_${ts}`;
   const tokenHash = createHash("sha256").update(rawToken).digest("hex");
@@ -211,6 +220,18 @@ async function main() {
   const w5 = await agentApiCall({ method: "POST", path: "/agent-api/message/send", agentToken, agentId, serverId, body: { target: "showcase", content: "agent-injected" } });
   check("returns 403", w5.status === 403);
   check("error message mentions read-only", JSON.stringify(w5.body).includes("read-only"));
+
+  // ── WRITE intercept 6: PATCH /api/tasks/:id/status → 403 ───────────────
+  console.log("\n[W6] PATCH /api/tasks/:id/status for showcase task — should 403");
+  const w6 = await apiCall({ method: "PATCH", path: `/api/tasks/${taskMsgId}/status`, token: userToken, serverId, body: { status: "todo" } });
+  check("returns 403", w6.status === 403);
+  check("error message mentions read-only", JSON.stringify(w6.body).includes("read-only"));
+
+  // ── WRITE intercept 7: DELETE /api/tasks/:id → 403 ─────────────────────
+  console.log("\n[W7] DELETE /api/tasks/:id for showcase task — should 403");
+  const w7 = await apiCall({ method: "DELETE", path: `/api/tasks/${taskMsgId}`, token: userToken, serverId });
+  check("returns 403", w7.status === 403);
+  check("error message mentions read-only", JSON.stringify(w7.body).includes("read-only"));
 }
 
 main()

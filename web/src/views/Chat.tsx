@@ -324,14 +324,15 @@ export function Chat() {
                     <div className="msg-meta">
                         {m.taskStatus && (() => {
                           const TI = TASK_ICON[m.taskStatus] || Circle;
-                          const claimable = !m.taskAssigneeId && m.taskStatus === "todo";
+                          const isShowcase = cur?.type === "showcase";
+                          const claimable = !isShowcase && !m.taskAssigneeId && m.taskStatus === "todo";
                           const claimedByMe = m.taskAssigneeType === "user" && m.taskAssigneeId === me?.id;
                           const opts = ynOptions(m.taskStatus, manageServer, claimedByMe);
-                          const open = taskMenu === m.id;
+                          const open = !isShowcase && taskMenu === m.id;
                           return (
                             <span className="task-pill-wrap">
-                              {/* clicking the badge changes status (does not open thread; use the reply / thread button for that) */}
-                              <button className={"task-pill st-" + m.taskStatus} onClick={(e) => { e.stopPropagation(); setTaskMenu(open ? null : m.id); }} title={t("chat.taskChangeStatus", { number: m.taskNumber })}><TI size={11} /> #{m.taskNumber} {t(ST_LABEL[m.taskStatus] ?? m.taskStatus)}{taskAssignee(m)}</button>
+                              {/* clicking the badge changes status; in showcase channels the pill is a read-only label */}
+                              <button className={"task-pill st-" + m.taskStatus} onClick={(e) => { e.stopPropagation(); if (!isShowcase) setTaskMenu(open ? null : m.id); }} title={isShowcase ? undefined : t("chat.taskChangeStatus", { number: m.taskNumber })} style={isShowcase ? { cursor: "default" } : undefined}><TI size={11} /> #{m.taskNumber} {t(ST_LABEL[m.taskStatus] ?? m.taskStatus)}{taskAssignee(m)}</button>
                               {open && <div className="st-menu" onMouseLeave={() => setTaskMenu(null)}>
                                 {claimable && <button onClick={() => { setTaskMenu(null); doTask(m, "claim"); }}>{t("chat.claim")}</button>}
                                 {opts.map((s) => <button key={s} className={s === m.taskStatus ? "on" : ""} onClick={() => { setTaskMenu(null); if (s !== m.taskStatus) doTask(m, "status", { status: s }); }}><span className={"st-dot st-" + s} />{t(ST_LABEL[s])}</button>)}
