@@ -110,8 +110,9 @@ gap: task *ownership* (§6 C5).
 | `GET /api/messages/channel/:id` | any tenant by UUID | `serverId`-scoped (cross-tenant read blocked) |
 | `GET /api/agents/:id/activity-log` | any tenant by agent id | `serverId`-scoped |
 | `GET /api/agents/:id/agent-dms` | any tenant's DMs | agent-ownership pre-check (404 on foreign agent) + `serverId`-scoped channel lookup |
-| `GET /api/channels/:id/members` | any tenant by UUID | channel-ownership pre-check (404 otherwise) |
-| `GET /api/channels/:id/files` | any tenant by UUID | `serverId`-scoped |
+| `GET /api/channels/:id/members` | any tenant by UUID | channel-ownership pre-check (404 otherwise) + `canUserReadChannel` membership check (IDOR-B2) |
+| `GET /api/channels/:id/files` | any tenant by UUID | `serverId`-scoped + `canUserReadChannel` membership check (IDOR-B2) |
+| `POST`/`DELETE /api/messages/:id/reactions` | message access, no channel-membership check | `canUserReadChannel` on message's channel after lookup (IDOR-B2) |
 | `resolveTarget` `dm:@user` (agent plane) | any global username | peer must be a `serverMembers` member |
 
 **Slice 2 — agent-plane channel-access layer (`canAgentReadChannel`):**
@@ -179,6 +180,16 @@ big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents fr
   public channel → ok; thread → inherits parent; private/DM non-member → 403. Integration test
   `test/channelAccess.integration.ts` confirms: 6 non-member cases fail on main, all pass after fix,
   public-channel regression check passes, DM isolation verified.
+
+- **IDOR-B2 [HIGH]** residual private-channel IDOR on three human-REST endpoints — fixed (sec-idor2 PR).
+  `GET /api/channels/:id/members` had a server-ownership check but no channel-membership check; a same-tenant
+  non-member could enumerate the member roster of any private/DM channel by UUID. `GET /api/channels/:id/files`
+  similarly only scoped by `serverId` — a non-member could list all files in a private/DM channel. `POST`/
+  `DELETE /api/messages/:id/reactions` verified only that the message existed (correct `serverId`) but not
+  that the caller could access the message's channel — a non-member could add/remove reactions on private-channel
+  messages. All three now call `canUserReadChannel(serverId, channelId, userId)` (reusing the same guard as
+  the §F-REST fix) and return 404 on failure. Integration test `test/channelAccessB2.integration.ts`: 8
+  non-member cases fail on main, all pass after fix; public-channel + DM regression checks included.
 
 ### Pending — agent-plane ownership (the channel-access layer above is done; this is a finer-grained check)
 - **C5 [MED]** `POST /agent/task/update`, `/task/unclaim` — an agent that can access the channel can still
