@@ -190,5 +190,9 @@ Human-auth env flags (`.env` / `.env.prod`):
 Transport-layer env flags:
 - `ALLOWED_ORIGIN` — comma-separated allowed browser origins for CORS. Dev default (unset): any
   `localhost` / `127.0.0.1` origin. Production: must be set to frontend URL(s).
-- `TRUST_PROXY` — set to `true` only when a controlled reverse proxy unconditionally rewrites
-  `X-Forwarded-For`. Without this, `clientIp()` uses the TCP socket address (unforgeable).
+- `TRUST_PROXY` — set to `true` only when a single controlled reverse proxy (Railway, nginx,
+  Caddy) appends the real client IP to `X-Forwarded-For`. `clientIp()` takes the **rightmost**
+  XFF value (the hop the proxy appended — unforgeable by the client). Taking the leftmost
+  would let clients spoof the IP and bypass rate-limiting. Assumes exactly **one trusted hop**;
+  multi-hop deployments (CDN → nginx → app) need hop-count-aware parsing instead. Without this
+  flag, `clientIp()` uses the TCP socket address (unforgeable).
