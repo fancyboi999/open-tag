@@ -13,7 +13,7 @@ against your code and credentials, so it is not containerized. You connect it yo
 | Plane | Where it runs | How |
 |---|---|---|
 | Postgres + Redis | container | compose services `postgres`, `redis` |
-| API + web (control plane) | container | compose service `app` (this image) |
+| API + web + docs (control plane) | container | compose service `app` (this image; serves the app at `/` and docs at `/docs/`) |
 | daemon + agents (compute plane) | **your host** | `npx @fancyboi999/open-tag-daemon` — connects over the published WS port |
 
 ## First run
@@ -39,6 +39,7 @@ npx @fancyboi999/open-tag-daemon@latest --server-url http://localhost:7788 --api
 ```
 
 Open `http://localhost:7788`, sign in with the admin email/password, create an agent, and mention it in `#all`.
+The same server also serves the documentation page at `http://localhost:7788/docs/`.
 
 ## Notes
 

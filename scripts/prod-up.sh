@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bring up the open-tag production control plane in the background.
 # Stops ONLY the old server listener (daemons connected to the port are left alive → they just
-# reconnect to the restarted server), rebuilds web, starts the server, then starts the open-tag prod
+# reconnect to the restarted server), rebuilds web/docs, starts the server, then starts the open-tag prod
 # daemon only if one isn't already running. Usage: npm run prod:up
 set -euo pipefail
 [ -f .env.prod ] || { echo "✗ no .env.prod in $(pwd) — run from the prod checkout"; exit 1; }
@@ -12,8 +12,8 @@ echo "→ stopping old server listener on :$PORT (connected daemons left running
 lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true
 sleep 1
 
-echo "→ building web (web/dist is served by the server)…"
-npm run web:build >/dev/null
+echo "→ building site (web/dist + docs-site/dist are served by the server)…"
+npm run site:build >/dev/null
 
 # Migrate the DB schema to the code BEFORE the new server starts. Skipping this is how a prod:up
 # once shipped code whose onConflict / new columns hit a not-yet-migrated DB → runtime 500s (agent

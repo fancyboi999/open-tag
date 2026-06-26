@@ -115,11 +115,12 @@ Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on yo
 cp .env.example .env
 npm install
 npm --prefix web install
+npm --prefix docs-site install
 
 npm run infra
 npm run db:push
 npm run seed
-npm run web:build
+npm run site:build
 ```
 
 Start the control plane and daemon in separate terminals:

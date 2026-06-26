@@ -30,6 +30,11 @@ const applyHelmet = (req: http.IncomingMessage, res: http.ServerResponse): Promi
     helmetMiddleware(req, res, (err?: unknown) => (err ? reject(err as Error) : resolve()))
   );
 
+const redirect = (res: import("node:http").ServerResponse, location: string): void => {
+  res.writeHead(308, { location });
+  res.end();
+};
+
 // ── CORS origin whitelist ─────────────────────────────────────────────────────
 // Reads ALLOWED_ORIGIN (comma-separated list of allowed origins, e.g. "https://app.example.com").
 // Dev fallback (ALLOWED_ORIGIN unset): any localhost / 127.0.0.1 origin is permitted so Vite HMR
@@ -52,6 +57,7 @@ function corsOriginHeader(reqOrigin: string | undefined): string | null {
 
 const PORT = Number(process.env.PORT ?? 7777);
 const WEBDIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../web/dist");
+const DOCSDIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../docs-site/dist");
 const log = createLogger("server");
 initRealtime();
 
@@ -65,6 +71,27 @@ async function serveStatic(res: import("node:http").ServerResponse, pathname: st
   catch { try { data = await readFile(path.join(WEBDIST, "index.html")); ext = ".html"; } catch { return false; } } // SPA fallback
   res.writeHead(200, { "content-type": CTYPE[ext] || "application/octet-stream" });
   res.end(data); return true;
+}
+
+async function serveDocs(res: import("node:http").ServerResponse, pathname: string, sendBody = true): Promise<boolean> {
+  const withoutPrefix = pathname === "/docs" ? "/" : pathname.slice("/docs".length);
+  const rel = withoutPrefix === "/" ? "/index.html" : withoutPrefix;
+  let file = path.join(DOCSDIST, rel);
+  if (!file.startsWith(DOCSDIST)) file = path.join(DOCSDIST, "index.html");
+  let data: Buffer; let ext = path.extname(file);
+  try { data = await readFile(file); }
+  catch { try { data = await readFile(path.join(DOCSDIST, "index.html")); ext = ".html"; } catch { return false; } }
+  res.writeHead(200, { "content-type": CTYPE[ext] || "application/octet-stream" });
+  res.end(sendBody ? data : undefined); return true;
+}
+
+async function serveDocsAsset(res: import("node:http").ServerResponse, pathname: string, sendBody = true): Promise<boolean> {
+  let file = path.join(DOCSDIST, pathname);
+  if (!file.startsWith(DOCSDIST)) return false;
+  let data: Buffer; const ext = path.extname(file);
+  try { data = await readFile(file); } catch { return false; }
+  res.writeHead(200, { "content-type": CTYPE[ext] || "application/octet-stream" });
+  res.end(sendBody ? data : undefined); return true;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -87,6 +114,10 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/health") return sendJson(res, 200, { ok: true, service: "open-tag", time: new Date().toISOString() });
     if (await handleAgentApi(req, res, url, method)) return;
     if (await handleApi(req, res, url, method)) return;
+    const isRead = method === "GET" || method === "HEAD";
+    if (isRead && url.pathname === "/docs") return redirect(res, "/docs/");
+    if (isRead && url.pathname.startsWith("/docs/") && await serveDocs(res, url.pathname, method === "GET")) return;
+    if (isRead && url.pathname.startsWith("/_astro/") && await serveDocsAsset(res, url.pathname, method === "GET")) return;
     // Static frontend (web/dist) + SPA fallback (client-side routing /s/:server/*)
     if (method === "GET" && await serveStatic(res, url.pathname)) return;
     sendErr(res, 404, "not found");
