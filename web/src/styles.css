@@ -545,6 +545,8 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 /* Connect machine modal: description + code box */
 .modal-note{font-size:13px;line-height:1.6;color:var(--muted);margin:0 0 4px}
 .modal-note code{font-family:ui-monospace,monospace;font-size:12px;background:var(--surface-strong);padding:1px 5px;border-radius:4px;color:var(--ink-2)}
+.update-steps{display:grid;gap:8px;margin:14px 0;color:var(--body);font-size:14px;line-height:1.55}
+.update-steps p{margin:0;padding:9px 11px;border:1px solid var(--hair);border-radius:8px;background:var(--canvas-soft)}
 .codebox{display:flex;align-items:center;gap:10px;background:var(--surface-strong);border:1px solid var(--hair-strong);border-radius:8px;padding:9px 12px;margin-top:2px}
 .codebox code{font-family:ui-monospace,monospace;font-size:12.5px;color:var(--ink);overflow-x:auto;white-space:nowrap;word-break:keep-all}
 .codebox .joinbtn{flex:none}
@@ -750,7 +752,7 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
 
 /* ── Modal / QuickSwitcher entry animation ── */
 @keyframes modal-enter{from{opacity:0;transform:translateY(6px) scale(.99)}to{opacity:1;transform:none}}
-.modal,.qs{animation:modal-enter var(--dur-slow) var(--ease-quint) both}
+.modal,.qs{animation:modal-enter var(--dur-slow) var(--ease-quint)}
 
 /* ── Channel / tab content crossfade: opacity + micro translateY ── */
 @keyframes view-enter{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}

@@ -61,3 +61,12 @@ test("inline empty-state body text clears WCAG AA (uses --muted, not the sub-AA 
     assert.doesNotMatch(body, /var\(--muted-soft\)/, `${sel} carries readable text and must not use --muted-soft`);
   }
 });
+
+test("modal entry animation does not retain a transform after it finishes", () => {
+  const modal = ruleBody(".modal,.qs");
+  assert.doesNotMatch(
+    modal,
+    /animation\s*:[^;]*(?:\bboth\b|\bforwards\b)/,
+    "modal animations must not keep fill-mode:both/forwards; retained identity transforms can break fixed-position overlays and menus",
+  );
+});

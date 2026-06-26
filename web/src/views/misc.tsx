@@ -9,6 +9,7 @@ import { TaskBoard } from "../TaskBoard.tsx";
 import { PaneEmpty } from "../PaneEmpty.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 import { useTranslation } from "react-i18next";
+import { daemonUpdateCommandTemplate, isDaemonUpdateAvailable } from "../machineUi.ts";
 
 export function Tasks() {
   const { channels, slug } = useStore();
@@ -181,17 +182,19 @@ export function Inbox() {
 // Runtime name → display label mapping
 const RT_LABEL: Record<string, string> = { claude: "Claude Code", codex: "Codex CLI", opencode: "OpenCode", copilot: "Copilot CLI", cursor: "Cursor CLI", gemini: "Gemini CLI", kimi: "Kimi" };
 export function Computers() {
-  const { machines, agents, slug, api, serverId, reload, attachmentUrl, capabilities } = useStore();
+  const { machines, agents, slug, api, serverId, reload, attachmentUrl, capabilities, latestDaemonVersion } = useStore();
   const confirm = useConfirm();
   const { t } = useTranslation();
   const { machineId } = useParams();
   const nav = useNavigate();
   const [connect, setConnect] = useState(false);
   const [reconnect, setReconnect] = useState<{ id: string; name: string } | null>(null);
+  const [updateGuide, setUpdateGuide] = useState<{ id: string; name: string; currentVersion: string; latestVersion: string; apiKeyPrefix?: string } | null>(null);
   const [delErr, setDelErr] = useState("");
   const [deleting, setDeleting] = useState(false);
   const cur = machines.find((m) => m.id === machineId) || machines[0];
   const onMachine = agents.filter((a) => a.machineId === cur?.id);
+  const canUpdateDaemon = isDaemonUpdateAvailable(cur, latestDaemonVersion);
   const removeMachine = async () => {
     if (!cur) return;
     setDelErr("");
@@ -222,6 +225,7 @@ export function Computers() {
           : <>
             <div className="head"><h1>{cur.name || cur.hostname}</h1><small>{cur.status === "online" ? t("misc.computersOnline") : t("misc.computersOffline")} · {t("misc.computersDaemonLabel")} {cur.daemonVersion || "?"}</small>
               {capabilities.manageMachines && <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                {canUpdateDaemon && <button className="action-btn" onClick={() => setUpdateGuide({ id: cur.id, name: cur.name || cur.hostname || "", currentVersion: cur.daemonVersion || "?", latestVersion: latestDaemonVersion, apiKeyPrefix: cur.apiKeyPrefix })}>{t("misc.computersUpdateDaemonBtn")}</button>}
                 {cur.status !== "online" && <button className="action-btn" onClick={() => setReconnect({ id: cur.id, name: cur.name || cur.hostname || "" })}>{t("misc.computersReconnectBtn")}</button>}
                 <button className="danger-btn" onClick={removeMachine} disabled={deleting}>{deleting ? t("misc.computersDeleting") : t("misc.computersDeleteBtn")}</button>
               </div>}
@@ -247,7 +251,33 @@ export function Computers() {
       </main>
       {connect && <ConnectMachineModal onClose={() => setConnect(false)} />}
       {reconnect && <ConnectMachineModal machine={reconnect} onClose={() => setReconnect(null)} />}
+      {updateGuide && <DaemonUpdateModal machine={updateGuide} onClose={() => setUpdateGuide(null)} />}
     </>
+  );
+}
+
+function DaemonUpdateModal({ onClose, machine }: { onClose: () => void; machine: { id: string; name: string; currentVersion: string; latestVersion: string; apiKeyPrefix?: string } }) {
+  useEscClose(onClose);
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+  const cmd = daemonUpdateCommandTemplate(window.location.origin);
+  const copy = () => { navigator.clipboard?.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>{t("misc.updateDaemonModalTitle", { name: machine.name })}</h3>
+        <p className="modal-note"><AlertTriangle size={14} /> {t("misc.updateDaemonModalNote", { current: machine.currentVersion, latest: machine.latestVersion })}</p>
+        <div className="update-steps">
+          <p>{t("misc.updateDaemonModalSavedKeyPath")}</p>
+          <p>{t("misc.updateDaemonModalLostKeyPath")}</p>
+          {machine.apiKeyPrefix && <p>{t("misc.updateDaemonModalKeyPrefix", { prefix: machine.apiKeyPrefix })}</p>}
+        </div>
+        <label>{t("misc.updateDaemonModalCmdLabel")}</label>
+        <div className="codebox"><code className="grow">{cmd}</code><button className="joinbtn" onClick={copy}>{copied ? t("misc.connectModalCopied") : t("misc.connectModalCopyBtn")}</button></div>
+        <p className="modal-note">{t("misc.updateDaemonModalPlaceholderNote")}</p>
+        <div className="acts"><button className="ok" onClick={onClose}>{t("misc.connectModalDone")}</button></div>
+      </div>
+    </div>
   );
 }
 

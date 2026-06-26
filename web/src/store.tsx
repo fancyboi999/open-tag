@@ -6,7 +6,7 @@ import { appendCapped, type TrajItem } from "./trajBuffer.ts";
 export interface Channel { id: string; name: string; description?: string; type: string; joined?: boolean; lastMessageAt?: string; archivedAt?: string | null }
 export interface Dm { id: string; name: string; type: string; description?: string; lastMessageAt?: string; peerId?: string | null; peerName?: string | null; peerDisplayName?: string | null; peerType?: string | null; peerAvatarUrl?: string | null }
 export interface Agent { id: string; name: string; displayName: string; description?: string; status: string; activity?: string; activityDetail?: string; model?: string; runtime: string; machineId?: string; avatarUrl?: string | null; creatorType?: string }
-export interface Machine { id: string; name?: string; hostname?: string; os?: string; runtimes?: string[]; status?: string; daemonVersion?: string; isComputer?: boolean }
+export interface Machine { id: string; name?: string; hostname?: string; os?: string; runtimes?: string[]; status?: string; daemonVersion?: string; isComputer?: boolean; apiKeyPrefix?: string }
 export interface Human { userId: string; name: string; displayName?: string; role?: string; description?: string; avatarUrl?: string | null }
 export interface ServerInfo { id: string; name: string; slug: string; avatarUrl?: string | null; role?: string; capabilities?: Record<string, boolean> }
 export interface Me { id: string; name: string; displayName?: string }
