@@ -24,7 +24,7 @@ function statusOf(a: { activity?: string | null; status: string }): string {
 
 export function Members() {
   const { t } = useTranslation();
-  const { agents, humans, machines, slug, capabilities, attachmentUrl } = useStore();
+  const { visibleAgents: agents, humans, machines, slug, capabilities, attachmentUrl } = useStore(); // visibleAgents: showcase demo props are hidden from the roster (they stay in the store for #showcase history)
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const { agentId, userId } = useParams();
   const nav = useNavigate();

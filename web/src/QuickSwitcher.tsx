@@ -10,7 +10,7 @@ interface QSItem { kind: "channel" | "dm" | "agent" | "human"; id: string; label
 
 export function QuickSwitcher({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const { channels, dms, agents, humans, slug } = useStore();
+  const { channels, dms, visibleAgents: agents, humans, slug } = useStore(); // visibleAgents: keep showcase demo props out of the quick switcher
   const nav = useNavigate();
   const [q, setQ] = useState("");
   const [hi, setHi] = useState(0);

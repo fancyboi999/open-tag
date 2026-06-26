@@ -198,6 +198,13 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .head{padding:18px 28px;border-bottom:1px solid var(--hair);display:flex;align-items:baseline;gap:12px}
 .head h1{font-family:var(--serif);font-weight:400;font-size:24px;letter-spacing:-.32px;color:var(--ink);margin:0}
 .head small{font-size:12px;color:var(--muted)}
+/* Chat channel header only (scoped via .chat-head so the shared .head in Members / agent profile is untouched):
+   keep name + description + tabs on ONE row. The description shrinks to an ellipsis instead of wrapping — wrapping
+   otherwise multiplied the header height and dropped the channel name to the bottom when the column got narrow
+   (e.g. a wide right panel). Name + tabs never shrink, so the tab row stays intact instead of being pushed around. */
+.chat-head>h1{flex-shrink:0}
+.chat-head>small,.chat-head>.head-status{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-head>.chtabs{flex-shrink:0}
 .scroll{flex:1;overflow:auto;padding:24px 28px}
 .msg{display:flex;gap:12px;margin:0 -12px 6px;padding:7px 12px;border-radius:12px;transition:background .1s;position:relative}
 .msg:hover{background:var(--canvas-soft)}
