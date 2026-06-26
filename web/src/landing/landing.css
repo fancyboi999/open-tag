@@ -171,6 +171,19 @@
    wins and the title↔subtitle gap collapses (the subtitle <p> overlaps the <h1>). */
 .lp-hero__intro .lp-hero__title { margin-top: var(--lp-space-6); font-family: var(--lp-font-display); font-weight: 400; font-size: 78px; line-height: 1.15; letter-spacing: var(--lp-tracking-display); }
 .lp-hero__title em { font-style: italic; color: var(--lp-accent); }
+/* Hero typewriter visuals. The JS types char-by-char (HeroTitle in Landing.tsx); these rules are
+   what make it *read* as typing. .lp-type__rest holds the not-yet-typed text invisibly so the box
+   reserves its full size — zero layout shift as characters land. .lp-caret is the blinking cursor
+   riding between typed and rest; on .is-done (and the reduced-motion path, which renders the full
+   text immediately) it fades out so a finished headline isn't left with a cursor stuck to it. */
+.lp-type__rest { visibility: hidden; }
+.lp-caret {
+  display: inline-block; width: 0.045em; height: 0.86em;
+  vertical-align: -0.04em; background: var(--lp-accent);
+  animation: lp-caret-blink 1.05s step-end infinite;
+}
+.lp-caret.is-done { animation: none; opacity: 0; }
+@keyframes lp-caret-blink { 0%, 50% { opacity: 1; } 50.001%, 100% { opacity: 0; } }
 .lp-hero__intro .lp-hero__sub { margin-top: var(--lp-space-8); margin-inline: auto; font-size: var(--lp-text-lg); color: var(--lp-fg-2); max-width: 48ch; }
 .lp-hero__actions { margin-top: var(--lp-space-12); display: flex; gap: var(--lp-space-4); justify-content: center; flex-wrap: wrap; }
 .lp-hero__intro .lp-hero__note { margin-top: var(--lp-space-5); text-align: center; font-size: var(--lp-text-sm); color: var(--lp-muted); }
