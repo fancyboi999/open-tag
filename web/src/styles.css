@@ -149,7 +149,12 @@ mark{background:var(--g-peach);color:var(--ink);padding:0 2px;border-radius:4px}
 .auth-card{width:100%;max-width:380px;background:var(--canvas);border:1px solid var(--hair-strong);border-radius:8px;padding:28px 26px;box-shadow:0 8px 28px var(--shadow-3)}
 .auth-brand{font-family:var(--serif);font-size:22px;color:var(--ink);margin-bottom:6px}
 .auth-card h1{font-size:20px;margin:0 0 16px;color:var(--ink)}
-.auth-card input{width:100%;font-size:15px;padding:10px 12px;border:1px solid var(--hair-strong);border-radius:8px;outline:none;background:var(--canvas);color:var(--ink);font-family:inherit;margin-bottom:10px}
+.auth-field{display:block;margin-bottom:10px}
+.auth-field span{display:block;font-size:13px;font-weight:500;color:var(--body);margin:0 0 5px}
+.auth-card input{width:100%;font-size:15px;padding:10px 12px;border:1px solid var(--hair-strong);border-radius:8px;outline:none;background:var(--canvas);color:var(--ink);font-family:inherit}
+.auth-card input:focus{border-color:var(--ink);box-shadow:0 0 0 2px var(--hair)}
+.auth-card input::placeholder{color:var(--muted)}
+.auth-card .form-err{margin:2px 0 12px;padding:10px 12px;border:1px solid var(--error-line);border-radius:8px;background:var(--error-soft);color:#991b1b;font-size:13px;line-height:1.45}
 .auth-submit{width:100%;margin-top:4px;padding:10px}
 .auth-alt{margin-top:14px;font-size:13px;color:var(--muted);text-align:center}
 .auth-alt a{color:var(--ink);cursor:pointer;text-decoration:underline}
