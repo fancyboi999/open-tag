@@ -145,6 +145,28 @@ export function serializeMsg(msg: typeof schema.messages.$inferSelect, mentions:
   };
 }
 
+async function publishThreadUpdated(
+  serverId: string,
+  ch: typeof schema.channels.$inferSelect | undefined,
+  senderId: string | null,
+  senderType: "user" | "agent" | "system",
+) {
+  if (ch?.type !== "thread" || !ch.parentMessageId) return;
+  const replies = await db.select({ id: schema.messages.id }).from(schema.messages).where(eq(schema.messages.channelId, ch.id));
+  const parts = await db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, ch.id));
+  const parent = (await db.select({ channelId: schema.messages.channelId }).from(schema.messages).where(eq(schema.messages.id, ch.parentMessageId)))[0];
+  await publish(serverId, {
+    type: "thread:updated",
+    threadChannelId: ch.id,
+    parentMessageId: ch.parentMessageId,
+    parentChannelId: parent?.channelId ?? null,
+    replyCount: replies.length,
+    participantIds: parts.map((p) => p.memberId),
+    senderId,
+    senderType,
+  });
+}
+
 /** Aggregate message reactions into grouped shape: one entry per emoji {emoji,count,reactorIds,reactorNames}. */
 export async function aggregateReactions(messageIds: string[]): Promise<Map<string, ReactionAgg[]>> {
   const out = new Map<string, ReactionAgg[]>();
@@ -326,20 +348,17 @@ export async function createMessage(opts: {
     msg!.threadId = th.id;
   }
   // Human-side realtime
-  await publish(opts.serverId, { type: "message", channelId: opts.channelId, message: serializeMsg(msg!, mentions, atts) });
+  await publish(opts.serverId, { type: "message", channelId: opts.channelId, message: { ...serializeMsg(msg!, mentions, atts), channelType: ch?.type ?? null } });
   if (opts.asTask) {
     await publish(opts.serverId, { type: "task", op: "created", task: serializeMsg(msg!, mentions, atts) });
-    await sysTaskMsg(opts.serverId, opts.channelId, `${opts.senderName} created task #${taskNumber} "${taskTitle(opts.content)}"`); // audit trail (task system messages)
+    const actor = (opts.senderType === "user" || opts.senderType === "agent") && opts.senderId ? { type: opts.senderType, id: opts.senderId } : undefined;
+    await sysTaskMsg(opts.serverId, opts.channelId, `${opts.senderName} created task #${taskNumber} "${taskTitle(opts.content)}"`, actor); // audit trail (task system messages)
   }
 
   // Agent-side wake: only wake agents @-mentioned (in channel), or agent members in a DM.
   const isDm = ch?.type === "dm";
   // Message in thread channel → broadcast thread:updated (parentMessageId + replyCount + participantIds)
-  if (ch?.type === "thread" && ch.parentMessageId) {
-    const replies = await db.select({ id: schema.messages.id }).from(schema.messages).where(eq(schema.messages.channelId, ch.id));
-    const parts = await db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, ch.id));
-    await publish(opts.serverId, { type: "thread:updated", threadChannelId: ch.id, parentMessageId: ch.parentMessageId, replyCount: replies.length, participantIds: parts.map((p) => p.memberId) });
-  }
+  await publishThreadUpdated(opts.serverId, ch, opts.senderId, opts.senderType);
   const mentionedAgents = new Set(mentions.filter((m) => m.type === "agent").map((m) => m.id));
   // inbox notice uses human-readable target (#name / dm:@sender), not uuid. threads use channel name.
   const targetName = isDm ? `dm:@${opts.senderName}` : `#${ch?.name ?? opts.channelId}`;
@@ -477,11 +496,13 @@ async function actorName(type: "user" | "agent", id: string): Promise<string> {
   const u = (await db.select().from(schema.users).where(eq(schema.users.id, id)))[0]; return u?.displayName || u?.name || "someone";
 }
 // Lightweight system message: only insert + publish message, no wake/no task creation (otherwise every status change wakes all agents = noise)
-async function sysTaskMsg(serverId: string, channelId: string, content: string) {
+async function sysTaskMsg(serverId: string, channelId: string, content: string, actor?: { type: "user" | "agent"; id: string }) {
   const seq = await nextSeq(serverId);
-  const [m] = await db.insert(schema.messages).values({ seq, serverId, channelId, senderType: "system", senderId: null, senderName: "system", messageType: "system", content, searchText: content }).returning();
+  const [m] = await db.insert(schema.messages).values({ seq, serverId, channelId, senderType: "system", senderId: actor?.id ?? null, senderName: "system", messageType: "system", content, searchText: content }).returning();
+  const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, channelId)))[0];
   await db.update(schema.channels).set({ lastMessageAt: new Date() }).where(eq(schema.channels.id, channelId));
-  await publish(serverId, { type: "message", channelId, message: serializeMsg(m!, [], []) });
+  await publish(serverId, { type: "message", channelId, message: { ...serializeMsg(m!, [], []), channelType: ch?.type ?? null } });
+  await publishThreadUpdated(serverId, ch, actor?.id ?? null, "system");
   return m!;
 }
 
@@ -501,7 +522,7 @@ export async function convertMessageToTask(serverId: string, messageId: string, 
   const [upd] = await db.update(schema.messages).set({ taskNumber, threadId: th.id }).where(eq(schema.messages.id, messageId)).returning();
   await publish(serverId, { type: "task", op: "created", task: serializeMsg(upd!, await taskMentions(messageId)) });
   const an = by ? await actorName(by.type, by.id) : "Someone";
-  await sysTaskMsg(serverId, upd!.channelId, `${an} converted a message to task #${taskNumber} "${taskTitle(upd!.content)}"`);
+  await sysTaskMsg(serverId, upd!.channelId, `${an} converted a message to task #${taskNumber} "${taskTitle(upd!.content)}"`, by);
   return upd!;
 }
 
@@ -545,7 +566,7 @@ export async function claimTask(serverId: string, messageId: string, assigneeTyp
     )).returning();
   if (!upd) return null; // 0 rows = already claimed by another (or task does not exist) → claim failed, caller should back off
   await emitTaskUpdated(serverId, upd);
-  await sysTaskMsg(serverId, upd.channelId, `${await actorName(assigneeType, assigneeId)} claimed #${upd.taskNumber} "${taskTitle(upd.content)}"`);
+  await sysTaskMsg(serverId, upd.channelId, `${await actorName(assigneeType, assigneeId)} claimed #${upd.taskNumber} "${taskTitle(upd.content)}"`, { type: assigneeType, id: assigneeId });
   return upd;
 }
 
@@ -555,7 +576,7 @@ export async function unclaimTask(serverId: string, messageId: string, by?: { ty
     .where(and(eq(schema.messages.id, messageId), eq(schema.messages.serverId, serverId), isNotNull(schema.messages.taskStatus))).returning();
   if (!upd) return null;
   await emitTaskUpdated(serverId, upd);
-  await sysTaskMsg(serverId, upd.channelId, `${by ? await actorName(by.type, by.id) : "Someone"} released #${upd.taskNumber} "${taskTitle(upd.content)}"`);
+  await sysTaskMsg(serverId, upd.channelId, `${by ? await actorName(by.type, by.id) : "Someone"} released #${upd.taskNumber} "${taskTitle(upd.content)}"`, by);
   return upd;
 }
 
@@ -579,7 +600,7 @@ export async function setTaskStatus(serverId: string, messageId: string, status:
   if (!upd.threadId) { await db.update(schema.messages).set({ threadId: threadCh }).where(eq(schema.messages.id, upd.id)); upd.threadId = threadCh; }
   const label = STATUS_LABEL[status] ?? status;
   const emoji = STATUS_EMOJI[status] ? STATUS_EMOJI[status] + " " : ""; // confirmed for in_progress/in_review; others pending confirmation, no guessing
-  const sysMsg = await sysTaskMsg(serverId, threadCh, `${emoji}${actor} moved #${upd.taskNumber} "${taskTitle(upd.content)}" to ${label}`);
+  const sysMsg = await sysTaskMsg(serverId, threadCh, `${emoji}${actor} moved #${upd.taskNumber} "${taskTitle(upd.content)}" to ${label}`, by);
   // Wake the assigned agent (only when changed by someone else). Verified: human changes status → assignee agent fires agent:activity working detail="Message received".
   if (upd.taskAssigneeType === "agent" && upd.taskAssigneeId && by?.id !== upd.taskAssigneeId) {
     await db.insert(schema.channelMembers).values({ channelId: threadCh, memberType: "agent", memberId: upd.taskAssigneeId }).onConflictDoNothing(); // ensure assignee is a thread member, otherwise message check cannot see this system message

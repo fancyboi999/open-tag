@@ -1,6 +1,6 @@
 // Auto-extracted from the former routes-api.ts monolith — bodies are verbatim.
 import type { ServerCtx } from "./ctx.js";
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { requireCap } from "../capabilities.js";
 import { getOrCreateDM, getOrCreateThread } from "../core.js";
@@ -8,6 +8,21 @@ import { publish } from "../realtime.js";
 import { readJson, sendErr, sendJson } from "../util.js";
 import { canUserReadChannel } from "../channelAccess.js";
 import { userChannels } from "./shared.js";
+
+const notSentBy = (userId: string) => or(isNull(schema.messages.senderId), ne(schema.messages.senderId, userId));
+
+async function unreadRowsForMember(member: typeof schema.channelMembers.$inferSelect, userId: string) {
+  if (member.threadDoneAt) return [];
+  return db.select({ id: schema.messages.id, seq: schema.messages.seq }).from(schema.messages)
+    .where(and(eq(schema.messages.channelId, member.channelId), gt(schema.messages.seq, member.lastReadSeq), notSentBy(userId)))
+    .orderBy(asc(schema.messages.seq));
+}
+
+async function parentChannelIdForThread(thread: typeof schema.channels.$inferSelect): Promise<string | null> {
+  if (thread.type !== "thread" || !thread.parentMessageId) return thread.id;
+  const parent = (await db.select({ channelId: schema.messages.channelId }).from(schema.messages).where(eq(schema.messages.id, thread.parentMessageId)))[0];
+  return parent?.channelId ?? null;
+}
 
 export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   const { req, res, url, method, p, userId, serverId } = ctx;
@@ -23,7 +38,8 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
       const replies = await db.select({ seq: schema.messages.seq, createdAt: schema.messages.createdAt }).from(schema.messages).where(eq(schema.messages.channelId, th.id)).orderBy(asc(schema.messages.seq));
       const parent = th.parentMessageId ? (await db.select().from(schema.messages).where(eq(schema.messages.id, th.parentMessageId)))[0] : null;
       const pch = parent ? (await db.select().from(schema.channels).where(eq(schema.channels.id, parent.channelId)))[0] : null;
-      out.push({ threadChannelId: th.id, parentMessageId: th.parentMessageId, parentChannelId: parent?.channelId ?? null, parentChannelName: pch?.name ?? null, parentPreview: (parent?.content ?? "").slice(0, 80), replyCount: replies.length, unreadCount: replies.filter((r) => r.seq > (myCm?.lastReadSeq ?? 0)).length, lastReplyAt: replies.length ? replies[replies.length - 1]!.createdAt : null });
+      const unread = myCm ? await unreadRowsForMember(myCm, userId) : [];
+      out.push({ threadChannelId: th.id, parentMessageId: th.parentMessageId, parentChannelId: parent?.channelId ?? null, parentChannelName: pch?.name ?? null, parentPreview: (parent?.content ?? "").slice(0, 80), replyCount: replies.length, unreadCount: unread.length, lastReplyAt: replies.length ? replies[replies.length - 1]!.createdAt : null });
     }
     return (sendJson(res, 200, { threads: out }), true);
   }
@@ -67,7 +83,8 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     for (const th of threads) {
       const replies = await db.select({ seq: schema.messages.seq, createdAt: schema.messages.createdAt }).from(schema.messages).where(eq(schema.messages.channelId, th.id)).orderBy(asc(schema.messages.seq));
       const myCm = (await db.select().from(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, th.id), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId))))[0];
-      map[th.parentMessageId!] = { threadChannelId: th.id, replyCount: replies.length, unreadCount: myCm ? replies.filter((r) => r.seq > (myCm.lastReadSeq ?? 0)).length : 0, lastReplyAt: replies.length ? replies[replies.length - 1]!.createdAt : null };
+      const unread = myCm ? await unreadRowsForMember(myCm, userId) : [];
+      map[th.parentMessageId!] = { threadChannelId: th.id, replyCount: replies.length, unreadCount: unread.length, lastReplyAt: replies.length ? replies[replies.length - 1]!.createdAt : null };
     }
     return (sendJson(res, 200, map), true);
   }
@@ -104,10 +121,17 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   if (p === "/api/channels/unread" && method === "GET") {
     const myMems = await db.select().from(schema.channelMembers).where(and(eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));
     const map: Record<string, number> = {};
+    const chs = myMems.length ? await db.select().from(schema.channels).where(inArray(schema.channels.id, myMems.map((m) => m.channelId))) : [];
+    const byId = new Map(chs.map((c) => [c.id, c]));
     for (const m of myMems) {
-      const [r] = await db.select({ n: count() }).from(schema.messages).where(and(eq(schema.messages.channelId, m.channelId), gt(schema.messages.seq, m.lastReadSeq), ne(schema.messages.senderId, userId)));
+      const ch = byId.get(m.channelId);
+      if (!ch || ch.deletedAt) continue;
+      if (ch.type === "thread" && m.threadDoneAt) continue;
+      const [r] = await db.select({ n: count() }).from(schema.messages).where(and(eq(schema.messages.channelId, m.channelId), gt(schema.messages.seq, m.lastReadSeq), notSentBy(userId)));
       const n = Number(r?.n ?? 0);
-      if (n > 0) map[m.channelId] = n;
+      if (n <= 0) continue;
+      const targetId = ch.type === "thread" ? await parentChannelIdForThread(ch) : ch.id;
+      if (targetId) map[targetId] = (map[targetId] ?? 0) + n;
     }
     return (sendJson(res, 200, map), true);
   }
@@ -128,12 +152,12 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
       const cm = myMems.find((m) => m.channelId === c.id)!;
       const last = (await db.select().from(schema.messages).where(eq(schema.messages.channelId, c.id)).orderBy(desc(schema.messages.seq)).limit(1))[0];
       if (!last) continue; // empty channels are excluded from the inbox
-      const [ur] = await db.select({ n: count() }).from(schema.messages).where(and(eq(schema.messages.channelId, c.id), gt(schema.messages.seq, cm.lastReadSeq), ne(schema.messages.senderId, userId)));
+      const [ur] = cm.threadDoneAt ? [] : await db.select({ n: count() }).from(schema.messages).where(and(eq(schema.messages.channelId, c.id), gt(schema.messages.seq, cm.lastReadSeq), notSentBy(userId)));
       const unreadCount = Number(ur?.n ?? 0);
       let firstUnreadMessageId: string | null = null;
       let hasMention = false;
       if (unreadCount > 0) {
-        const unread = await db.select({ id: schema.messages.id }).from(schema.messages).where(and(eq(schema.messages.channelId, c.id), gt(schema.messages.seq, cm.lastReadSeq), ne(schema.messages.senderId, userId))).orderBy(asc(schema.messages.seq));
+        const unread = await db.select({ id: schema.messages.id }).from(schema.messages).where(and(eq(schema.messages.channelId, c.id), gt(schema.messages.seq, cm.lastReadSeq), notSentBy(userId))).orderBy(asc(schema.messages.seq));
         firstUnreadMessageId = unread[0]?.id ?? null;
         const [mc] = await db.select({ n: count() }).from(schema.messageMentions).where(and(inArray(schema.messageMentions.messageId, unread.map((u) => u.id)), eq(schema.messageMentions.mentionType, "user"), eq(schema.messageMentions.mentionId, userId)));
         hasMention = Number(mc?.n ?? 0) > 0;

@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
 import { appendCapped, type TrajItem } from "./trajBuffer.ts";
+import { messageUnreadDelta, threadUnreadDelta } from "./threadUnread";
 
 export interface Channel { id: string; name: string; description?: string; type: string; joined?: boolean; lastMessageAt?: string; archivedAt?: string | null }
 export interface Dm { id: string; name: string; type: string; description?: string; lastMessageAt?: string; peerId?: string | null; peerName?: string | null; peerDisplayName?: string | null; peerType?: string | null; peerAvatarUrl?: string | null }
@@ -283,8 +284,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sock.on("message:new", (msg: any) => {
         if (msg?.seq) lastSeq = Math.max(lastSeq, msg.seq);
         if (msg?.channelId) {
-          // Own messages don't increment unread; all others do.
-          if (msg.senderId !== myId) { setUnread((u) => ({ ...u, [msg.channelId]: (u[msg.channelId] || 0) + 1 })); syncUnread(); } // optimistic ++ for instant feedback; debounced re-fetch corrects stale counts
+          // Own messages don't increment unread; thread-channel messages are aggregated by thread:updated onto their parent channel.
+          const delta = messageUnreadDelta(msg.senderId, myId, msg.channelType);
+          if (delta > 0) { setUnread((u) => ({ ...u, [msg.channelId]: (u[msg.channelId] || 0) + delta })); syncUnread(); } // optimistic ++ for instant feedback; debounced re-fetch corrects stale counts
           setChannels((cs) => cs.map((c) => (c.id === msg.channelId ? { ...c, lastMessageAt: msg.createdAt } : c)));
           setDms((ds) => ds.map((d) => (d.id === msg.channelId ? { ...d, lastMessageAt: msg.createdAt } : d)));
         }
@@ -317,7 +319,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sock.on("task:updated", (p: any) => dispatch({ type: "task", op: "updated", task: p.task }));                                  // payload={channelId,task}
       sock.on("task:deleted", (p: any) => dispatch({ type: "task", op: "deleted", taskId: p.taskId, channelId: p.channelId }));      // payload={channelId,taskId}
       sock.on("message:updated", (m: any) => dispatch({ type: "message:updated", message: m }));
-      sock.on("thread:updated", (p: any) => dispatch({ type: "thread:updated", ...p }));
+      sock.on("thread:updated", (p: any) => {
+        const delta = threadUnreadDelta(1, p?.senderId, myId);
+        if (p?.parentChannelId && delta > 0) { setUnread((u) => ({ ...u, [p.parentChannelId]: (u[p.parentChannelId] || 0) + delta })); syncUnread(); }
+        dispatch({ type: "thread:updated", ...p });
+      });
     })();
     return () => { cancelled = true; sock?.close(); sockRef.current = null; if (unreadTimer) clearTimeout(unreadTimer); };
   }, [activeId]);

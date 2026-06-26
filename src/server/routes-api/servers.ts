@@ -1,6 +1,6 @@
 // Auto-extracted from the former routes-api.ts monolith — bodies are verbatim.
 import type { UserCtx, ServerCtx } from "./ctx.js";
-import { and, count, eq, gt, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, count, eq, gt, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { hashToken, newKey } from "../auth.js";
 import { can, capabilitiesFor, requireCap } from "../capabilities.js";
@@ -42,12 +42,13 @@ export async function handleServersUserScope(ctx: UserCtx): Promise<boolean> {
     const myCms = await db.select().from(schema.channelMembers).where(and(eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));
     const perServer: Record<string, number> = {};
     if (myCms.length) {
-      const chs = await db.select({ id: schema.channels.id, serverId: schema.channels.serverId, deletedAt: schema.channels.deletedAt }).from(schema.channels).where(inArray(schema.channels.id, myCms.map((c) => c.channelId)));
-      const chServer = new Map(chs.filter((c) => !c.deletedAt).map((c) => [c.id, c.serverId]));
+      const chs = await db.select({ id: schema.channels.id, serverId: schema.channels.serverId, type: schema.channels.type, deletedAt: schema.channels.deletedAt }).from(schema.channels).where(inArray(schema.channels.id, myCms.map((c) => c.channelId)));
+      const chById = new Map(chs.filter((c) => !c.deletedAt).map((c) => [c.id, c]));
       for (const cm of myCms) {
-        const sid = chServer.get(cm.channelId); if (!sid) continue;
-        const [r] = await db.select({ n: count() }).from(schema.messages).where(and(eq(schema.messages.channelId, cm.channelId), gt(schema.messages.seq, cm.lastReadSeq), ne(schema.messages.senderId, userId)));
-        perServer[sid] = (perServer[sid] ?? 0) + Number(r?.n ?? 0);
+        const ch = chById.get(cm.channelId); if (!ch) continue;
+        if (ch.type === "thread" && cm.threadDoneAt) continue;
+        const [r] = await db.select({ n: count() }).from(schema.messages).where(and(eq(schema.messages.channelId, cm.channelId), gt(schema.messages.seq, cm.lastReadSeq), or(isNull(schema.messages.senderId), ne(schema.messages.senderId, userId))));
+        perServer[ch.serverId] = (perServer[ch.serverId] ?? 0) + Number(r?.n ?? 0);
       }
     }
     return (sendJson(res, 200, mems.map((m) => ({ serverId: m.serverId, unreadCount: perServer[m.serverId] ?? 0 }))), true);
