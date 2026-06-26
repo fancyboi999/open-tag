@@ -284,7 +284,13 @@ export function Chat() {
                 // action card (agent proposal card) → rendered by dedicated ActionCardMsg component
                 if (m.messageType === "action" && m.actionMetadata?.kind === "action-card") return <ActionCardMsg m={m} key={m.id} />;
                 // system messages (task lifecycle events, etc.) → centered grey bar (no avatar, no full message block)
-                if (m.senderType === "system") return <div className="msg-sys" id={"m-" + m.id} key={m.id}>{m.content}</div>;
+                // If the system message has thread replies (e.g. showcase case anchors), render a thread-pill below the bar so it's clickable.
+                if (m.senderType === "system") return (
+                  <div className="msg-sys" id={"m-" + m.id} key={m.id}>
+                    <MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} />
+                    {tm?.replyCount ? <button className="thread-pill" onClick={() => startThread(m)}><MessageCircle size={12} /> {t("chat.replyCount", { count: tm.replyCount })}</button> : null}
+                  </div>
+                );
                 const staggerIdx = newMsgOrderRef.current.get(m.id);
                 const isNewMsg = staggerIdx !== undefined;
                 return (
@@ -521,7 +527,9 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
         <div className="thread-sep">{t("chat.replyCount", { count: msgs.length })}</div>
         {msgs.map(row)}
       </div>
-      <Composer channelId={channelId} placeholder={t("chat.threadReplyPlaceholder")} className="thread-composer" />
+      {channels.find((c) => c.id === parent.channelId)?.type === "showcase"
+        ? <div className="showcase-readonly"><Eye size={14} />{t("chat.showcaseReadOnly")}</div>
+        : <Composer channelId={channelId} placeholder={t("chat.threadReplyPlaceholder")} className="thread-composer" />}
     </aside>
   );
 }

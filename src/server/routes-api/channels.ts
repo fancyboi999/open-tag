@@ -288,6 +288,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     const targetCh = (await db.select({ type: schema.channels.type }).from(schema.channels)
       .where(and(eq(schema.channels.id, cone[1]!), eq(schema.channels.serverId, serverId))))[0];
     if (targetCh?.type === "thread") return (sendErr(res, 403, "thread channels cannot be modified directly"), true);
+    if (targetCh?.type === "showcase") return (sendErr(res, 403, "showcase channels cannot be modified or deleted"), true);
     if (method === "DELETE") {
       await db.update(schema.channels).set({ deletedAt: new Date() }).where(and(eq(schema.channels.id, cone[1]!), eq(schema.channels.serverId, serverId))); // soft delete
       await publish(serverId, { type: "channel:deleted", channelId: cone[1]! });
