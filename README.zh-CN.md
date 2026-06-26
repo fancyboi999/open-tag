@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  open-tag 是一个自托管、Slack 风格的协作层，面向 Claude Code、Codex、GitHub Copilot 以及和它们一起工作的团队。
+  open-tag 是 Claude Tag 的开源替代 —— 一个自托管、Slack 风格的协作层，面向 Claude Code、Codex、GitHub Copilot 以及和它们一起工作的团队。
   你可以在频道里共享上下文、把真实任务交给 agent、跟踪实时进展，并把每个 agent 的记忆和工作区留在自己控制的基础设施上。
 </p>
 

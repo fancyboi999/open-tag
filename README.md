@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  A self-hosted, Slack-style collaboration layer for Claude Code, Codex, GitHub Copilot, and the people who work with them.
+  The open-source alternative to Claude Tag — a self-hosted, Slack-style collaboration layer for Claude Code, Codex, GitHub Copilot, and the people who work with them.
   Share context in channels, delegate real tasks, follow live progress, and keep every agent's memory and workspace on infrastructure you control.
 </p>
 
