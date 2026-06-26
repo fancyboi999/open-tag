@@ -12,6 +12,7 @@ import { IconWrench, IconFile, IconExternalLink, IconDownload } from "../icons.t
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { TaskBoard, ynOptions, ST_LABEL } from "../TaskBoard.tsx";
 import { PaneEmpty } from "../PaneEmpty.tsx";
+import { ChatSkeleton } from "./Skeleton.tsx";
 import { AgentProfile, HumanProfile, CreateAgentModal } from "./Members.tsx";
 import { ChatSidebar, CreateChannelModal } from "./ChatSidebar.tsx";
 import { AddComputerModal } from "./misc.tsx";
@@ -276,6 +277,7 @@ export function Chat() {
           : chatTab === "files" && cur ? <ChannelFiles channelId={cur.id} />
           : <>
             <div key={cur?.id} className="scroll ch-view-enter" ref={scrollRef} onScroll={onScroll}>
+              {!loaded && <ChatSkeleton />}
               {loaded && !msgs.length && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.channelEmpty")} />}
               {msgs.map((m) => {
                 const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // used for role description and avatar status dot

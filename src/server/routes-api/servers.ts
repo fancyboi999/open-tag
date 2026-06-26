@@ -32,7 +32,9 @@ export async function handleServersUserScope(ctx: UserCtx): Promise<boolean> {
     let slug = base; // slug must be unique: append -N suffix on collision
     for (let n = 2; (await db.select().from(schema.servers).where(eq(schema.servers.slug, slug)))[0]; n++) slug = `${base}-${n}`;
     const srv = await createServer(name, slug, userId);
-    return (sendJson(res, 200, { id: srv.id, name: srv.name, slug: srv.slug }), true);
+    // Return role + capabilities (creator is owner) so the client can optimistically activate the new workspace
+    // without a re-fetch — mirrors the GET /api/servers shape. Enables instant client-side nav (no full-page reload).
+    return (sendJson(res, 200, { id: srv.id, name: srv.name, slug: srv.slug, role: "owner", capabilities: capabilitiesFor("owner") }), true);
   }
   // Cross-server unread aggregation: server switcher badge. No x-server-id; placed before the :id regex to avoid being consumed by it.
   if (p === "/api/servers/unread-summary" && method === "GET") {

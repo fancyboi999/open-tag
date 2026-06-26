@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { StoreProvider, useStore } from "./store.tsx";
+import { WorkspaceSkeleton } from "./views/Skeleton.tsx";
 import { ConfirmProvider } from "./ConfirmModal.tsx";
 import { ToastProvider } from "./toast.tsx";
 import { Layout } from "./Layout.tsx";
@@ -16,20 +17,25 @@ import "./styles.css";
 // Root / unmatched path → wait for bootstrap, then redirect to the current user's own workspace (or /login if anonymous).
 function RootRedirect() {
   const { slug, ready, authState } = useStore();
-  if (!ready) return null; // wait for bootstrap to resolve auth + slug before redirecting
+  if (!ready) return <WorkspaceSkeleton />; // bootstrap in flight: show the workspace skeleton, not a blank screen
   if (authState !== "authed") return <Navigate to="/login" replace />;
   return <Navigate to={`/s/${slug}/channel`} replace />;
 }
 
-// Auth guard + slug canonicalization for /s/:server/*. The auth check runs BEFORE <Layout/> renders, so an
-// unauthenticated visitor is redirected to /login without the workspace ever painting (no flash of protected UI).
+// Auth guard + workspace activation for /s/:server/*. The URL is the source of truth for the active workspace: if it
+// names a known workspace that isn't active yet, switch to it client-side (no full-page reload) and show the skeleton
+// while it loads. The auth check runs BEFORE <Layout/> renders, so an unauthenticated visitor is redirected to /login
+// without the workspace ever painting (no flash of protected UI).
 function WorkspaceRoute() {
-  const { slug, ready, authState } = useStore();
+  const { slug, ready, authState, servers, switchServer } = useStore();
   const { server } = useParams();
   const loc = useLocation();
-  if (!ready) return null; // bootstrap in flight: render nothing (not the workspace)
+  const known = !!server && servers.some((s) => s.slug === server); // is the URL's slug a workspace this user belongs to?
+  // URL → store: a known-but-not-active slug (server switcher, deep link, browser back/forward) drives a client-side switch.
+  useEffect(() => { if (ready && authState === "authed" && known && server !== slug) switchServer(server!); }, [ready, authState, known, server, slug, switchServer]);
+  if (!ready || (known && server !== slug)) return <WorkspaceSkeleton />; // bootstrap or a switch in flight → skeleton (do NOT bounce the URL while slug catches up)
   if (authState !== "authed") return <Navigate to="/login" replace />; // hard auth gate
-  if (server !== slug) {
+  if (server !== slug) { // unknown / stale slug (not a member, typo) → canonicalize to the active workspace
     const pathname = loc.pathname.replace(/^\/s\/[^/]+/, `/s/${slug}`);
     return <Navigate to={`${pathname}${loc.search}${loc.hash}`} replace />;
   }

@@ -786,3 +786,36 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
   .joinbtn{padding:6px 11px;font-size:13px}
   .addbtn{width:30px;height:30px}
 }
+
+/* ───────── Loading skeletons (WorkspaceSkeleton / ChatSkeleton, see views/Skeleton.tsx) ─────────
+   Mirror the app-shell grid (.app.has-traj) so the swap to the real UI is layout-shift-free. Editorial-calm:
+   hairline placeholder blocks with a soft left-to-right shimmer; shimmer off under prefers-reduced-motion. */
+.skel-app{background:var(--canvas)}
+.skel-box{position:relative;overflow:hidden;background:var(--hair);border-radius:8px}
+.skel-box::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.5) 50%,transparent 100%);animation:skel-shimmer 1.5s var(--ease-decel) infinite}
+@keyframes skel-shimmer{100%{transform:translateX(100%)}}
+@media (prefers-reduced-motion:reduce){.skel-box::after{display:none}}
+.skel-rail{justify-content:flex-start;gap:10px}
+.skel-rail .skel-brand{width:36px;height:36px;border-radius:8px;margin-bottom:8px}
+.skel-rail .skel-railicon{width:40px;height:40px;border-radius:12px}
+.skel-sb{background:var(--canvas-soft);box-shadow:1px 0 0 var(--hair);display:flex;flex-direction:column;gap:14px;padding:20px 16px;min-width:0}
+.skel-sb .skel-sb-title{height:22px;width:60%;border-radius:6px;margin-bottom:6px}
+.skel-sb .skel-sb-line{height:13px;border-radius:6px}
+.skel-main{display:flex;flex-direction:column;min-width:0}
+.skel-main-head{height:56px;box-shadow:0 1px 0 var(--hair);display:flex;align-items:center;padding:0 24px;flex:none}
+.skel-main-head .skel-main-title{height:18px;width:180px;border-radius:6px}
+.skel-main-scroll{flex:1;overflow:hidden;padding:24px 28px}
+.skel-traj{background:var(--canvas-soft);box-shadow:-1px 0 0 var(--hair);display:flex;flex-direction:column;gap:12px;padding:20px 18px;min-width:0}
+.skel-traj .skel-traj-title{height:16px;width:50%;border-radius:6px;margin-bottom:8px}
+.skel-traj .skel-traj-line{height:11px;border-radius:6px}
+.skel-msgs{display:flex;flex-direction:column;gap:22px}
+.skel-msg{display:flex;gap:12px;align-items:flex-start}
+.skel-msg .skel-ava{width:36px;height:36px;border-radius:8px;flex:none}
+.skel-msg-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;padding-top:2px}
+.skel-msg-body .skel-line{height:12px;border-radius:6px}
+.skel-msg-body .skel-line-name{width:120px;height:13px}
+@media (max-width:820px){
+  /* match the real shell's mobile behavior: sidebar + trace hidden, main full-width; rail uses the base .rail mobile rules */
+  .skel-sb,.skel-traj{display:none}
+  .skel-rail .skel-brand{display:none}
+}

@@ -438,6 +438,7 @@
     "saved": "已保存",
     "detectedRuntimes": "检测到的 Runtime",
     "menuToggle": "菜单",
+    "loadingWorkspace": "正在加载工作区…",
     "resizeSidebar": "拖动调整侧栏宽度",
     "resizeTraj": "拖动调整右栏宽度",
     "model": "模型",

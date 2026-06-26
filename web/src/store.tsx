@@ -22,7 +22,8 @@ interface Store {
   uploadServerAvatar: (file: File) => Promise<void>;
   uploadAgentAvatar: (agentId: string, file: File) => Promise<string>;
   uploadUserAvatar: (file: File) => Promise<string>;
-  createServer: (name: string, slug?: string) => Promise<void>;
+  createServer: (name: string, slug?: string) => Promise<string | null>; // POST → optimistically add to servers; returns the new slug so the caller navigates client-side (no full-page reload)
+  switchServer: (slug: string) => void;                          // client-side workspace switch: re-point the active server, reset per-workspace state, reconnect the socket (no full-page reload)
   logout: () => void;
   channels: Channel[]; dms: Dm[]; unread: Record<string, number>; agents: Agent[]; machines: Machine[]; humans: Human[];
   latestDaemonVersion: string;                                    // newest published daemon version (packages/daemon); online machines below it are flagged outdated in the system-alert center
@@ -74,8 +75,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [traj, setTraj] = useState<TrajItem[]>([]); // global live-trace feed: bounded ring buffer held here (not per Chat view) so it persists across channel/DM switches
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [agentPanelReq, setAgentPanelReq] = useState<string | null>(null); // cross-component signal: LiveAgentBar (sidebar) → Chat view opens the agent profile panel
+  const [activeId, setActiveId] = useState(""); // id of the workspace to activate; changing it drives the activation effect (initial pick + every client-side switch)
   const tokenRef = useRef("");
   const sidRef = useRef("");
+  const serversRef = useRef<ServerInfo[]>([]); // mirror of `servers` for lookups in effects/handlers without taking a render dependency on it
+  const meIdRef = useRef<string | undefined>(undefined); // current user id; read by socket handlers (own-message unread suppression) and stable across workspace switches
   const sockRef = useRef<Socket | null>(null); // active socket connection; emits join:channel when joining/creating a channel mid-session for room isolation
   const subscribedRef = useRef<Set<string>>(new Set()); // channels/threads explicitly subscribed by the active view; re-emitted on every (re)connect so a reconnect re-joins them
   const listeners = useRef(new Set<(e: Ev) => void>());
@@ -88,12 +92,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return r.json();
   };
   const reload = async () => {
-    setChannels(await api("GET", "/api/channels"));
-    try { setDms(await api("GET", "/api/channels/dm")); } catch { setDms([]); }
-    try { setUnread(await api("GET", "/api/channels/unread") || {}); } catch { setUnread({}); }
-    setAgents(await api("GET", "/api/agents"));
-    try { const mc = await api("GET", `/api/servers/${sidRef.current}/machines`); setMachines(mc.machines || []); setLatestDaemonVersion(mc.latestDaemonVersion || ""); } catch { setMachines([]); }
-    try { setHumans(await api("GET", `/api/servers/${sidRef.current}/members`)); } catch { setHumans([]); }
+    // Pin the target server at entry. A client-side workspace switch re-points sidRef mid-flight; `fresh()` then
+    // turns false, so this (now-stale) reload's results are dropped instead of landing mixed with the new
+    // workspace's data — guards rapid A→B→C switches (the sequential awaits below each read the shared sidRef).
+    const sid = sidRef.current;
+    const fresh = () => sidRef.current === sid;
+    const ch = await api("GET", "/api/channels"); if (fresh()) setChannels(ch);
+    try { const dm = await api("GET", "/api/channels/dm"); if (fresh()) setDms(dm); } catch { if (fresh()) setDms([]); }
+    try { const un = (await api("GET", "/api/channels/unread")) || {}; if (fresh()) setUnread(un); } catch { if (fresh()) setUnread({}); }
+    const ag = await api("GET", "/api/agents"); if (fresh()) setAgents(ag);
+    try { const mc = await api("GET", `/api/servers/${sid}/machines`); if (fresh()) { setMachines(mc.machines || []); setLatestDaemonVersion(mc.latestDaemonVersion || ""); } } catch { if (fresh()) setMachines([]); }
+    try { const hm = await api("GET", `/api/servers/${sid}/members`); if (fresh()) setHumans(hm); } catch { if (fresh()) setHumans([]); }
   };
   const onEvent = (cb: (e: Ev) => void) => { listeners.current.add(cb); return () => { listeners.current.delete(cb); }; };
   // View-driven realtime subscription: opening a channel/thread joins its room so message:new arrives live, regardless of how the
@@ -101,7 +110,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const subscribeChannel = (id: string) => { if (!id) return; subscribedRef.current.add(id); sockRef.current?.emit("join:channel", id); };
 
   const createChannel = async (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => { const r = await api("POST", "/api/channels", { name: opts.name, description: opts.description, visibility: opts.visibility, agentIds: opts.agentIds ?? [], userIds: opts.userIds ?? [] }); if (r?.id) { await reload(); sockRef.current?.emit("join:channel", r.id); } return r?.id ? r : null; };
-  const createServer = async (name: string, slug?: string) => { const r = await api("POST", "/api/servers", { name, slug }); if (r?.slug) window.location.assign(`/s/${r.slug}/channel`); }; // create workspace → full-page redirect to re-run bootstrap
+  // Create workspace → optimistically add it to the server list (POST returns role+capabilities so no re-fetch needed) and
+  // return the new slug. The caller navigates client-side to /s/<slug>/channel; the URL drives activation (see main.tsx),
+  // so there is no full-page reload — the workspace skeleton shows while the new workspace's data loads.
+  const createServer = async (name: string, slug?: string): Promise<string | null> => {
+    const r = await api("POST", "/api/servers", { name, slug });
+    if (!r?.id) return null;
+    const info: ServerInfo = { id: r.id, name: r.name, slug: r.slug, avatarUrl: null, role: r.role || "owner", capabilities: r.capabilities || {} };
+    const next = [...serversRef.current.filter((s) => s.id !== r.id), info];
+    serversRef.current = next; setServers(next);
+    return r.slug;
+  };
+  // Client-side workspace switch: re-point the active server by slug. The activation effect (keyed on activeId) resets
+  // per-workspace state and reconnects the socket. No-op if the target is unknown or already active.
+  const switchServer = (targetSlug: string) => { const cur = serversRef.current.find((s) => s.slug === targetSlug); if (cur && cur.id !== sidRef.current) setActiveId(cur.id); };
   const logout = () => { localStorage.removeItem("open-tag.token"); localStorage.removeItem("open-tag.devuser"); window.location.assign("/login"); }; // clear token + dev user → redirect to login (JWT is short-lived; client-side removal is sufficient)
   const markActionExecuted = async (messageId: string, result?: { kind: string; id: string; name: string }) => { await api("POST", `/api/actions/${messageId}/mark-executed`, { result: result ?? null }); };
   const createTasks = async (channelId: string, titles: string[]) => { const r = await api("POST", `/api/tasks/channel/${channelId}`, { tasks: titles.map((title) => ({ title })) }); return r?.tasks || []; };
@@ -158,17 +180,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const unsaveMsg = async (messageId: string) => { setSavedIds((s) => { const n = new Set(s); n.delete(messageId); return n; }); await api("DELETE", `/api/channels/saved/${messageId}`); };
   const listSaved = async (limit = 20, offset = 0) => { const r = await api("GET", `/api/channels/saved?limit=${limit}&offset=${offset}`); return { saved: r?.saved ?? [], hasMore: !!r?.hasMore }; };
 
+  // ── Auth bootstrap (runs once): resolve a session token + the user's workspace list, then pick the initial workspace
+  //    from the URL. Loading that workspace (its data + socket) is the activation effect below, keyed on activeId — the
+  //    SAME path a client-side switch takes, so there is one load path, not two.
   useEffect(() => {
-    let sock: Socket | null = null;
-    // StrictMode double-mount guard: socket is built asynchronously; if the component unmounts before the
-    // socket connects, the flag ensures the late connection is closed immediately (prevents duplicate sockets).
     let cancelled = false;
-    const dispatch = (d: Ev) => listeners.current.forEach((cb) => cb(d));
-    // Unread badge correction: optimistic ++ gives instant feedback; after each incoming message a debounced
-    // re-fetch of /channels/unread overwrites store.unread with the DB truth, fixing badge drift caused by
-    // cross-view messages or reconnect catch-up double-counting.
-    let unreadTimer: ReturnType<typeof setTimeout> | null = null;
-    const syncUnread = () => { if (unreadTimer) clearTimeout(unreadTimer); unreadTimer = setTimeout(async () => { try { setUnread((await api("GET", "/api/channels/unread")) || {}); } catch { /* keep stale value on error */ } }, 400); };
     (async () => {
       // Resolve a session token. Precedence: explicit ?as= dev-login (dev only) > stored JWT. NO silent fallback —
       // an anonymous visitor never auto-logs-in; the /s/* route guard sends them to /login (see main.tsx).
@@ -187,29 +203,64 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           else localStorage.removeItem("open-tag.token"); // expired / invalid / 401 → drop it so the guard redirects to /login
         }
       }
+      if (cancelled) return;
       if (!token) { setAuthState("anon"); setReady(true); return; } // unauthenticated: auth pages & landing render; protected routes redirect to /login
       tokenRef.current = token;
+      meIdRef.current = user?.id;
       setMe(user);
       setAuthState("authed");
-      const myId = user?.id;
       const serverList: ServerInfo[] = await (await fetch("/api/servers", { headers: { authorization: "Bearer " + tokenRef.current } })).json();
+      if (cancelled) return;
+      serversRef.current = serverList;
       setServers(serverList);
       const urlSlug = location.pathname.match(/\/s\/([^/]+)/)?.[1]; // resolve workspace from URL /s/:slug (multi-workspace support); fall back to first
       const cur = serverList.find((s) => s.slug === urlSlug) || serverList[0];
       if (!cur) { setReady(true); return; } // no workspace found: prevent white screen (defensive fallback; workspace is normally created on register/dev-login)
-      sidRef.current = cur.id; setServerId(cur.id); setSlug(cur.slug || "open-tag"); setMyRole(cur.role || "member"); setCapabilities(cur.capabilities || {});
-      setServerAvatar(cur.avatarUrl ? `${cur.avatarUrl}?token=${encodeURIComponent(tokenRef.current)}` : null);
+      setActiveId(cur.id); // → activation effect loads this workspace + opens the socket
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Workspace activation (runs on the initial pick + every client-side switch): load the active workspace's data and
+  //    open a socket scoped to it. Resets all per-workspace state first so nothing leaks across a switch, and flips
+  //    `ready` false→true so the route guard shows the workspace skeleton during the gap (no blank screen, no reload).
+  useEffect(() => {
+    if (!activeId) return; // nothing to activate yet (pre-auth / anon / no-workspace)
+    const cur = serversRef.current.find((s) => s.id === activeId);
+    if (!cur) return; // unknown id (should not happen: serversRef is always seeded before setActiveId)
+    let sock: Socket | null = null;
+    // StrictMode / switch guard: socket is built asynchronously; if this effect is cleaned up (unmount or a newer
+    // switch) before the socket connects, the flag ensures the late connection is closed immediately.
+    let cancelled = false;
+    const dispatch = (d: Ev) => listeners.current.forEach((cb) => cb(d));
+    // Unread badge correction: optimistic ++ gives instant feedback; after each incoming message a debounced
+    // re-fetch of /channels/unread overwrites store.unread with the DB truth, fixing badge drift caused by
+    // cross-view messages or reconnect catch-up double-counting.
+    let unreadTimer: ReturnType<typeof setTimeout> | null = null;
+    const syncUnread = () => { if (unreadTimer) clearTimeout(unreadTimer); unreadTimer = setTimeout(async () => { try { setUnread((await api("GET", "/api/channels/unread")) || {}); } catch { /* keep stale value on error */ } }, 400); };
+    const myId = meIdRef.current;
+    // Point at the active workspace + clear the previous one's state so a switch starts from a clean slate; the
+    // ready=false → workspace skeleton shows while it reloads.
+    setReady(false);
+    sidRef.current = cur.id; setServerId(cur.id); setSlug(cur.slug || "open-tag"); setMyRole(cur.role || "member"); setCapabilities(cur.capabilities || {});
+    setServerAvatar(cur.avatarUrl ? `${cur.avatarUrl}?token=${encodeURIComponent(tokenRef.current)}` : null);
+    setChannels([]); setDms([]); setUnread({}); setAgents([]); setMachines([]); setHumans([]); setTraj([]); setSavedIds(new Set()); setAgentPanelReq(null);
+    subscribedRef.current = new Set(); // the previous workspace's view-subscriptions don't carry over
+    sockRef.current = null; // the previous socket is closed by this effect's cleanup; drop the stale ref until the new one connects
+    let lastSeq = 0;
+    (async () => {
       await reload();
+      if (cancelled) return;
       // Pre-load saved message id set (small enough for a single full fetch; drives bookmark state + Saved count).
       try { const sv = await api("GET", "/api/channels/saved?limit=100"); setSavedIds(new Set((sv?.saved ?? []).map((s: any) => s.messageId))); } catch { /* */ }
       // Track highest seq so reconnect can fetch only missed messages incrementally.
-      let lastSeq = 0;
       try { const s = await api("GET", "/api/messages/sync?since=0"); lastSeq = s?.maxSeq ?? 0; } catch { /* */ }
+      if (cancelled) return;
       setReady(true);
       // Socket.io handshake auth carries {token, serverId}; event names follow the workspace protocol
       // (message:new / agent:activity / machine:status).
       sock = io("/", { auth: { token: tokenRef.current, serverId: sidRef.current }, transports: ["websocket"] });
-      if (cancelled) { sock.close(); sock = null; return; } // late connect after unmount (StrictMode first mount) → close immediately
+      if (cancelled) { sock.close(); sock = null; return; } // late connect after unmount/switch → close immediately
       sockRef.current = sock; // exposed so joinChannel/createChannel/openDM can emit join:channel for room isolation
       let firstConnect = true;
       sock.on("connect", async () => {
@@ -265,10 +316,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sock.on("message:updated", (m: any) => dispatch({ type: "message:updated", message: m }));
       sock.on("thread:updated", (p: any) => dispatch({ type: "thread:updated", ...p }));
     })();
-    return () => { cancelled = true; sock?.close(); if (unreadTimer) clearTimeout(unreadTimer); };
-  }, []);
+    return () => { cancelled = true; sock?.close(); sockRef.current = null; if (unreadTimer) clearTimeout(unreadTimer); };
+  }, [activeId]);
 
-  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, latestDaemonVersion, humans, traj, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, switchServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, machines, latestDaemonVersion, humans, traj, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
 }
 
 export const fmtTime = (iso?: string) => { try { return iso ? new Date(iso).toLocaleTimeString("zh-CN", { hour12: false }) : ""; } catch { return ""; } };

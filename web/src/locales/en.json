@@ -438,6 +438,7 @@
     "saved": "Saved",
     "detectedRuntimes": "Detected Runtimes",
     "menuToggle": "Menu",
+    "loadingWorkspace": "Loading workspace…",
     "resizeSidebar": "Drag to resize sidebar",
     "resizeTraj": "Drag to resize panel",
     "model": "Model",
