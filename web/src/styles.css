@@ -231,6 +231,13 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .mention{color:var(--ink);font-weight:600;background:var(--mention);border-radius:4px;padding:0 3px}
 .composer{position:relative;padding:16px 28px 22px;border-top:1px solid var(--hair)}
 .showcase-readonly{display:flex;align-items:center;gap:8px;padding:14px 28px 18px;border-top:1px solid var(--hair);font-size:13px;color:var(--muted);font-style:italic}
+/* Showcase layout: the /showcase route never gets has-traj's 4th grid column, so this shell IS the single
+   1fr grid cell and lays out "channel column + thread panel" itself (no empty strip when the thread is closed). */
+.showcase-shell{display:flex;height:100vh;overflow:hidden;min-width:0}
+.showcase-shell>.content-col{flex:1;min-width:0}
+.showcase-thread{flex:none;width:var(--traj-w,360px)}  /* the thread panel; .thread-panel supplies the skin, mobile @820 makes it fullscreen */
+.showcase-case{transition:background .12s ease}
+.showcase-case.open{background:var(--surface-strong);box-shadow:inset 3px 0 0 var(--g-sky)}  /* highlight the case whose thread is open */
 .wake-hint{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:0 2px 9px;line-height:1.4}
 .wake-hint svg{color:var(--g-sky);flex:0 0 auto}
 .wake-hint.wh-off svg{color:var(--muted-soft)}
@@ -777,6 +784,7 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
   .t-label{position:static;opacity:1;transform:none;background:none;color:var(--muted);font-size:10px;padding:0;box-shadow:none;pointer-events:auto;line-height:1.1}
   .rail a.t.active .t-label{color:var(--ink)}
   main.content-col{grid-row:1;min-width:0;height:auto;min-height:0}  /* overrides desktop height:100vh, delegated to grid 1fr; otherwise fills viewport and pushes bottom bar off screen */
+  .showcase-shell{grid-row:1;height:auto;min-height:0}  /* same delegation: the showcase wrapper is the grid cell here (its inner .content-col gets height:auto via the rule above; the thread panel goes fullscreen via .thread-panel) */
   /* sidebar (channels/members etc.) → left drawer, collapsed by default, hamburger toggles body.sb-open */
   .sidebar{position:fixed;top:0;bottom:0;left:0;width:84vw;max-width:330px;z-index:60;transform:translateX(-100%);transition:transform var(--dur-slow) var(--ease-quint);box-shadow:4px 0 28px var(--scrim)}
   body.sb-open .sidebar{transform:translateX(0)}
