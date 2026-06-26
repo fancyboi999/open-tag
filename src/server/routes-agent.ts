@@ -125,9 +125,6 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     if (!b.target) return (sendErr(res, 400, "target required"), true);
     const tgt = await resolveTarget(serverId, b.target, agent.id);
     if (!tgt) return (sendErr(res, 404, "target not found", { code: "TARGET_FAILED" }), true);
-    // Showcase channel is read-only — agent writes are blocked after resolveTarget (not inside it, to keep the read path working)
-    const sendDestCh = (await db.select({ type: schema.channels.type }).from(schema.channels).where(eq(schema.channels.id, tgt.channelId)))[0];
-    if (sendDestCh?.type === "showcase") return (sendErr(res, 403, "showcase channel is read-only"), true);
     const draftKey = `${agent.id}:${tgt.channelId}`;
     const post = async (content: string, attachmentIds: string[]) => {
       drafts.delete(draftKey);
@@ -240,7 +237,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     return (sendJson(res, 200, {
       // Agent ACL: only surface public channels + channels the agent has joined — never reveal a private
       // channel's name/description to a non-member (DMs are listed elsewhere). Keeps private channels invisible.
-      channels: chs.filter((c) => c.type !== "dm" && c.type !== "thread" && !c.deletedAt && (c.type === "channel" || c.type === "showcase" || joined.has(c.id))).map((c) => ({ name: c.name, description: c.description, joined: joined.has(c.id), type: c.type })),
+      channels: chs.filter((c) => c.type !== "dm" && c.type !== "thread" && !c.deletedAt && (c.type === "channel" || joined.has(c.id))).map((c) => ({ name: c.name, description: c.description, joined: joined.has(c.id), type: c.type })),
       agents: agents.map((a) => ({ name: a.name, status: a.status, description: a.description ?? null })),
       humans: humans.map((u) => ({ name: u.name, description: u.description ?? null })),
     }), true);
@@ -253,8 +250,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     if (!ch) return (sendErr(res, 404, "channel not found"), true);
     // Agent ACL: self-join is for public channels only. Private / DM / thread are invite-only — an admin or an
     // existing member must add the agent (mirrors the human self-join guard). Prevents an agent walking into a
-    // private channel by name. Showcase channels are world-readable but not joinable.
-    if (ch.type === "showcase") return (sendErr(res, 403, "showcase channel is read-only — it is visible to all agents without joining"), true);
+    // private channel by name.
     if (ch.type !== "channel") return (sendErr(res, 403, "this channel is invite-only — an admin or member must add the agent"), true);
     await db.insert(schema.channelMembers).values({ channelId: ch.id, memberType: "agent", memberId: agent.id }).onConflictDoNothing();
     return (sendJson(res, 200, { ok: true, joined: name }), true);
@@ -342,9 +338,6 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     if (!b.parent || !b.content) return (sendErr(res, 400, "parent + content required"), true);
     const parent = await findParent(b.parent, b.channel ?? b.target ?? null);
     if (!parent) return (sendErr(res, 404, "parent message not found"), true);
-    // Showcase channel is read-only — block agents from threading onto its messages
-    const replyParentCh = (await db.select({ type: schema.channels.type }).from(schema.channels).where(eq(schema.channels.id, parent.channelId)))[0];
-    if (replyParentCh?.type === "showcase") return (sendErr(res, 403, "showcase channel is read-only"), true);
     const th = await getOrCreateThread(serverId, parent.id, { type: "agent", id: agent.id });
     const msg = await createMessage({ serverId, channelId: th.id, senderType: "agent", senderId: agent.id, senderName: agent.name, content: b.content });
     return (sendJson(res, 200, { ok: true, threadChannelId: th.id, id: msg.id, seq: msg.seq }), true);

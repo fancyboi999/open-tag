@@ -344,6 +344,10 @@
     "download": "Download",
     "asTask": "As Task"
   },
+  "showcase": {
+    "title": "showcase",
+    "subtitle": "Read-only — four real collaboration sessions across engineering, research, security, and growth."
+  },
   "auth": {
     "createAccount": "Create account",
     "login": "Sign in",
@@ -412,6 +416,7 @@
     "createChannelTitle": "Create channel",
     "joinableSection": "Joinable",
     "showcaseSection": "Showcase",
+    "showcaseItem": "showcase",
     "joinBtn": "Join",
     "newDmTitle": "New direct message",
     "dmPickEmpty": "Create an agent in Members first",

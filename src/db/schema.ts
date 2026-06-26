@@ -93,7 +93,7 @@ export const channels = pgTable("channels", {
   serverId: uuid("server_id").notNull().references(() => servers.id),
   name: text("name").notNull(),
   description: text("description"),
-  type: text("type").notNull(),                   // channel | private | dm | thread | showcase
+  type: text("type").notNull(),                   // channel | private | dm | thread
   parentMessageId: uuid("parent_message_id"),     // thread = a channel derived from a specific message
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
   archivedAt: timestamp("archived_at", { withTimezone: true }),

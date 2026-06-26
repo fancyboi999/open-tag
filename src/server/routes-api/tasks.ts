@@ -51,14 +51,6 @@ export async function handleTasks(ctx: ServerCtx): Promise<boolean> {
   const tact = /^\/api\/tasks\/([^/]+)\/(claim|unclaim|status)$/.exec(p);
   if (tact && method === "PATCH") { // claim/unclaim/status are all PATCH
     const [, taskId, action] = tact;
-    // Showcase tasks are read-only — check the task's channel type before allowing mutation
-    const taskMsg = (await db.select({ channelId: schema.messages.channelId }).from(schema.messages)
-      .where(and(eq(schema.messages.id, taskId!), eq(schema.messages.serverId, serverId))))[0];
-    if (taskMsg) {
-      const taskCh = (await db.select({ type: schema.channels.type }).from(schema.channels)
-        .where(eq(schema.channels.id, taskMsg.channelId)))[0];
-      if (taskCh?.type === "showcase") return (sendErr(res, 403, "showcase tasks are read-only"), true);
-    }
     let r;
     if (action === "claim") {
       r = await claimTask(serverId, taskId!, "user", userId);
@@ -70,14 +62,6 @@ export async function handleTasks(ctx: ServerCtx): Promise<boolean> {
   }
   const tdel = /^\/api\/tasks\/([^/]+)$/.exec(p);
   if (tdel && method === "DELETE") { // delete task = revert to plain message (clear task fields); source message is preserved
-    // Showcase tasks are read-only
-    const tdMsg = (await db.select({ channelId: schema.messages.channelId }).from(schema.messages)
-      .where(and(eq(schema.messages.id, tdel[1]!), eq(schema.messages.serverId, serverId))))[0];
-    if (tdMsg) {
-      const tdCh = (await db.select({ type: schema.channels.type }).from(schema.channels)
-        .where(eq(schema.channels.id, tdMsg.channelId)))[0];
-      if (tdCh?.type === "showcase") return (sendErr(res, 403, "showcase tasks are read-only"), true);
-    }
     const r = await deleteTask(serverId, tdel[1]!);
     return (r ? sendJson(res, 200, { ok: true }) : sendErr(res, 404, "task not found"), true);
   }

@@ -20,9 +20,9 @@ export function ChatSidebar() {
   const [mkChan, setMkChan] = useState(false);
   const [dmPick, setDmPick] = useState(false);
   const onSaved = pathname.endsWith("/saved");
+  const onShowcase = pathname.endsWith("/showcase");
 
   const allJoined = channels.filter((c: any) => c.joined);
-  const showcaseChans = channels.filter((c: any) => c.type === "showcase");
   const otherChans = channels.filter((c: any) => !c.joined && c.type !== "showcase");
   const pinnedChans = pinned.map((id) => allJoined.find((c) => c.id === id)).filter(Boolean) as typeof allJoined;
   const joinedChans = allJoined.filter((c) => !pinned.includes(c.id));
@@ -51,16 +51,13 @@ export function ChatSidebar() {
         <span className="grow"><Bookmark size={14} style={{ verticalAlign: "-2px" }} /> {t("common.saved")}</span>
         {savedIds.size > 0 && <span className="badge">{savedIds.size}</span>}
       </div>
-      {/* Showcase pinned to the very top: it's a read-only demo (browsed a few times, then ignored). Kept above
-          Channels/DMs by product call so the two high-traffic sections stay adjacent and uninterrupted. */}
-      {showcaseChans.length > 0 && <>
-        <div className="sec sec-sub">{t("sidebar.showcaseSection")}</div>
-        {showcaseChans.map((c) => (
-          <div key={c.id} className={"item" + (c.id === channelId ? " active" : "")} style={{ cursor: "pointer" }} onClick={() => nav(`/s/${slug}/channel/${c.id}`)}>
-            <Eye size={13} style={{ flexShrink: 0, opacity: 0.7 }} /><span className="grow">{c.name}</span>
-          </div>
-        ))}
-      </>}
+      {/* Showcase pinned to the very top: a static, read-only demo page (no DB channel, no API) — browsed a few
+          times, then ignored. Kept above Channels/DMs by product call so the two high-traffic sections stay
+          adjacent and uninterrupted. */}
+      <div className="sec sec-sub">{t("sidebar.showcaseSection")}</div>
+      <div className={"item" + (onShowcase ? " active" : "")} style={{ cursor: "pointer" }} onClick={() => nav(`/s/${slug}/showcase`)}>
+        <Eye size={13} style={{ flexShrink: 0, opacity: 0.7 }} /><span className="grow">{t("sidebar.showcaseItem")}</span>
+      </div>
       {pinnedChans.length > 0 && <><div className="sec">{t("sidebar.pinnedSection")}</div>{pinnedChans.map(chanRow)}</>}
       <div className="sec">{t("common.channels")} {capabilities.manageChannels && <button className="addbtn" title={t("sidebar.createChannelTitle")} onClick={() => { setMkChan(true); setDmPick(false); }}>+</button>}</div>
       {joinedChans.map(chanRow)}

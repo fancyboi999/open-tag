@@ -52,9 +52,6 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     if (!parent) return (sendErr(res, 404, "parent message not found"), true);
     // Channel visibility gate — non-members must not create threads on private/DM channels (IDOR-B3)
     if (!(await canUserReadChannel(serverId, parent.channelId, userId))) return (sendErr(res, 403, "forbidden"), true);
-    // Showcase channel is read-only — threads may not be created on its messages
-    const parentCh = (await db.select({ type: schema.channels.type }).from(schema.channels).where(eq(schema.channels.id, parent.channelId)))[0];
-    if (parentCh?.type === "showcase") return (sendErr(res, 403, "showcase channel is read-only"), true);
     const th = await getOrCreateThread(serverId, b.parentMessageId, { type: "user", id: userId });
     const replies = await db.select({ createdAt: schema.messages.createdAt }).from(schema.messages).where(eq(schema.messages.channelId, th.id));
     const parts = await db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, th.id));
@@ -78,8 +75,8 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   if (p === "/api/channels" && method === "GET") {
     const { chs, joined } = await userChannels(serverId, userId);
     const archIncl = url.searchParams.get("archived") === "include"; // ?archived=include; archived channels hidden by default
-    // Public/showcase channels visible to all; private channels visible to members only; archived hidden by default
-    const list = chs.filter((c) => !c.deletedAt && (archIncl || !c.archivedAt) && (c.type === "channel" || c.type === "showcase" || (c.type === "private" && joined.has(c.id))));
+    // Public channels visible to all; private channels visible to members only; archived hidden by default
+    const list = chs.filter((c) => !c.deletedAt && (archIncl || !c.archivedAt) && (c.type === "channel" || (c.type === "private" && joined.has(c.id))));
     return (sendJson(res, 200, list.map((c) => ({
       id: c.id, serverId: c.serverId, name: c.name, description: c.description, type: c.type,
       parentMessageId: c.parentMessageId, createdAt: c.createdAt, archivedAt: c.archivedAt, deletedAt: c.deletedAt,
@@ -243,8 +240,6 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     if (!name) return (sendErr(res, 400, "name required"), true);
     const dup = (await db.select().from(schema.channels).where(and(eq(schema.channels.serverId, serverId), eq(schema.channels.name, name))))[0];
     if (dup && !dup.deletedAt) return (sendErr(res, 409, "channel name exists"), true);
-    // Showcase channels are created only by the seed — block API creation to prevent privilege escalation
-    if (b.type === "showcase" || b.visibility === "showcase") return (sendErr(res, 403, "showcase channels can only be created by the system"), true);
     // Frontend sends visibility public/private → backend stores as type channel/private (backward-compatible with legacy type field)
     const type = (b.visibility === "private" || b.type === "private") ? "private" : "channel";
     const [ch] = await db.insert(schema.channels).values({ serverId, name, description: b.description ?? null, type }).returning();
@@ -297,7 +292,6 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     const targetCh = (await db.select({ type: schema.channels.type }).from(schema.channels)
       .where(and(eq(schema.channels.id, cone[1]!), eq(schema.channels.serverId, serverId))))[0];
     if (targetCh?.type === "thread") return (sendErr(res, 403, "thread channels cannot be modified directly"), true);
-    if (targetCh?.type === "showcase") return (sendErr(res, 403, "showcase channels cannot be modified or deleted"), true);
     if (method === "DELETE") {
       await db.update(schema.channels).set({ deletedAt: new Date() }).where(and(eq(schema.channels.id, cone[1]!), eq(schema.channels.serverId, serverId))); // soft delete
       await publish(serverId, { type: "channel:deleted", channelId: cone[1]! });
@@ -319,7 +313,6 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     if (action === "join") {
       if (ch.type === "private") return (sendErr(res, 403, "private channel is invite-only"), true); // private channels require owner/admin invitation (cmem POST); self-join is not allowed
       if (ch.type === "thread") return (sendErr(res, 403, "thread channels cannot be joined directly — use the thread follow API"), true);
-      if (ch.type === "showcase") return (sendErr(res, 403, "showcase channel is read-only — it is visible to all members without joining"), true);
       await db.insert(schema.channelMembers).values({ channelId: chId!, memberType: "user", memberId: userId }).onConflictDoNothing();
     } else if (action === "leave") {
       if (ch.type === "thread") return (sendErr(res, 403, "thread channels cannot be left directly — use the thread unfollow API"), true);

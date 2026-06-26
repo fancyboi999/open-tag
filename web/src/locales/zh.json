@@ -344,6 +344,10 @@
     "download": "下载",
     "asTask": "作为任务"
   },
+  "showcase": {
+    "title": "案例展示",
+    "subtitle": "只读——工程、研究、安全、增长四个领域的真实协作实录。"
+  },
   "auth": {
     "createAccount": "创建账号",
     "login": "登录",
@@ -412,6 +416,7 @@
     "createChannelTitle": "创建频道",
     "joinableSection": "可加入",
     "showcaseSection": "案例展示",
+    "showcaseItem": "案例展示",
     "joinBtn": "加入",
     "newDmTitle": "发起私聊",
     "dmPickEmpty": "先在 Members 创建 agent",

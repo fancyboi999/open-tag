@@ -7,7 +7,6 @@ import { broadcastToDaemons, daemonCount } from "./daemonHub.js";
 import { agentHasScope } from "./scopes.js";
 import { newKey, hashToken } from "./auth.js";
 import { createLogger } from "../log.js";
-import { seedShowcase } from "./showcaseSeed.js";
 
 const log = createLogger("server:core");
 const PORT = Number(process.env.PORT ?? 7777);
@@ -41,8 +40,6 @@ export async function createServer(name: string, slug: string, ownerId: string) 
   await db.insert(schema.serverMembers).values({ serverId: srv!.id, userId: ownerId, role: "owner" });
   const [all] = await db.insert(schema.channels).values({ serverId: srv!.id, name: "all", description: "General channel for all members", type: "channel" }).returning();
   await db.insert(schema.channelMembers).values({ channelId: all!.id, memberType: "user", memberId: ownerId }).onConflictDoNothing();
-  // Seed the read-only showcase channel with case transcripts so every new user sees agent collaboration examples
-  await seedShowcase(srv!.id, ownerId);
   return srv!;
 }
 
@@ -382,7 +379,7 @@ export async function canAgentReadChannel(serverId: string, channelId: string, a
   if (member) return true;
   const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, channelId)))[0];
   if (!ch || ch.serverId !== serverId || ch.deletedAt) return false;
-  if (ch.type === "channel" || ch.type === "showcase") return true;        // public/showcase: any agent in the server may read
+  if (ch.type === "channel") return true;                                  // public: any agent in the server may read
   if (ch.parentMessageId) {                                                // thread: visibility follows its parent message's channel
     const parent = (await db.select().from(schema.messages).where(eq(schema.messages.id, ch.parentMessageId)))[0];
     if (parent) return canAgentReadChannel(serverId, parent.channelId, agentId); // depth 1 (a parent channel is never itself a thread)

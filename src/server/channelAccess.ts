@@ -1,7 +1,7 @@
 // Shared channel read-access guard for the human REST plane.
 // The agent-plane mirror is canAgentReadChannel in core.ts.
 // The socket.io room-join check is canReadChannel in socketio.ts (private; not exported).
-// All three follow the same logic: channel member OR public/showcase channel OR thread of a readable parent.
+// All three follow the same logic: channel member OR public channel OR thread of a readable parent.
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 
@@ -11,7 +11,6 @@ import { db, schema } from "../db/index.js";
  * True when any of:
  *   • the user is a channel member (channelMembers row exists)
  *   • the channel is public (type="channel") — any server member may access it
- *   • the channel is a showcase (type="showcase") — world-readable, same visibility as public
  *   • the channel is a thread whose parent channel passes this same check (depth-1 recursion)
  *
  * False for private / DM channels the user is not a member of, and for channels that
@@ -42,7 +41,7 @@ export async function canUserReadChannel(
     await db.select().from(schema.channels).where(eq(schema.channels.id, channelId))
   )[0];
   if (!ch || ch.serverId !== serverId || ch.deletedAt) return false;
-  if (ch.type === "channel" || ch.type === "showcase") return true; // public/showcase: any server member may read
+  if (ch.type === "channel") return true; // public: any server member may read
 
   if (ch.parentMessageId) {
     // thread: visibility follows its parent message's channel (depth 1 — a parent channel is never itself a thread)

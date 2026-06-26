@@ -7,6 +7,7 @@ import { ConfirmProvider } from "./ConfirmModal.tsx";
 import { ToastProvider } from "./toast.tsx";
 import { Layout } from "./Layout.tsx";
 import { Chat } from "./views/Chat.tsx";
+import { Showcase } from "./views/Showcase.tsx";
 import { Members } from "./views/Members.tsx";
 import { Tasks, Computers, Search, Settings, Inbox, Saved } from "./views/misc.tsx";
 import { AuthPage, JoinPage } from "./views/Auth.tsx";
@@ -57,6 +58,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route index element={<Navigate to="channel" replace />} />
             <Route path="inbox" element={<Inbox />} />
             <Route path="saved" element={<Saved />} />
+            <Route path="showcase" element={<Showcase />} />
             <Route path="channel" element={<Chat />} />
             <Route path="channel/:channelId" element={<Chat />} />
             <Route path="agent" element={<Members />} />

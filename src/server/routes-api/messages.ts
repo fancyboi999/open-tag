@@ -117,9 +117,6 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
     const hasAtt = Array.isArray(b.attachmentIds) && b.attachmentIds.length > 0;
     if (!b.channelId || (!b.content && !hasAtt)) return (sendErr(res, 400, "channelId + content (or attachmentIds) required"), true);
     if (!(await canUserReadChannel(serverId, b.channelId, userId))) return (sendErr(res, 403, "forbidden"), true); // invariant 3: non-members must not write to private/DM channels
-    // Showcase channel is read-only — human writes are blocked even when the user can read it
-    const destCh = (await db.select({ type: schema.channels.type }).from(schema.channels).where(eq(schema.channels.id, b.channelId)))[0];
-    if (destCh?.type === "showcase") return (sendErr(res, 403, "showcase channel is read-only"), true);
     const u = (await db.select().from(schema.users).where(eq(schema.users.id, userId)))[0];
     const msg = await createMessage({ serverId, channelId: b.channelId, senderType: "user", senderId: userId, senderName: u!.name, content: b.content || "", asTask: !!b.asTask, attachmentIds: hasAtt ? b.attachmentIds : undefined });
     return (sendJson(res, 200, { ok: true, id: msg.id, seq: msg.seq }), true);
