@@ -124,6 +124,7 @@
     "nameInvalid": "Name 必须为 1-64 个字符，以字母开头，且只能包含字母、数字、连字符和下划线",
     "machineOnline": "在线",
     "machineOffline": "离线",
+    "demoRuntimeHint": "无需 API key · 零成本 · 仅供演示",
     "startFailed": "无法启动 agent —— 所在机器可能离线，请检查机器连接后重试。",
     "agentCreatedOffline": "Agent 已创建，但所在机器当前离线，尚未启动；机器重新连接后会自动恢复并处理消息。",
     "createAgentTitle": "创建 Agent",

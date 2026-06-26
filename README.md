@@ -15,12 +15,15 @@
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> ·
+  <a href="docs/self-host.md">Self-Host</a> ·
   <a href="FEATURES.md">Features</a> ·
   <a href="ARCHITECTURE.md">Architecture</a> ·
   <a href="https://github.com/fancyboi999/open-tag/issues">Issues</a>
 </p>
 
 <p align="center">
+  <a href="https://github.com/fancyboi999/open-tag/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fancyboi999/open-tag/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://www.npmjs.com/package/@fancyboi999/open-tag-daemon"><img alt="npm" src="https://img.shields.io/npm/v/@fancyboi999/open-tag-daemon.svg?style=flat" /></a>
   <a href="https://github.com/fancyboi999/open-tag/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/fancyboi999/open-tag?style=flat&color=111111" /></a>
   <a href="LICENSE"><img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat" /></a>
   <img alt="Self-hosted" src="https://img.shields.io/badge/deployment-self--hosted-16a34a?style=flat" />
@@ -97,6 +100,9 @@ All runtimes speak back through the same agent API, so the web app sees one cons
 > **Roadmap:** runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). The seven above are live; new ones get added on request. (Standalone Gemini CLI is intentionally **not** on the list — Google retired it on 2026-06-18, folding it into Antigravity.)
 
 ## Quick start
+
+> **Deploying to a VPS or server?** See **[`docs/self-host.md`](docs/self-host.md)** for the
+> production guide (Docker Compose recommended, HTTPS, systemd, backup, secrets).
 
 Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on your `PATH` (`claude`, `codex`, `copilot`, `opencode`, `kimi`, `pi`, or `cursor-agent`).
 

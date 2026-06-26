@@ -234,7 +234,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     return (sendJson(res, 200, {
       // Agent ACL: only surface public channels + channels the agent has joined — never reveal a private
       // channel's name/description to a non-member (DMs are listed elsewhere). Keeps private channels invisible.
-      channels: chs.filter((c) => c.type !== "dm" && !c.deletedAt && (c.type === "channel" || joined.has(c.id))).map((c) => ({ name: c.name, description: c.description, joined: joined.has(c.id) })),
+      channels: chs.filter((c) => c.type !== "dm" && c.type !== "thread" && !c.deletedAt && (c.type === "channel" || joined.has(c.id))).map((c) => ({ name: c.name, description: c.description, joined: joined.has(c.id) })),
       agents: agents.map((a) => ({ name: a.name, status: a.status, description: a.description ?? null })),
       humans: humans.map((u) => ({ name: u.name, description: u.description ?? null })),
     }), true);
