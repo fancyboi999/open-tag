@@ -41,7 +41,10 @@ conn = new Connection(serverUrl, apiKey, (msg) => {
   if (msg.type !== "ping") log.debug("recv", { type: msg.type, agentId: msg.agentId });
   switch (msg.type) {
     case "ready:ack": if (typeof msg.machineId === "string" && msg.machineId) saveMachineId(msg.machineId); break;
-    case "agent:start": void mgr.start(msg.agentId, { ...msg.config }); break;
+    // Agent dials the same server URL this daemon connected with (proven reachable), overriding the
+    // server-reported config.serverUrl (SELF_URL = localhost:PORT on the server box — wrong whenever the
+    // daemon runs on a different host than the server, e.g. local daemon ↔ getopentag.com).
+    case "agent:start": void mgr.start(msg.agentId, { ...msg.config, serverUrl }); break;
     case "agent:deliver": mgr.deliver(msg.agentId, msg.from ?? "someone", msg.target ?? "", !!msg.mentioned, { targetName: msg.targetName, msgShort: msg.msgShort, isTask: msg.isTask }); conn.send({ type: "agent:deliver:ack", agentId: msg.agentId, seq: msg.seq }); break;
     case "agent:stop": mgr.stop(msg.agentId); break;
     case "agent:sleep": mgr.sleep(msg.agentId); break;
