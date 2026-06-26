@@ -11,7 +11,7 @@ import { LiveAgentBar } from "./LiveAgentBar.tsx";
 // Both the Chat view and the Saved view (misc.tsx) render this component so the channel list stays visible when navigating to Saved.
 export function ChatSidebar() {
   const { t } = useTranslation();
-  const { api, serverId, channels, dms, unread, agents, slug, savedIds, capabilities, createChannel, openDM, joinChannel, attachmentUrl } = useStore();
+  const { api, serverId, channels, dms, unread, agents, visibleAgents, slug, savedIds, capabilities, createChannel, openDM, joinChannel, attachmentUrl } = useStore();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const { channelId } = useParams();
   const { pathname } = useLocation();
@@ -51,6 +51,16 @@ export function ChatSidebar() {
         <span className="grow"><Bookmark size={14} style={{ verticalAlign: "-2px" }} /> {t("common.saved")}</span>
         {savedIds.size > 0 && <span className="badge">{savedIds.size}</span>}
       </div>
+      {/* Showcase pinned to the very top: it's a read-only demo (browsed a few times, then ignored). Kept above
+          Channels/DMs by product call so the two high-traffic sections stay adjacent and uninterrupted. */}
+      {showcaseChans.length > 0 && <>
+        <div className="sec sec-sub">{t("sidebar.showcaseSection")}</div>
+        {showcaseChans.map((c) => (
+          <div key={c.id} className={"item" + (c.id === channelId ? " active" : "")} style={{ cursor: "pointer" }} onClick={() => nav(`/s/${slug}/channel/${c.id}`)}>
+            <Eye size={13} style={{ flexShrink: 0, opacity: 0.7 }} /><span className="grow">{c.name}</span>
+          </div>
+        ))}
+      </>}
       {pinnedChans.length > 0 && <><div className="sec">{t("sidebar.pinnedSection")}</div>{pinnedChans.map(chanRow)}</>}
       <div className="sec">{t("common.channels")} {capabilities.manageChannels && <button className="addbtn" title={t("sidebar.createChannelTitle")} onClick={() => { setMkChan(true); setDmPick(false); }}>+</button>}</div>
       {joinedChans.map(chanRow)}
@@ -60,16 +70,8 @@ export function ChatSidebar() {
           <div key={c.id} className="item ghost"><span className="grow"># {c.name}</span><button className="joinbtn" onClick={() => joinChannel(c.id)}>{t("sidebar.joinBtn")}</button></div>
         ))}
       </>}
-      {showcaseChans.length > 0 && <>
-        <div className="sec sec-sub">{t("sidebar.showcaseSection")}</div>
-        {showcaseChans.map((c) => (
-          <div key={c.id} className={"item" + (c.id === channelId ? " active" : "")} style={{ cursor: "pointer" }} onClick={() => nav(`/s/${slug}/channel/${c.id}`)}>
-            <Eye size={13} style={{ flexShrink: 0, opacity: 0.7 }} /><span className="grow">{c.name}</span>
-          </div>
-        ))}
-      </>}
       <div className="sec">{t("common.directMessages")} <button className="addbtn" title={t("sidebar.newDmTitle")} onClick={() => { setDmPick((v) => !v); setMkChan(false); }}>+</button></div>
-      {dmPick && <div className="dm-pick">{agents.length ? agents.map((a) => <button key={a.id} className="item" onClick={() => doDM(a.id)}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span></button>) : <div className="empty">{t("sidebar.dmPickEmpty")}</div>}</div>}
+      {dmPick && <div className="dm-pick">{visibleAgents.length ? visibleAgents.map((a) => <button key={a.id} className="item" onClick={() => doDM(a.id)}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span></button>) : <div className="empty">{t("sidebar.dmPickEmpty")}</div>}</div>}
       {dms.map((c) => {
         const a = c.peerType === "agent" ? agents.find((x) => x.id === c.peerId) : undefined; // agent DM → show real-time status dot
         return (
@@ -92,7 +94,7 @@ export function ChatSidebar() {
 export function CreateChannelModal({ onCreate, onClose, prefill, submitLabel }: { onCreate: (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => void; onClose: () => void; prefill?: { name?: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }; submitLabel?: string }) {
   useEscClose(onClose);
   const { t } = useTranslation();
-  const { agents, humans, me, attachmentUrl } = useStore();
+  const { visibleAgents: agents, humans, me, attachmentUrl } = useStore(); // visibleAgents: showcase demo props are not offered as channel members
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const [name, setName] = useState(prefill?.name ?? "");
   const [desc, setDesc] = useState(prefill?.description ?? "");

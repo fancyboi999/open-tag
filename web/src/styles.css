@@ -198,6 +198,13 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .head{padding:18px 28px;border-bottom:1px solid var(--hair);display:flex;align-items:baseline;gap:12px}
 .head h1{font-family:var(--serif);font-weight:400;font-size:24px;letter-spacing:-.32px;color:var(--ink);margin:0}
 .head small{font-size:12px;color:var(--muted)}
+/* Chat channel header only (scoped via .chat-head so the shared .head in Members / agent profile is untouched):
+   keep name + description + tabs on ONE row. The description shrinks to an ellipsis instead of wrapping — wrapping
+   otherwise multiplied the header height and dropped the channel name to the bottom when the column got narrow
+   (e.g. a wide right panel). Name + tabs never shrink, so the tab row stays intact instead of being pushed around. */
+.chat-head>h1{flex-shrink:0}
+.chat-head>small,.chat-head>.head-status{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-head>.chtabs{flex-shrink:0}
 .scroll{flex:1;overflow:auto;padding:24px 28px}
 .msg{display:flex;gap:12px;margin:0 -12px 6px;padding:7px 12px;border-radius:12px;transition:background .1s;position:relative}
 .msg:hover{background:var(--canvas-soft)}
@@ -269,7 +276,7 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .patt-ok{position:absolute;top:-5px;left:-5px;color:var(--success);background:var(--surface);border-radius:50%;display:flex;box-shadow:0 0 0 1px var(--hair)}
 .patt.st-error{border-color:var(--error)}
 .patt-err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--error);background:var(--error-soft);border-radius:inherit}
-.msg-atts{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.msg-atts{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin-top:6px}
 .msg-att{display:inline-flex;align-items:center;gap:8px;max-width:360px;padding:7px 11px;border:1px solid var(--hair-strong);border-radius:8px;background:var(--surface);color:var(--body);text-decoration:none;font-size:14px}
 .msg-att:hover{background:var(--surface-strong)} .msg-att .asz{font-size:11px;color:var(--muted-soft);flex:none}
 .file-row{display:flex;align-items:center;gap:8px;padding:12px 14px}
@@ -466,13 +473,14 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .member-pick .ck-mark{color:var(--success);font-weight:700}
 .sec-sub{font-size:11px;color:var(--muted-soft);margin-top:8px}
 /* Image attachments: inline message preview + file row thumbnail */
-.msg-att-img{display:inline-block;margin-top:6px;border:1px solid var(--hair-strong);border-radius:12px;overflow:hidden;line-height:0;background:var(--surface-strong);padding:0;cursor:zoom-in}
-.msg-att-img img{display:block;max-width:320px;max-height:240px;width:auto;height:auto;object-fit:contain}
+.msg-att-img{display:inline-flex;align-self:flex-start;max-width:min(100%,320px);margin-top:6px;border:1px solid var(--hair-strong);border-radius:12px;overflow:hidden;line-height:0;background:var(--surface-strong);padding:0;cursor:zoom-in}
+.msg-att-img img{display:block;max-width:100%;max-height:240px;width:auto;height:auto;object-fit:contain}
 /* Video inline player (skin from DESIGN.md: hairline rounded corners) */
 .msg-att-video{display:block;margin-top:6px;max-width:420px;max-height:300px;width:auto;border:1px solid var(--hair-strong);border-radius:12px;background:var(--ink)}
 /* Image lightbox fullscreen overlay */
-.lightbox-bg{position:fixed;inset:0;z-index:200;background:var(--scrim);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;overflow:hidden}
-.lightbox-img{max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 12px 48px var(--shadow-7);transition:transform .04s linear;user-select:none}
+.lightbox-bg{position:fixed;inset:0;z-index:200;background:var(--scrim);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;overflow:hidden;padding:32px}
+.lightbox-panel{display:flex;align-items:center;justify-content:center;max-width:min(92vw,1120px);max-height:calc(100vh - 64px);background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;box-shadow:0 12px 48px var(--shadow-7);overflow:hidden}
+.lightbox-img{display:block;max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;transition:transform .04s linear;user-select:none}
 .lightbox-x{position:fixed;top:18px;right:20px;z-index:201;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:none;border-radius:9999px;background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:0 4px 16px var(--shadow-6)}
 .lightbox-x:hover{background:var(--surface-strong)}
 .file-thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;flex:none;background:var(--surface-strong)}
