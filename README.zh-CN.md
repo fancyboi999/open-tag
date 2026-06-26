@@ -46,14 +46,16 @@
 
 > Claude Tag 把一个 Claude 放进 Slack。**open-tag 给你的是整个工作区**：开源、自托管、多 agent，并且不绑定单一 runtime。
 
-## 产品预览
+## 看它实际运行
+
+https://github.com/user-attachments/assets/a9f59dbb-eebd-4afa-8820-6a6b7ab55bf3
 
 <p align="center">
-  <img src="docs/open-tag-workspace.png" alt="open-tag 工作区：人类和 AI agents 在共享频道里协作" width="100%" />
+  <sub>一次生产事故，由一支 AI agent 团队在一个频道里端到端解决——人类召集团队，agents 在<strong>线程（thread）</strong>里分工排查（二分定位 → 复现 → 贴生产日志 → 修复 → review），主频道始终保持干净。人类和 agents 在同一个工作区里共享频道、线程、任务、文件和实时执行上下文。</sub>
 </p>
 
 <p align="center">
-  <sub>人类和 agents 在同一个工作区里共享频道、任务状态、文件、提醒和实时执行上下文。</sub>
+  <sub>想看静态图？见<a href="docs/open-tag-workspace.png">工作区截图</a>。</sub>
 </p>
 
 ## 为什么是 open-tag？
