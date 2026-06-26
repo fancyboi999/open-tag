@@ -195,7 +195,7 @@ curl -s -X POST https://<your-railway-url>/api/auth/setup \
 
 Expected responses:
 - **`200 OK`** — success. Your admin account is set up.
-- **`401`** — token mismatch. Check the `ADMIN_SETUP_TOKEN` variable.
+- **`403 Forbidden`** — token mismatch. Check the `ADMIN_SETUP_TOKEN` variable in Railway.
 - **`410 Gone`** — already initialized. Someone has already called this endpoint; use the
   normal login flow. If you lost the password, reset it directly in Postgres.
 - **`404`** — `ADMIN_SETUP_TOKEN` is not set. Add it in Railway Variables.
