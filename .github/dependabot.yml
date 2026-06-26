@@ -1,19 +1,40 @@
 version: 2
+# Tuned to avoid noise: patch/minor only (majors are upgraded deliberately, after
+# real testing — Dependabot's CI green ≠ runtime-safe for a major lib bump), grouped
+# into one PR per ecosystem, with a cap on concurrently-open PRs.
 updates:
   # Root package (server + daemon + CLI)
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      root-minor-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # Web frontend (Vite + React)
   - package-ecosystem: "npm"
     directory: "/web"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      web-minor-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
-  # GitHub Actions workflows
+  # GitHub Actions workflows (grouped; action majors are low-risk CI infra)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]
