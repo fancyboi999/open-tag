@@ -267,6 +267,10 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   const cops = /^\/api\/channels\/([^/]+)\/(archive|unarchive)$/.exec(p);
   if (cops && method === "POST") {
     if (!await requireCap(serverId, userId, "manageChannels")) return (sendErr(res, 403, "need manageChannels capability"), true);
+    // Thread channels follow their parent message's lifecycle; direct archive/unarchive is not allowed.
+    const archTarget = (await db.select({ type: schema.channels.type }).from(schema.channels)
+      .where(and(eq(schema.channels.id, cops[1]!), eq(schema.channels.serverId, serverId))))[0];
+    if (archTarget?.type === "thread") return (sendErr(res, 403, "thread channels cannot be archived directly"), true);
     await db.update(schema.channels).set({ archivedAt: cops[2] === "archive" ? new Date() : null }).where(and(eq(schema.channels.id, cops[1]!), eq(schema.channels.serverId, serverId)));
     await publish(serverId, { type: "channel:updated", channelId: cops[1]! });
     return (sendJson(res, 200, { ok: true }), true);
@@ -274,6 +278,11 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   const cone = /^\/api\/channels\/([^/]+)$/.exec(p);
   if (cone && (method === "PATCH" || method === "DELETE")) {
     if (!await requireCap(serverId, userId, "manageChannels")) return (sendErr(res, 403, "need manageChannels capability"), true);
+    // Fetch the channel first: thread channels must not be modified via this endpoint — their
+    // lifecycle is managed by their parent message (getOrCreateThread / thread follow API).
+    const targetCh = (await db.select({ type: schema.channels.type }).from(schema.channels)
+      .where(and(eq(schema.channels.id, cone[1]!), eq(schema.channels.serverId, serverId))))[0];
+    if (targetCh?.type === "thread") return (sendErr(res, 403, "thread channels cannot be modified directly"), true);
     if (method === "DELETE") {
       await db.update(schema.channels).set({ deletedAt: new Date() }).where(and(eq(schema.channels.id, cone[1]!), eq(schema.channels.serverId, serverId))); // soft delete
       await publish(serverId, { type: "channel:deleted", channelId: cone[1]! });
@@ -294,8 +303,10 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     if (!ch) return (sendErr(res, 404, "channel not found"), true);
     if (action === "join") {
       if (ch.type === "private") return (sendErr(res, 403, "private channel is invite-only"), true); // private channels require owner/admin invitation (cmem POST); self-join is not allowed
+      if (ch.type === "thread") return (sendErr(res, 403, "thread channels cannot be joined directly — use the thread follow API"), true);
       await db.insert(schema.channelMembers).values({ channelId: chId!, memberType: "user", memberId: userId }).onConflictDoNothing();
     } else if (action === "leave") {
+      if (ch.type === "thread") return (sendErr(res, 403, "thread channels cannot be left directly — use the thread unfollow API"), true);
       await db.delete(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, chId!), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));
     } else { // read: advance cursor to the latest seq
       const b = await readJson(req).catch(() => ({}));

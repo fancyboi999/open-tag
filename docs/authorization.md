@@ -96,7 +96,8 @@ gap: task *ownership* (§6 C5).
    member of the server may read/join. Private / DM / thread: only explicitly-added members. The human
    self-join guard (`routes-api.ts` "private channel is invite-only") has an agent-plane equivalent:
    `canAgentReadChannel` enforced in `resolveTarget` / `resolveMessageId` / `findParent` / `channel/join`
-   (§6 C1–C3/C6/C7/C8 — fixed).
+   (§6 C1–C3/C6/C7/C8 — fixed). Human REST read/write of messages and tasks is gated by
+   `canUserReadChannel` (`channelAccess.ts`) — same logic, human plane (§6 F-REST — fixed).
 
 ## 5. What the hardening PRs enforced
 
@@ -168,6 +169,16 @@ big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents fr
 - **C4** deleted-agent token still valid — fixed (auth-caps PR). `resolveAgent` now filters `isNull(deletedAt)`
   **and** soft-delete clears `agentTokenHash` (defense in depth). Real E2E: a deleted agent's token authenticates
   before delete (200) and is rejected after (401); the `deletedAt` filter alone rejects even with the hash intact.
+
+- **F-REST [HIGH]** human REST plane missing channel-membership check on private/DM channels — fixed
+  (private-channel-idor PR). `GET /api/messages/channel/:id`, `POST /api/messages`, and
+  `GET/POST /api/tasks/channel/:id` all lacked a member-check; a same-tenant non-member could read full
+  message history and write to private/DM channels by supplying any known channel UUID. Fixed by adding
+  `canUserReadChannel(serverId, channelId, userId)` (`src/server/channelAccess.ts`) — identical logic to
+  the existing agent-plane `canAgentReadChannel` and socket.io `canReadChannel`: channel member → ok;
+  public channel → ok; thread → inherits parent; private/DM non-member → 403. Integration test
+  `test/channelAccess.integration.ts` confirms: 6 non-member cases fail on main, all pass after fix,
+  public-channel regression check passes, DM isolation verified.
 
 ### Pending — agent-plane ownership (the channel-access layer above is done; this is a finer-grained check)
 - **C5 [MED]** `POST /agent/task/update`, `/task/unclaim` — an agent that can access the channel can still

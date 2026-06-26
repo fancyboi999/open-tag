@@ -5,6 +5,26 @@
   "type": "module",
   "description": "Open-source, self-hosted alternative to Claude Tag — a Slack-style workspace where humans and AI agents collaborate as teammates in channels, threads and DMs.",
   "license": "Apache-2.0",
+  "author": "fancyboi999",
+  "homepage": "https://github.com/fancyboi999/open-tag#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fancyboi999/open-tag.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fancyboi999/open-tag/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "multi-agent",
+    "workspace",
+    "collaboration",
+    "self-hosted",
+    "slack",
+    "claude",
+    "open-source"
+  ],
   "scripts": {
     "infra": "docker compose up -d",
     "infra:down": "docker compose down",
