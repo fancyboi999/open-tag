@@ -104,6 +104,39 @@
 .lp-orb--lavender { width: 400px; height: 400px; background: #c8b8e0; top: 420px; right: 8%; opacity: 0.38; }
 .lp-orb--sky      { width: 360px; height: 360px; background: #a8c8e8; top: 560px; left: 18%; opacity: 0.32; }
 
+/* —— Hero orb drift: ambient breathing, pure transform (§4: zero layout-prop animation), 12–20s cycles, ≤24px amplitude —— */
+@keyframes lp-orb-drift-mint {
+  0%   { transform: translate(0px,    0px)   scale(1);    }
+  25%  { transform: translate(14px,  -10px)  scale(1.03); }
+  50%  { transform: translate(8px,    16px)  scale(0.98); }
+  75%  { transform: translate(-12px,  8px)   scale(1.02); }
+  100% { transform: translate(0px,    0px)   scale(1);    }
+}
+@keyframes lp-orb-drift-peach {
+  0%   { transform: translate(0px,    0px)   scale(1);    }
+  25%  { transform: translate(-16px,  10px)  scale(0.97); }
+  50%  { transform: translate(-8px,  -18px)  scale(1.04); }
+  75%  { transform: translate(18px,  -6px)   scale(0.99); }
+  100% { transform: translate(0px,    0px)   scale(1);    }
+}
+@keyframes lp-orb-drift-lavender {
+  0%   { transform: translate(0px,    0px)   scale(1);    }
+  33%  { transform: translate(20px,   12px)  scale(1.03); }
+  66%  { transform: translate(-14px,  20px)  scale(0.97); }
+  100% { transform: translate(0px,    0px)   scale(1);    }
+}
+@keyframes lp-orb-drift-sky {
+  0%   { transform: translate(0px,    0px)   scale(1);    }
+  30%  { transform: translate(-22px, -8px)   scale(1.02); }
+  60%  { transform: translate(10px,  -18px)  scale(0.98); }
+  100% { transform: translate(0px,    0px)   scale(1);    }
+}
+/* Phase-staggered via negative delay so each orb enters mid-cycle; --lp-ease = cubic-bezier(0.2,0,0,1) */
+.lp-orb--mint     { animation: lp-orb-drift-mint     16s cubic-bezier(0.2, 0, 0, 1) infinite; }
+.lp-orb--peach    { animation: lp-orb-drift-peach    20s cubic-bezier(0.2, 0, 0, 1) -5s infinite; }
+.lp-orb--lavender { animation: lp-orb-drift-lavender 14s cubic-bezier(0.2, 0, 0, 1) -8s infinite; }
+.lp-orb--sky      { animation: lp-orb-drift-sky      18s cubic-bezier(0.2, 0, 0, 1) -12s infinite; }
+
 /* —— Buttons —— */
 .lp-btn { display: inline-flex; align-items: center; gap: var(--lp-space-2); font-family: var(--lp-font-body); font-size: var(--lp-text-base); font-weight: 500; border-radius: var(--lp-radius-pill); padding: 14px 26px; cursor: pointer; transition: background var(--lp-motion-base) var(--lp-ease), border-color var(--lp-motion-base) var(--lp-ease), transform var(--lp-motion-fast) var(--lp-ease); border: 1px solid transparent; }
 .lp-btn:focus-visible { outline: none; box-shadow: var(--lp-focus-ring); }
@@ -306,6 +339,8 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-hero__intro > *, .lp-browser { animation: none; }
   .lp-reveal { opacity: 1; transform: none; transition: none; }
+  /* Orb drift: stop all continuous loops (§4 red line + §5 集中兜底块) */
+  .lp-orb--mint, .lp-orb--peach, .lp-orb--lavender, .lp-orb--sky { animation: none; }
 }
 
 /* —— Responsive —— */

@@ -12,6 +12,14 @@
   /* Shadow scale (elevation depth): black at varying opacity, centralized as tokens to prevent scattering (same sidecar approach); used for box-shadow on overlays/cards/menus */
   --shadow-1:rgba(0,0,0,.05);--shadow-2:rgba(0,0,0,.1);--shadow-3:rgba(0,0,0,.12);--shadow-4:rgba(0,0,0,.16);--shadow-5:rgba(0,0,0,.25);--shadow-6:rgba(0,0,0,.3);--shadow-7:rgba(0,0,0,.45);
   --serif:'EB Garamond','Times New Roman',serif;--sans:'Inter',-apple-system,'PingFang SC','Segoe UI',sans-serif;
+  /* Motion tokens — app shell (not landing page --lp-* system) */
+  --ease-quint: cubic-bezier(.22, 1, .36, 1);
+  --ease-expo:  cubic-bezier(.16, 1, .3, 1);
+  --ease-decel: cubic-bezier(0, 0, .2, 1);
+  --dur-fast:      120ms;
+  --dur-base:      200ms;
+  --dur-slow:      320ms;
+  --dur-signature: 440ms;
 }
 *{box-sizing:border-box}
 body{margin:0;font-family:var(--sans);font-size:16px;line-height:1.5;letter-spacing:.15px;background:var(--canvas);color:var(--ink-2)}
@@ -218,7 +226,7 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .wake-hint.wh-off svg{color:var(--muted-soft)}
 /* Global toast notifications (toast.tsx) — one-shot operation feedback, bottom-right stack. */
 .toast-stack{position:fixed;bottom:18px;right:18px;z-index:1000;display:flex;flex-direction:column;gap:8px;max-width:360px}
-.toast{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.45;background:var(--surface);border:1px solid var(--hair-strong);box-shadow:0 4px 16px rgba(12,10,9,.12);cursor:pointer;animation:toast-in .16s ease-out}
+.toast{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.45;background:var(--surface);border:1px solid var(--hair-strong);box-shadow:0 4px 16px rgba(12,10,9,.12);cursor:pointer;animation:toast-in var(--dur-fast) var(--ease-quint) both}
 .toast-error{background:var(--error-soft);border-color:var(--error-line)}
 .toast-info{background:var(--tint-blue);border-color:var(--tint-blue-strong)}
 .toast-msg{flex:1 1 auto;color:var(--ink)}
@@ -354,7 +362,7 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .ws-root{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-family:ui-monospace,monospace;color:var(--muted-soft)}
 .ws-copy{flex:none;border:0;background:transparent;color:var(--muted);cursor:pointer;padding:3px;border-radius:6px;display:flex;align-items:center}
 .ws-copy:hover{background:var(--surface-strong);color:var(--ink)}
-.ws-caret{color:var(--muted-soft);transition:transform .12s}
+.ws-caret{color:var(--muted-soft);transition:transform var(--dur-fast) var(--ease-quint)}
 .ws-caret.open{transform:rotate(90deg)}
 /* .md Preview/Raw toggle (editorial pill) */
 .ws-toggle{margin-left:auto;display:inline-flex;border:1px solid var(--hair-strong);border-radius:9999px;overflow:hidden}
@@ -536,7 +544,7 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .sel-trigger.open{border-color:var(--ink-2);box-shadow:0 0 0 1px var(--ink-2)}
 .sel-trigger .grow{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sel-ph{color:var(--muted-soft)}
-.sel-caret{color:var(--muted);flex:none;transition:transform .15s ease}
+.sel-caret{color:var(--muted);flex:none;transition:transform var(--dur-fast) var(--ease-quint)}
 .sel-trigger.open .sel-caret{transform:rotate(180deg)}
 .sel-menu{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;box-shadow:0 10px 32px rgba(12,10,9,.16);padding:5px;max-height:280px;overflow-y:auto}
 .sel-opt{display:flex;align-items:center;gap:8px;width:100%;font-family:var(--sans);font-size:15px;color:var(--body);background:none;border:0;border-radius:8px;padding:8px 10px;cursor:pointer;text-align:left}
@@ -651,7 +659,7 @@ aside.traj-col.profile-mode{display:flex;flex-direction:column;overflow:hidden;m
 aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -20px;padding:0 20px}
 
 /* ── Hover agent → info card ─────────────────────────── */
-.agent-hovercard{position:fixed;z-index:60;display:flex;gap:11px;align-items:flex-start;background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;box-shadow:0 8px 28px var(--shadow-3);padding:13px 15px;min-width:200px;max-width:248px;pointer-events:none;animation:ahc-in .12s cubic-bezier(.22,1,.36,1)}
+.agent-hovercard{position:fixed;z-index:60;display:flex;gap:11px;align-items:flex-start;background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;box-shadow:0 8px 28px var(--shadow-3);padding:13px 15px;min-width:200px;max-width:248px;pointer-events:none;animation:ahc-in var(--dur-fast) var(--ease-quint) both}
 @keyframes ahc-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 .agent-hovercard .ahc-body{min-width:0;display:flex;flex-direction:column;gap:2px}
 .agent-hovercard .ahc-name{font-size:15px;font-weight:600;color:var(--ink-2);display:flex;align-items:center;gap:6px}
@@ -661,7 +669,7 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
 
 /* ── Message right-click context menu ──────────────────────────── */
 .ctx-backdrop{position:fixed;inset:0;z-index:70}
-.ctx-menu{position:fixed;min-width:212px;background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;box-shadow:0 10px 34px var(--shadow-4);padding:6px;animation:ahc-in .1s ease-out}
+.ctx-menu{position:fixed;min-width:212px;background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;box-shadow:0 10px 34px var(--shadow-4);padding:6px;animation:ahc-in var(--dur-fast) var(--ease-quint) both}
 .ctx-rx{display:flex;gap:2px;padding:3px 2px 7px;margin-bottom:4px;border-bottom:1px solid var(--hair)}
 .ctx-rx button{flex:1;border:0;background:transparent;font-size:17px;line-height:1;padding:5px 0;border-radius:8px;cursor:pointer;transition:background .1s}
 .ctx-rx button:hover{background:var(--surface-strong);transform:scale(1.15)}
@@ -708,6 +716,43 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
 @keyframes lb-ping{0%{transform:scale(1);opacity:.55}70%,100%{transform:scale(2.4);opacity:0}}
 @media (prefers-reduced-motion:reduce){.live-bar__pip::after{animation:none;opacity:0}}
 
+/* ── Message enter animation: new socket-pushed messages slide in from opacity:0 + translateY(6px).
+   Only transform/opacity are animated (layout-safe). Stagger delay set per-element via --msg-delay. ── */
+@keyframes msg-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.msg-enter {
+  animation-name: msg-enter;
+  animation-duration: var(--dur-slow);
+  animation-timing-function: var(--ease-quint);
+  animation-delay: var(--msg-delay, 0ms);
+  animation-fill-mode: both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-enter { animation: none; }
+}
+
+/* ── Primary button press feedback: snap-scale on :active (transform only, layout-safe) ── */
+.send-btn,.modal .ok,.setform .ok,.newtask,.action-card .ac-btn,.perm-head .ok{transition:transform var(--dur-fast)}
+.send-btn:active,.modal .ok:active,.setform .ok:active,.newtask:active,.action-card .ac-btn:active,.perm-head .ok:active{transform:scale(.97)}
+
+/* ── Modal / QuickSwitcher entry animation ── */
+@keyframes modal-enter{from{opacity:0;transform:translateY(6px) scale(.99)}to{opacity:1;transform:none}}
+.modal,.qs{animation:modal-enter var(--dur-slow) var(--ease-quint) both}
+
+/* ── Channel / tab content crossfade: opacity + micro translateY ── */
+@keyframes view-enter{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.ch-view-enter{animation:view-enter var(--dur-base) var(--ease-quint) both}
+/* TaskBoard root fires the animation on each tab-switch (board-scroll is TaskBoard's top-level element) */
+.board-scroll{animation:view-enter var(--dur-base) var(--ease-quint) both}
+
+/* ── Reduced-motion overrides for all new secondary animations (consolidated block) ── */
+@media (prefers-reduced-motion:reduce){
+  .modal,.qs,.ch-view-enter,.board-scroll{animation:none}
+  .send-btn,.modal .ok,.setform .ok,.newtask,.action-card .ac-btn,.perm-head .ok{transition:none}
+}
+
 /* ───────── Mobile adaptation (≤820px): three columns → single column, rail moves to bottom tab bar, sidebar becomes drawer, thread/profile goes fullscreen, modal becomes bottom sheet ───────── */
 .mobile-burger,.mobile-scrim{display:none}  /* hidden on desktop by default: if scrim is not hidden it occupies the first grid column and shifts rail/sidebar/content out of place */
 @media (max-width:820px){
@@ -720,7 +765,7 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
   .rail a.t.active .t-label{color:var(--ink)}
   main.content-col{grid-row:1;min-width:0;height:auto;min-height:0}  /* overrides desktop height:100vh, delegated to grid 1fr; otherwise fills viewport and pushes bottom bar off screen */
   /* sidebar (channels/members etc.) → left drawer, collapsed by default, hamburger toggles body.sb-open */
-  .sidebar{position:fixed;top:0;bottom:0;left:0;width:84vw;max-width:330px;z-index:60;transform:translateX(-100%);transition:transform .22s cubic-bezier(.2,.8,.2,1);box-shadow:4px 0 28px var(--scrim)}
+  .sidebar{position:fixed;top:0;bottom:0;left:0;width:84vw;max-width:330px;z-index:60;transform:translateX(-100%);transition:transform var(--dur-slow) var(--ease-quint);box-shadow:4px 0 28px var(--scrim)}
   body.sb-open .sidebar{transform:translateX(0)}
   body.sb-open .mobile-scrim{display:block}
   .mobile-scrim{display:none;position:fixed;inset:0;background:var(--scrim);z-index:55}

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
@@ -144,6 +144,11 @@ export function Chat() {
   const loadingOlderRef = useRef(false); // de-dupes concurrent "load older" fetches while one is in flight
   const prependRestoreRef = useRef<number | null>(null); // scrollHeight captured before a prepend; restored after so the viewport doesn't jump
   const trimmedRef = useRef(false); // a live-tail trim dropped the oldest in-memory messages → mark hasMore so they stay re-fetchable
+  // Message enter animation tracking: id → stagger index (0–7) for messages that arrived via socket (true new).
+  // Historical loads (initial fetch, loadOlder) never touch this map, so they never get the enter class.
+  const newMsgOrderRef = useRef(new Map<string, number>());
+  const burstCountRef = useRef(0); // how many messages have arrived in the current burst window
+  const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // resets burstCount after 600ms silence
   const cur = [...channels, ...dms].find((c) => c.id === channelId) || channels.find((c) => c.name === "all") || channels[0];
   const curIdRef = useRef<string | undefined>(undefined);
   curIdRef.current = cur?.id; // latest channel id for async guards: a loadOlder that resolves after a channel switch must drop its stale-channel result (no cross-channel prepend / hasMore clobber)
@@ -178,7 +183,7 @@ export function Chat() {
     // eslint-disable-next-line
   }, [agentPanelReq]);
   useEffect(() => onEvent((e) => {
-    if (e.type === "message" && e.channelId === cur?.id) { setMsgs((m) => { const { next, trimmed } = appendWithCap(m, e.message, atBottomRef.current && !loadingOlderRef.current); if (trimmed) trimmedRef.current = true; return next; }); markRead(cur.id); } // don't trim mid-pagination: a trim's setHasMore(true) would race the in-flight loadOlder's setHasMore — suppressing it closes the window (the next message trims instead)
+    if (e.type === "message" && e.channelId === cur?.id) { const idx = Math.min(burstCountRef.current, 7); newMsgOrderRef.current.set(e.message.id, idx); burstCountRef.current += 1; if (burstTimerRef.current) clearTimeout(burstTimerRef.current); burstTimerRef.current = setTimeout(() => { burstCountRef.current = 0; burstTimerRef.current = null; }, 600); setMsgs((m) => { const { next, trimmed } = appendWithCap(m, e.message, atBottomRef.current && !loadingOlderRef.current); if (trimmed) trimmedRef.current = true; return next; }); markRead(cur.id); } // don't trim mid-pagination: a trim's setHasMore(true) would race the in-flight loadOlder's setHasMore — suppressing it closes the window (the next message trims instead)
     else if (e.type === "message:updated" && e.message) setMsgs((m) => m.map((x) => (x.id === e.message.id ? { ...x, ...e.message } : x))); // sync reactions and task fields
     else if (e.type === "thread:updated" && e.parentMessageId) setThreadMeta((tm) => { // live reply count update; unreadCount is approximated from the replyCount delta (socket does not carry unreadCount; the authoritative value is corrected on channel switch via GET)
       const prev = tm[e.parentMessageId]; const delta = prev ? Math.max(0, e.replyCount - prev.replyCount) : 0;
@@ -190,7 +195,7 @@ export function Chat() {
   // Keep the viewport anchored across an older-page prepend: restore scrollTop before paint. Runs before the auto-scroll effect above, which is a no-op here anyway (a prepend only happens while scrolled up, so atBottomRef is false).
   useLayoutEffect(() => { const el = scrollRef.current; if (el && prependRestoreRef.current != null) { el.scrollTop = el.scrollHeight - prependRestoreRef.current; prependRestoreRef.current = null; } }, [msgs]);
   useEffect(() => { if (trimmedRef.current) { trimmedRef.current = false; setHasMore(true); } }, [msgs]); // a live-tail trim opened a gap at the top → older messages stay re-fetchable
-  useEffect(() => { atBottomRef.current = true; setShowJump(false); }, [cur?.id]); // reset bottom-pin state on channel switch
+  useEffect(() => { atBottomRef.current = true; setShowJump(false); newMsgOrderRef.current.clear(); burstCountRef.current = 0; }, [cur?.id]); // reset bottom-pin state + new-msg enter animation tracking on channel switch
   const toBottom = () => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; atBottomRef.current = true; setShowJump(false); };
   // Fetch the previous (older) page via the `before` keyset cursor and prepend it; guarded so concurrent scroll events can't fire duplicate loads.
   const loadOlder = async () => {
@@ -270,7 +275,7 @@ export function Chat() {
         {chatTab === "tasks" && cur ? <TaskBoard channelId={cur.id} onOpenThread={startThread} />
           : chatTab === "files" && cur ? <ChannelFiles channelId={cur.id} />
           : <>
-            <div className="scroll" ref={scrollRef} onScroll={onScroll}>
+            <div key={cur?.id} className="scroll ch-view-enter" ref={scrollRef} onScroll={onScroll}>
               {loaded && !msgs.length && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.channelEmpty")} />}
               {msgs.map((m) => {
                 const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // used for role description and avatar status dot
@@ -280,8 +285,10 @@ export function Chat() {
                 if (m.messageType === "action" && m.actionMetadata?.kind === "action-card") return <ActionCardMsg m={m} key={m.id} />;
                 // system messages (task lifecycle events, etc.) → centered grey bar (no avatar, no full message block)
                 if (m.senderType === "system") return <div className="msg-sys" id={"m-" + m.id} key={m.id}>{m.content}</div>;
+                const staggerIdx = newMsgOrderRef.current.get(m.id);
+                const isNewMsg = staggerIdx !== undefined;
                 return (
-                <div className="msg" id={"m-" + m.id} key={m.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ m, x: e.clientX, y: e.clientY }); }}>
+                <div className={"msg" + (isNewMsg ? " msg-enter" : "")} id={"m-" + m.id} key={m.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ m, x: e.clientX, y: e.clientY }); }} style={isNewMsg ? { "--msg-delay": `${staggerIdx * 60}ms` } as CSSProperties : undefined}>
                   <div className="msg-toolbar">
                     <button title={t("chat.emojiActions")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCtxMenu({ m, x: r.left - 180, y: r.bottom + 4 }); }}><Smile size={15} /></button>
                     <button title={t("chat.openThread")} onClick={() => startThread(m)}><MessageCircle size={15} /></button>
@@ -563,7 +570,7 @@ function ChannelFiles({ channelId }: { channelId: string }) {
   const [files, setFiles] = useState<any[]>([]);
   useEffect(() => { (async () => { const d = await api("GET", `/api/channels/${channelId}/files`); setFiles(d?.files || []); })(); }, [channelId]);
   return (
-    <div className="scroll">
+    <div className="scroll ch-view-enter">
       {files.length === 0 ? <div className="empty">{t("chat.noFiles")}</div>
         : files.map((f) => (
           <div key={f.id} className="card file-row">

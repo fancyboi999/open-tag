@@ -2,7 +2,7 @@
 // Rendered inside StoreProvider: in dev the store auto dev-logs-in, so me/slug are ready;
 // "Enter workspace" routes to the app (/s/:slug/channel) when signed in, else to /login.
 // Copy is English (open-source / global audience) and only claims capabilities verified in README.
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AtSign, Network, ListChecks, Clock, ScanEye, Moon, BookMarked, Inbox, Boxes,
@@ -57,6 +57,50 @@ const ENGINES = [
 // hidden when this is empty rather than showing an empty "coming soon" header.
 const PLANNED_RUNTIMES: { name: string; icon: string }[] = [];
 
+// Hero title typewriter. Full text always holds the box (rest is visibility:hidden) so there's
+// zero layout shift; the caret rides between typed/rest. reduced-motion → full text, no caret.
+const HERO_TITLE = "Where your team and its\nAI agents work as one.";
+
+function renderTyped(s: string) {
+  return s.split("\n").map((line, i, arr) => (
+    <span key={i}>{line}{i < arr.length - 1 ? <br /> : null}</span>
+  ));
+}
+
+function HeroTitle() {
+  const reduced =
+    typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const [n, setN] = useState(reduced ? HERO_TITLE.length : 0);
+  useEffect(() => {
+    if (reduced) return;
+    let i = 0;
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const start = setTimeout(() => {
+      interval = setInterval(() => {
+        i += 1;
+        setN(i);
+        if (i >= HERO_TITLE.length && interval) clearInterval(interval);
+      }, 48);
+    }, 350);
+    return () => {
+      clearTimeout(start);
+      if (interval) clearInterval(interval);
+    };
+  }, [reduced]);
+  const typed = HERO_TITLE.slice(0, n);
+  const rest = HERO_TITLE.slice(n);
+  const done = n >= HERO_TITLE.length;
+  return (
+    <h1 className="lp-hero__title" aria-label={HERO_TITLE.replace("\n", " ")}>
+      <span aria-hidden="true">
+        <span>{renderTyped(typed)}</span>
+        <span className={"lp-caret" + (done ? " is-done" : "")} />
+        <span className="lp-type__rest">{renderTyped(rest)}</span>
+      </span>
+    </h1>
+  );
+}
+
 export function Landing() {
   const { me, slug } = useStore();
   const navigate = useNavigate();
@@ -105,7 +149,7 @@ export function Landing() {
         <div className="lp-container">
           <div className="lp-hero__intro">
             <span className="lp-eyebrow">The open-source Claude Tag alternative</span>
-            <h1 className="lp-hero__title">Where your team and its<br />AI agents work as <em>one</em>.</h1>
+            <HeroTitle />
             <p className="lp-hero__sub">An open, self-hostable workspace where people and AI agents collaborate as colleagues — in channels, threads, and DMs. Agents are persistent, keep their own memory, and run on machines you control.</p>
             <div className="lp-hero__actions">
               <button className="lp-btn lp-btn--primary" onClick={enterWorkspace}>Enter workspace <ArrowRight size={18} /></button>
