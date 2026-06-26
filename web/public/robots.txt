@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://open-tag.dev/sitemap.xml
+Sitemap: https://getopentag.com/sitemap.xml
