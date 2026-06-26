@@ -26,32 +26,39 @@ const buckets = new Map<string, Bucket>();
  * making rate-limiting ineffective (all requests share one bucket).
  *
  * Set TRUST_PROXY=true in .env when running behind a single trusted reverse proxy (nginx,
- * Caddy, Railway, cloud load-balancer) that appends the real client IP to X-Forwarded-For.
- * Only enable this when you control the proxy; never enable it when the server is
- * directly internet-facing, as clients could inject arbitrary XFF headers.
+ * Caddy, Railway, cloud load-balancer) that rewrites the client-IP headers. Only enable this
+ * when you control the proxy; never enable it when the server is directly internet-facing, as
+ * clients could otherwise inject arbitrary X-Real-IP / X-Forwarded-For headers.
  *
- * XFF parsing assumes exactly ONE trusted proxy hop. The proxy appends the real
- * client IP as the rightmost entry in the chain; we take that rightmost value.
- * Example: a client forges "X-Forwarded-For: 1.2.3.4"; the proxy appends the real IP
- * "203.0.113.9" → XFF becomes "1.2.3.4, 203.0.113.9" → we return "203.0.113.9".
- * Taking the leftmost value (the old behaviour) would return the forged "1.2.3.4",
- * allowing the attacker to rotate buckets and bypass rate-limiting.
+ * When trusted, we prefer X-Real-IP (a single clean value the proxy sets to the real client and
+ * overwrites if forged), and fall back to the FIRST X-Forwarded-For hop (the proxy puts the real
+ * client at the front and strips any client-supplied XFF).
  *
- * Multi-hop deployments (CDN → nginx → app) need hop-count-aware parsing; that is
- * outside the scope of this single-hop implementation and should use a dedicated
- * library (e.g. proxy-addr) instead.
+ * Verified empirically against Railway (getopentag.com's proxy): a request carrying a forged
+ * `X-Real-IP` AND a forged `X-Forwarded-For` arrived with both rewritten — X-Real-IP held the
+ * true client IP and the forged XFF entries were dropped, leaving the real client leftmost.
+ * Railway *prepends* the real client and *appends* its own (rotating) edge hop, so the RIGHTMOST
+ * XFF entry is the proxy's edge IP — using it as the rate-limit key gives every request a fresh
+ * bucket and defeats the limit entirely.
+ *
+ * NB: this assumes the proxy overwrites/prepends these headers (Railway; nginx with
+ * `proxy_set_header X-Real-IP $remote_addr`). A proxy that blindly *appends* a client-supplied
+ * XFF would leave the leftmost spoofable. Multi-hop chains (CDN → nginx → app) need hop-count-aware
+ * parsing (e.g. proxy-addr) — outside the scope of this single-trusted-hop implementation.
  *
  * Note: this server uses node:http directly (not Express), so there is no framework-level
  * trust proxy setting — the decision is explicit via this env flag. */
 export function clientIp(req: IncomingMessage): string {
   if (process.env.TRUST_PROXY === "true") {
+    const xRealIp = req.headers["x-real-ip"];
+    const real = (Array.isArray(xRealIp) ? xRealIp[0] : xRealIp)?.trim();
+    if (real) return real;
     const xff = req.headers["x-forwarded-for"];
-    // node:http may deliver multiple XFF headers as a string[]; join before splitting.
-    const raw = Array.isArray(xff) ? xff.join(",") : xff;
-    if (raw) {
-      const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
-      if (parts.length > 0) return parts[parts.length - 1]!;
-    }
+    // node:http may deliver multiple XFF headers as a string[]; the real client is the first
+    // entry of the first header (the trusted proxy prepends it).
+    const raw = Array.isArray(xff) ? xff[0] : xff;
+    const first = raw?.split(",")[0]?.trim();
+    if (first) return first;
   }
   return req.socket?.remoteAddress ?? "unknown";
 }
