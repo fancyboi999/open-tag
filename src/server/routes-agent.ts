@@ -1,6 +1,6 @@
 // Agent-side REST: /agent-api/*  (Bearer per-agent token sk_agent_* + x-agent-id; NOT a machine/bootstrap key — see docs/authorization.md §1)
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { and, eq, gt, lt, inArray, asc, desc, ilike, like, sql, isNull } from "drizzle-orm";
+import { and, eq, ne, gt, lt, inArray, asc, desc, ilike, like, sql, isNull } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, agentIdHeader } from "./util.js";
 import { resolveAgent } from "./auth.js";
@@ -231,7 +231,10 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
   if (p === "/agent-api/server/info" && method === "GET") {
     const chs = await db.select().from(schema.channels).where(eq(schema.channels.serverId, serverId));
     const joined = new Set((await agentChannels(agent.id)).map((c) => c.channelId));
-    const agents = await db.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), isNull(schema.agents.deletedAt)));
+    // Exclude system-seeded showcase demo props (creatorType="system") from the agent-facing teammate roster,
+    // mirroring the human plane's visibleAgents: they aren't reachable (workspaceMembers excludes them from
+    // @-mention/wake for every sender), so listing them would just tempt an agent into a no-op @-mention.
+    const agents = await db.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), isNull(schema.agents.deletedAt), ne(schema.agents.creatorType, "system")));
     const memberRows = await db.select().from(schema.serverMembers).where(eq(schema.serverMembers.serverId, serverId));
     const humans = memberRows.length ? await db.select().from(schema.users).where(inArray(schema.users.id, memberRows.map((m) => m.userId))) : [];
     return (sendJson(res, 200, {

@@ -261,7 +261,7 @@ export function Chat() {
     <>
       <ChatSidebar />
       <main className="content-col">
-        <div className="head">
+        <div className="head chat-head">
           <h1>{isDm ? "@ " + (cur?.name || "") : cur?.type === "showcase" ? <><Eye size={16} style={{ verticalAlign: "-3px", opacity: 0.7 }} /> {cur?.name || "…"}</> : "# " + (cur?.name || "…")}</h1>
           {dmAgent
             ? <span className="head-status"><span className={"dot " + (dmAgent.activity || "offline")} />{dmAgent.activityDetail || dmAgent.activity || "offline"}</span>
@@ -540,7 +540,7 @@ function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: s
   /* avatars: data.agents/humans come from /channels/:id/members (carry avatarUrl); resolve to signed/scheme via resolveAvatar */
   const { t } = useTranslation();
   useEscClose(onClose);
-  const { api, agents, attachmentUrl, capabilities } = useStore();
+  const { api, visibleAgents: agents, attachmentUrl, capabilities } = useStore(); // visibleAgents: showcase demo props are not offered in the "add agent" list
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const [data, setData] = useState<{ agents: any[]; humans: any[] }>({ agents: [], humans: [] });
   const load = async () => { const d = await api("GET", `/api/channels/${channelId}/members`); setData({ agents: d?.agents || [], humans: d?.humans || [] }); };

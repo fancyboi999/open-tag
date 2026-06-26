@@ -1,5 +1,5 @@
 // Message core: seq assignment, @mention parsing, DB write, SSE broadcast (human), wake delivery (agent), target resolution.
-import { and, eq, desc, gt, inArray, like, sql, or, isNull, isNotNull } from "drizzle-orm";
+import { and, eq, ne, desc, gt, inArray, like, sql, or, isNull, isNotNull } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { nextSeq, publish } from "./realtime.js";
 import { nextTaskNumber } from "../redis.js";
@@ -80,7 +80,12 @@ export function parseMentions(content: string, members: Member[]) {
  *  (a human in the users table who isn't a member of this server, or another server's agent, is excluded). */
 export async function workspaceMembers(serverId: string): Promise<Member[]> {
   const out: Member[] = [];
-  const ags = await db.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), isNull(schema.agents.deletedAt)));
+  // Exclude system-seeded showcase demo agents (creatorType="system"): they are display-only props for the
+  // read-only #showcase channel, NOT @-reachable members. This pool feeds @-mention auto-join in public
+  // channels — without the filter, @-ing a word that happens to match a prop's name (e.g. "Pat") would
+  // auto-join it into a real channel and fire a no-op wake (it has no machine). Message rendering resolves a
+  // sender by id elsewhere, so props still render correctly in #showcase history.
+  const ags = await db.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), isNull(schema.agents.deletedAt), ne(schema.agents.creatorType, "system")));
   for (const a of ags) out.push({ type: "agent", id: a.id, name: a.name, displayName: a.displayName });
   const sm = await db.select().from(schema.serverMembers).where(eq(schema.serverMembers.serverId, serverId));
   const uids = sm.map((s) => s.userId);

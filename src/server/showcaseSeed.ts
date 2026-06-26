@@ -11,8 +11,11 @@
  * reconcileCounters() at server startup advances Redis counters above the hardcoded
  * task numbers (1, 2) so later real tasks / messages get correct higher values.
  */
+import { Readable } from "node:stream";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
+import { saveObject } from "./storage.js";
+import { SHOWCASE_REPORTS_CSV, SHOWCASE_AVATAR_PNG_BASE64 } from "./showcaseAssets.js";
 
 // ── Showcase agents (fake, per-server, machineId=null, status=inactive) ──────
 
@@ -102,6 +105,40 @@ const CASE4: Line[] = [
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
+// ── Showcase sample attachments ──────────────────────────────────────────────
+// Real downloadable files seeded onto two anchors so the demo actually exercises file send/receive +
+// download + the channel Files tab (not just text about it). CSV → Case 1 (the "CSV export" eng thread);
+// PNG → Case 3 (the "PNG upload" bug-hunt thread). Asset bytes live in showcaseAssets.ts.
+type ShowcaseAtt = { filename: string; mimeType: string; bytes: Buffer };
+const CSV_ATT: ShowcaseAtt = { filename: "reports-2026-Q2.csv", mimeType: "text/csv", bytes: Buffer.from(SHOWCASE_REPORTS_CSV, "utf8") };
+const PNG_ATT: ShowcaseAtt = { filename: "avatar.png", mimeType: "image/png", bytes: Buffer.from(SHOWCASE_AVATAR_PNG_BASE64, "base64") };
+
+/** Save a sample file to object storage and attach it to a showcase message. messageId is set immediately
+ *  (the channel Files list only returns attachments whose messageId is non-null). */
+async function attachToShowcaseMessage(serverId: string, ownerId: string, channelId: string, messageId: string, att: ShowcaseAtt): Promise<void> {
+  const saved = await saveObject(att.filename, Readable.from(att.bytes));
+  await db.insert(schema.attachments).values({
+    serverId, channelId, messageId, uploaderType: "user", uploaderId: ownerId,
+    filename: att.filename, mimeType: att.mimeType, sizeBytes: saved.size, storageKey: saved.key,
+  });
+}
+
+/** Idempotent back-fill for an EXISTING showcase channel: prod seeded #showcase before attachments existed,
+ *  and seedShowcase no-ops once the channel is present — so on the next seed run this attaches the sample
+ *  files to the Case 1 / Case 3 anchors if they have none yet (anchors matched by their stable seeded content). */
+async function ensureShowcaseAttachments(serverId: string, ownerId: string, showcaseChId: string): Promise<void> {
+  const have = await db.select({ id: schema.attachments.id }).from(schema.attachments)
+    .where(eq(schema.attachments.channelId, showcaseChId));
+  if (have.length) return; // already back-filled
+  const anchors = await db.select({ id: schema.messages.id, content: schema.messages.content }).from(schema.messages)
+    .where(and(eq(schema.messages.channelId, showcaseChId), eq(schema.messages.senderType, "user")));
+  const csvAnchor = anchors.find((m) => m.content === CASE1_ANCHOR);
+  const pngAnchor = anchors.find((m) => m.content === CASE3_ANCHOR);
+  if (csvAnchor) await attachToShowcaseMessage(serverId, ownerId, showcaseChId, csvAnchor.id, CSV_ATT);
+  if (pngAnchor) await attachToShowcaseMessage(serverId, ownerId, showcaseChId, pngAnchor.id, PNG_ATT);
+  if (csvAnchor || pngAnchor) console.log(`[showcase] back-filled sample attachments (server=${serverId})`);
+}
+
 type AnchorTask = { taskNumber: number; taskStatus: string; taskCompletedAt: Date } | null;
 
 /** Idempotent: creates the #showcase channel + Case threads for a server. No-ops if already present. */
@@ -109,7 +146,7 @@ export async function seedShowcase(serverId: string, ownerId: string): Promise<v
   // Idempotency: skip if showcase already exists
   const existing = (await db.select({ id: schema.channels.id }).from(schema.channels)
     .where(and(eq(schema.channels.serverId, serverId), eq(schema.channels.type, "showcase"))))[0];
-  if (existing) return;
+  if (existing) { await ensureShowcaseAttachments(serverId, ownerId, existing.id); return; }
 
   // 1. Create showcase agents (fake, per-server, machineId=null, status=inactive)
   const agentMap = new Map<string, string>(); // name → id
@@ -181,7 +218,7 @@ export async function seedShowcase(serverId: string, ownerId: string): Promise<v
    * - anchorTask: if set, the anchor is seeded as a task (status "done")
    * - lines: thread replies (agent | null=you)
    */
-  const seedCase = async (anchorContent: string, anchorTask: AnchorTask, lines: Line[]) => {
+  const seedCase = async (anchorContent: string, anchorTask: AnchorTask, lines: Line[], att?: ShowcaseAtt) => {
     // Anchor = real human message in the showcase channel
     const anchorMsg = await insertMsg({
       channelId: showcaseChId,
@@ -193,6 +230,9 @@ export async function seedShowcase(serverId: string, ownerId: string): Promise<v
       taskNumber: anchorTask?.taskNumber ?? null,
       taskCompletedAt: anchorTask?.taskCompletedAt ?? null,
     });
+
+    // A sample file on the anchor → exercises the channel Files tab + inline attachment render + download
+    if (att) await attachToShowcaseMessage(serverId, ownerId, showcaseChId, anchorMsg.id, att);
 
     // Thread channel for this Case
     const [threadCh] = await db.insert(schema.channels).values({
@@ -236,9 +276,9 @@ export async function seedShowcase(serverId: string, ownerId: string): Promise<v
   // Tasks are seeded as already-completed (taskCompletedAt in the past)
   const PAST = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000); // 3 days ago
 
-  await seedCase(CASE1_ANCHOR, { taskNumber: 1, taskStatus: "done", taskCompletedAt: PAST }, CASE1);
+  await seedCase(CASE1_ANCHOR, { taskNumber: 1, taskStatus: "done", taskCompletedAt: PAST }, CASE1, CSV_ATT);
   await seedCase(CASE2_ANCHOR, null, CASE2);
-  await seedCase(CASE3_ANCHOR, { taskNumber: 2, taskStatus: "done", taskCompletedAt: PAST }, CASE3);
+  await seedCase(CASE3_ANCHOR, { taskNumber: 2, taskStatus: "done", taskCompletedAt: PAST }, CASE3, PNG_ATT);
   await seedCase(CASE4_ANCHOR, null, CASE4);
 
   console.log(`[showcase] seeded #showcase with 4 Case threads (server=${serverId})`);

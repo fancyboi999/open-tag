@@ -20,7 +20,7 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
   className?: string;        // extra class on the .composer root (threads pass "thread-composer")
 }) {
   const { t } = useTranslation();
-  const { api, agents, humans, machines, uploadOne, attachmentUrl } = useStore();
+  const { api, visibleAgents: agents, humans, machines, uploadOne, attachmentUrl } = useStore(); // visibleAgents: only real agents are @-mention candidates / reachability targets (not showcase demo props)
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const [text, setText] = useState("");
   const [asTask, setAsTask] = useState(false);
