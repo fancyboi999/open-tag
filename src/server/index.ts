@@ -15,6 +15,7 @@ import { reconcileCounters } from "../redis.js";
 import { reconcileMachinesOnBoot, startMachineSweeper } from "./machineLiveness.js";
 import { sendJson, sendErr } from "./util.js";
 import { createLogger } from "../log.js";
+import { shouldServeAppShell } from "./staticRoutes.js";
 
 // ── Security headers (helmet) ────────────────────────────────────────────────
 // CSP, COEP, and CORP are disabled here: the Vite-built frontend uses inline
@@ -68,7 +69,10 @@ async function serveStatic(res: import("node:http").ServerResponse, pathname: st
   if (!file.startsWith(WEBDIST)) file = path.join(WEBDIST, "index.html");
   let data: Buffer; let ext = path.extname(file);
   try { data = await readFile(file); }
-  catch { try { data = await readFile(path.join(WEBDIST, "index.html")); ext = ".html"; } catch { return false; } } // SPA fallback
+  catch {
+    if (!shouldServeAppShell(pathname)) return false;
+    try { data = await readFile(path.join(WEBDIST, "index.html")); ext = ".html"; } catch { return false; }
+  }
   res.writeHead(200, { "content-type": CTYPE[ext] || "application/octet-stream" });
   res.end(data); return true;
 }
