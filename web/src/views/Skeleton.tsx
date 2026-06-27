@@ -30,9 +30,13 @@ export function ChatSkeleton() {
 }
 
 // Full workspace shell skeleton: same grid as <Layout/> (.app.has-traj) so the swap to the real UI is shift-free.
-export function WorkspaceSkeleton() {
+// `chat` forces the 4-column chat variant when the caller knows the destination is a channel even though the
+// current URL isn't one yet (e.g. the "/" guard redirects an authed user to /s/:slug/channel) — without it the
+// skeleton would render 3-col then shift to 4-col on arrival, the exact jump this skeleton exists to avoid.
+export function WorkspaceSkeleton({ chat }: { chat?: boolean } = {}) {
   const { t } = useTranslation();
-  const isChat = useLocation().pathname.includes("/channel"); // mirror <Layout/>'s has-traj rule: only chat shows the 4th (trace) column → swap is shift-free
+  const loc = useLocation();
+  const isChat = chat ?? loc.pathname.includes("/channel"); // mirror <Layout/>'s has-traj rule: only chat shows the 4th (trace) column → swap is shift-free
   return (
     <div className={"app skel-app" + (isChat ? " has-traj" : "")} role="status" aria-busy="true" aria-label={t("common.loadingWorkspace")}>
       <div className="rail skel-rail">

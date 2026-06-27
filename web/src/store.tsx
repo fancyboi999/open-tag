@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { io, type Socket } from "socket.io-client";
 import { appendCapped, type TrajItem } from "./trajBuffer.ts";
 import { messageUnreadDelta, threadUnreadDelta } from "./threadUnread";
+import { initialAuthState, TOKEN_KEY, type AuthState } from "./routing.ts";
 
 export interface Channel { id: string; name: string; description?: string; type: string; joined?: boolean; lastMessageAt?: string; archivedAt?: string | null }
 export interface Dm { id: string; name: string; type: string; description?: string; lastMessageAt?: string; peerId?: string | null; peerName?: string | null; peerDisplayName?: string | null; peerType?: string | null; peerAvatarUrl?: string | null }
@@ -61,7 +62,11 @@ export const useStore = () => useContext(Ctx);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [authState, setAuthState] = useState<"loading" | "authed" | "anon">("loading"); // human-auth gate: drives the /s/* route guard (no dev-login fallback)
+  // human-auth gate driving the "/" + /s/* route guards (no dev-login fallback). Seeded synchronously
+  // from session hints so a true anonymous visitor is known "anon" on the FIRST render — letting "/"
+  // paint Landing with no skeleton/Landing flash — while a stored token or in-flight ?as= dev-login
+  // defers to "loading" until the async bootstrap below resolves it.
+  const [authState, setAuthState] = useState<AuthState>(initialAuthState);
   const [serverId, setServerId] = useState("");
   const [slug, setSlug] = useState("open-tag");
   const [servers, setServers] = useState<ServerInfo[]>([]);          // all servers the user belongs to (used by server switcher)
@@ -128,7 +133,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Client-side workspace switch: re-point the active server by slug. The activation effect (keyed on activeId) resets
   // per-workspace state and reconnects the socket. No-op if the target is unknown or already active.
   const switchServer = (targetSlug: string) => { const cur = serversRef.current.find((s) => s.slug === targetSlug); if (cur && cur.id !== sidRef.current) setActiveId(cur.id); };
-  const logout = () => { localStorage.removeItem("open-tag.token"); localStorage.removeItem("open-tag.devuser"); window.location.assign("/login"); }; // clear token + dev user → redirect to login (JWT is short-lived; client-side removal is sufficient)
+  const logout = () => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem("open-tag.devuser"); window.location.assign("/login"); }; // clear token + dev user → redirect to login (JWT is short-lived; client-side removal is sufficient)
   const markActionExecuted = async (messageId: string, result?: { kind: string; id: string; name: string }) => { await api("POST", `/api/actions/${messageId}/mark-executed`, { result: result ?? null }); };
   const createTasks = async (channelId: string, titles: string[]) => { const r = await api("POST", `/api/tasks/channel/${channelId}`, { tasks: titles.map((title) => ({ title })) }); return r?.tasks || []; };
   const openDM = async (memberType: string, memberId: string) => { const body = memberType === "user" ? { userId: memberId } : { agentId: memberId }; const r = await api("POST", "/api/channels/dm", body); if (r?.id) { await reload(); sockRef.current?.emit("join:channel", r.id); } return r?.id ?? null; };
@@ -197,14 +202,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       let user: Me | null = null;
       if (asParam) { // explicit developer action: dev-login only succeeds when the backend has ALLOW_DEV_LOGIN=true; on success persist the JWT as a normal session
         const r = await fetch("/api/auth/dev-login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: asParam }) });
-        if (r.ok) { const d = await r.json().catch(() => null); if (d?.token) { token = d.token; user = d.user ?? null; localStorage.setItem("open-tag.token", d.token); } }
+        if (r.ok) { const d = await r.json().catch(() => null); if (d?.token) { token = d.token; user = d.user ?? null; localStorage.setItem(TOKEN_KEY, d.token); } }
       }
       if (!token) {
-        const storedToken = localStorage.getItem("open-tag.token"); // JWT persisted after real register/login (or dev-login above)
+        const storedToken = localStorage.getItem(TOKEN_KEY); // JWT persisted after real register/login (or dev-login above)
         if (storedToken) {
           const meRes = await (await fetch("/api/auth/me", { headers: { authorization: "Bearer " + storedToken } })).json().catch(() => null);
           if (meRes?.id) { token = storedToken; user = meRes; }
-          else localStorage.removeItem("open-tag.token"); // expired / invalid / 401 → drop it so the guard redirects to /login
+          else localStorage.removeItem(TOKEN_KEY); // expired / invalid / 401 → drop it so the guard redirects to /login
         }
       }
       if (cancelled) return;

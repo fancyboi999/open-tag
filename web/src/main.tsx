@@ -13,8 +13,23 @@ import { Tasks, Computers, Search, Settings, Inbox, Saved } from "./views/misc.t
 import { AuthPage, JoinPage } from "./views/Auth.tsx";
 import { Landing } from "./views/Landing.tsx";
 import { Features } from "./views/Features.tsx";
+import { homeRoute } from "./routing.ts";
 import "./i18n";
 import "./styles.css";
+
+// Public home ("/"). The marketing Landing is for anonymous visitors only; a user who has — or is
+// still resolving — a session must never see it. While the bootstrap runs we show the workspace
+// skeleton (NOT the marketing page, and NOT a blank screen), then send an authed user to their
+// workspace. Same "wait for bootstrap before deciding" gate as RootRedirect/WorkspaceRoute, so
+// every route is consistent and there is no flash of the wrong screen on refresh/deep-link.
+function PublicHome() {
+  const { slug, ready, authState } = useStore();
+  switch (homeRoute({ authState, ready })) {
+    case "redirect": return <Navigate to={`/s/${slug}/channel`} replace />;
+    case "skeleton": return <WorkspaceSkeleton chat />; // bootstrap → we'll land on /channel, so render the 4-col chat skeleton now (shift-free)
+    default: return <Landing />;
+  }
+}
 
 // Root / unmatched path → wait for bootstrap, then redirect to the current user's own workspace (or /login if anonymous).
 function RootRedirect() {
@@ -51,7 +66,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <ToastProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Landing />} />
+          <Route path="/" element={<PublicHome />} />
           <Route path="/features" element={<Features />} />
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/register" element={<AuthPage mode="register" />} />
