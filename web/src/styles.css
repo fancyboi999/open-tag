@@ -243,6 +243,13 @@ main.content-col{display:flex;flex-direction:column;height:100vh;background:var(
 .showcase-thread{flex:none;width:var(--traj-w,360px)}  /* the thread panel; .thread-panel supplies the skin, mobile @820 makes it fullscreen */
 .showcase-case{transition:background .12s ease}
 .showcase-case.open{background:var(--surface-strong);box-shadow:inset 3px 0 0 var(--g-sky)}  /* highlight the case whose thread is open */
+/* The open case reuses Chat's .msg, whose :hover paints an opaque, *lighter* (canvas-soft) rounded block.
+   On the open case's darker (surface-strong) fill that block reads as a reversed, half-height highlight AND,
+   being opaque, clips the lower part of the inset accent bar — leaving a stray bar segment above the avatar.
+   Inside an open case the whole case already is the highlight, so suppress the per-message hover fill: the
+   fill stays uniform and the accent bar runs full-height. Scoped to .showcase-case.open — global .msg:hover
+   (real Chat channels) is untouched. */
+.showcase-case.open .msg:hover{background:transparent}
 .wake-hint{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:0 2px 9px;line-height:1.4}
 .wake-hint svg{color:var(--g-sky);flex:0 0 auto}
 .wake-hint.wh-off svg{color:var(--muted-soft)}
