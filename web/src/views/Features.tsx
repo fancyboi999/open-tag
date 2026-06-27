@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { useStore } from "../store.tsx";
 import { ProductMock, type ProductMockCase } from "./ProductMock.tsx";
+import { MarketingNav } from "../landing/MarketingNav.tsx";
+import { GITHUB_URL } from "../landing/publicNav.ts";
 import "../landing/landing.css";
 
 declare module "react" {
@@ -25,8 +27,6 @@ declare module "react" {
   }
 }
 
-const GITHUB_URL = "https://github.com/fancyboi999/open-tag";
-const MARKETING_ORIGINS = new Set(["https://getopentag.com", "https://www.getopentag.com"]);
 const DIALOGUE_LOTTIE_URL = "https://cdn.prod.website-files.com/6889473510b50328dbb70ae6/69423930508a9aa8996cc590_Object-Dialogue.lottie";
 const DOT_LOTTIE_PLAYER_SRC = "https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs";
 
@@ -75,11 +75,6 @@ type FeatureCopy = {
     github: string;
   };
 };
-
-function docsUrl(): string {
-  const origin = typeof window !== "undefined" && window.location?.origin ? window.location.origin : "https://getopentag.com";
-  return MARKETING_ORIGINS.has(origin) ? "https://docs.getopentag.com/" : `${origin}/docs/`;
-}
 
 export function currentLang(language?: string): Lang {
   return language?.toLowerCase().startsWith("zh") ? "zh" : "en";
@@ -536,7 +531,6 @@ export function Features() {
   const [activeId, setActiveId] = useState(cases[0]!.id);
   const active = useMemo(() => cases.find((c) => c.id === activeId) ?? cases[0]!, [activeId, cases]);
   const enterWorkspace = () => navigate(me ? `/s/${slug}/channel` : "/login");
-  const docsHref = docsUrl();
   const nextLang: Lang = lang === "en" ? "zh" : "en";
   const switchLanguage = () => {
     void i18n.changeLanguage(nextLang);
@@ -559,27 +553,24 @@ export function Features() {
 
   return (
     <main className="lp-root lp-features">
-      <header className="lp-nav">
-        <div className="lp-container lp-nav__inner">
-          <Link className="lp-brand" to="/">open<b>-tag</b></Link>
-          <nav className="lp-nav__links">
-            <Link to="/features">{copy.nav.features}</Link>
-            <a href="/#capabilities">{copy.nav.capabilities}</a>
-            <a href="/#engines">{copy.nav.engines}</a>
-            <a href="/#self-hosted">{copy.nav.selfHosted}</a>
-            <a href={docsHref}>{copy.nav.docs}</a>
-          </nav>
-          <div className="lp-nav__cta">
-            <button className="lp-btn lp-btn--ghost lp-btn--sm" type="button" onClick={switchLanguage} aria-label={copy.nav.languageLabel}>
-              {lang === "en" ? "中文" : "EN"}
-            </button>
-            <a className="lp-btn lp-btn--ghost lp-btn--sm" href={GITHUB_URL} target="_blank" rel="noreferrer">
-              <GithubIcon size={16} /> {copy.nav.github}
-            </a>
-            <button className="lp-btn lp-btn--primary lp-btn--sm" onClick={enterWorkspace}>{copy.nav.enter}</button>
-          </div>
-        </div>
-      </header>
+      <MarketingNav
+        variant="features"
+        labels={{
+          features: copy.nav.features,
+          capabilities: copy.nav.capabilities,
+          engines: copy.nav.engines,
+          selfHosted: copy.nav.selfHosted,
+          docs: copy.nav.docs,
+        }}
+        githubLabel={copy.nav.github}
+        enterLabel={copy.nav.enter}
+        onEnterWorkspace={enterWorkspace}
+        languageToggle={{
+          label: copy.nav.languageLabel,
+          text: lang === "en" ? "中文" : "EN",
+          onClick: switchLanguage,
+        }}
+      />
 
       <section className="lp-feature-hero">
         <div className="lp-container lp-feature-hero__grid">

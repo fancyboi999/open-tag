@@ -11,15 +11,9 @@ import {
 import { useStore } from "../store.tsx";
 import { COPY as FEATURE_COPY, currentLang, type Lang } from "./Features.tsx";
 import { ProductMock } from "./ProductMock.tsx";
+import { MarketingNav, PublicBrand } from "../landing/MarketingNav.tsx";
+import { GITHUB_URL, resolveDocsHref } from "../landing/publicNav.ts";
 import "../landing/landing.css";
-
-const GITHUB_URL = "https://github.com/fancyboi999/open-tag";
-const MARKETING_ORIGINS = new Set(["https://getopentag.com", "https://www.getopentag.com"]);
-
-function docsUrl(): string {
-  const origin = typeof window !== "undefined" && window.location?.origin ? window.location.origin : "https://getopentag.com";
-  return MARKETING_ORIGINS.has(origin) ? "https://docs.getopentag.com/" : `${origin}/docs/`;
-}
 
 function detectLandingLang(): Lang {
   if (typeof window === "undefined") return "en";
@@ -306,13 +300,14 @@ export function Landing() {
   const navigate = useNavigate();
   const [lang, setLang] = useState<Lang>(() => detectLandingLang());
   const enterWorkspace = () => navigate(me ? `/s/${slug}/channel` : "/login");
-  const docsHref = docsUrl();
   const copy = LANDING_COPY[lang];
   const nextLang: Lang = lang === "en" ? "zh" : "en";
   const switchLanguage = () => {
     setLang(nextLang);
     try { localStorage.setItem("open-tag.lang", nextLang); } catch { /* ignore */ }
   };
+  const origin = typeof window !== "undefined" && window.location?.origin ? window.location.origin : undefined;
+  const docsHref = resolveDocsHref(origin);
 
   // Scroll reveal: add is-visible once a section enters the viewport (one-shot); reduced-motion falls back to visible via CSS.
   useEffect(() => {
@@ -327,28 +322,24 @@ export function Landing() {
 
   return (
     <main className="lp-root">
-      {/* —— Nav —— */}
-      <header className="lp-nav">
-        <div className="lp-container lp-nav__inner">
-          <a className="lp-brand" href="#top">open<b>-tag</b></a>
-          <nav className="lp-nav__links">
-            <Link to="/features">{copy.nav.features}</Link>
-            <a href="#capabilities">{copy.nav.capabilities}</a>
-            <a href="#engines">{copy.nav.engines}</a>
-            <a href="#self-hosted">{copy.nav.selfHosted}</a>
-            <a href={docsHref}>{copy.nav.docs}</a>
-          </nav>
-          <div className="lp-nav__cta">
-            <button className="lp-btn lp-btn--ghost lp-btn--sm" type="button" onClick={switchLanguage} aria-label={copy.nav.languageLabel}>
-              {lang === "en" ? "中文" : "EN"}
-            </button>
-            <a className="lp-btn lp-btn--ghost lp-btn--sm" href={GITHUB_URL} target="_blank" rel="noreferrer">
-              <GithubIcon size={16} /> {copy.nav.github}
-            </a>
-            <button className="lp-btn lp-btn--primary lp-btn--sm" onClick={enterWorkspace}>{copy.nav.enter}</button>
-          </div>
-        </div>
-      </header>
+      <MarketingNav
+        variant="landing"
+        labels={{
+          features: copy.nav.features,
+          capabilities: copy.nav.capabilities,
+          engines: copy.nav.engines,
+          selfHosted: copy.nav.selfHosted,
+          docs: copy.nav.docs,
+        }}
+        githubLabel={copy.nav.github}
+        enterLabel={copy.nav.enter}
+        onEnterWorkspace={enterWorkspace}
+        languageToggle={{
+          label: copy.nav.languageLabel,
+          text: lang === "en" ? "中文" : "EN",
+          onClick: switchLanguage,
+        }}
+      />
 
       {/* —— Hero —— */}
       <section className="lp-hero" id="top">
@@ -506,7 +497,7 @@ export function Landing() {
         <div className="lp-container lp-reveal">
           <div className="lp-footer__grid">
             <div className="lp-footer__brand">
-              <div className="lp-brand">open<b>-tag</b></div>
+              <PublicBrand />
               <p className="lp-footer__tagline">{copy.footer.tagline}</p>
             </div>
             <div className="lp-footer__col">

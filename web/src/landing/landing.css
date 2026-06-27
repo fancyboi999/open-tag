@@ -1,3 +1,5 @@
+@import "./publicNav.css";
+
 /* landing.css — skin for the public landing page (/).
  * Source: the `warm-editorial` design system from open-design (tokens.css as the source of truth),
  * re-keyed to the app's DESIGN.md palette so the landing and the app stay visually one.
@@ -47,6 +49,7 @@
   --lp-section-y: 112px;
   --lp-container-max: 1180px;
   --lp-gutter: 36px;
+  --lp-public-nav-height: 64px;
 
   /* —— Radius / elevation / motion —— */
   --lp-radius-xs: 6px; --lp-radius-sm: 10px; --lp-radius-md: 16px; --lp-radius-lg: 24px; --lp-radius-pill: 9999px;
@@ -82,7 +85,6 @@
 .lp-root a { color: inherit; text-decoration: none; }
 
 /* —— Layout primitives —— */
-.lp-container { max-width: var(--lp-container-max); margin: 0 auto; padding-inline: var(--lp-gutter); }
 .lp-section { position: relative; padding-block: var(--lp-section-y); }
 .lp-section--alt { background: var(--lp-bg-2); border-block: 1px solid var(--lp-border-soft); }
 
@@ -141,25 +143,7 @@
 .lp-orb--lavender { animation: lp-orb-drift-lavender 14s cubic-bezier(0.2, 0, 0, 1) -8s infinite; }
 .lp-orb--sky      { animation: lp-orb-drift-sky      18s cubic-bezier(0.2, 0, 0, 1) -12s infinite; }
 
-/* —— Buttons —— */
-.lp-btn { display: inline-flex; align-items: center; gap: var(--lp-space-2); font-family: var(--lp-font-body); font-size: var(--lp-text-base); font-weight: 500; border-radius: var(--lp-radius-pill); padding: 14px 26px; cursor: pointer; transition: background var(--lp-motion-base) var(--lp-ease), border-color var(--lp-motion-base) var(--lp-ease), transform var(--lp-motion-fast) var(--lp-ease); border: 1px solid transparent; }
-.lp-btn:focus-visible { outline: none; box-shadow: var(--lp-focus-ring); }
-.lp-btn--primary { background: var(--lp-accent); color: var(--lp-accent-on); }
-.lp-btn--primary:hover { background: var(--lp-accent-hover); }
-.lp-btn--primary:active { background: var(--lp-accent-active); }
-.lp-btn--ghost { background: transparent; color: var(--lp-fg); border-color: var(--lp-border); }
-.lp-btn--ghost:hover { border-color: var(--lp-fg); }
-.lp-btn--sm { padding: 9px 18px; font-size: var(--lp-text-sm); }
-
 /* —— Nav —— */
-.lp-nav { position: sticky; top: 0; z-index: 20; background: color-mix(in oklab, var(--lp-bg), transparent 12%); backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--lp-border-soft); }
-.lp-nav__inner { display: flex; align-items: center; justify-content: space-between; height: 68px; }
-.lp-brand { font-family: var(--lp-font-display); font-size: 24px; letter-spacing: -0.01em; white-space: nowrap; }
-.lp-brand b { font-weight: 500; }
-.lp-nav__links { display: flex; align-items: center; gap: var(--lp-space-8); }
-.lp-nav__links a { font-size: var(--lp-text-sm); color: var(--lp-fg-2); transition: color var(--lp-motion-fast) var(--lp-ease); }
-.lp-nav__links a:hover { color: var(--lp-accent); }
-.lp-nav__cta { display: flex; align-items: center; gap: var(--lp-space-4); }
 .lp-features .lp-nav { position: relative; }
 
 /* —— Hero —— */

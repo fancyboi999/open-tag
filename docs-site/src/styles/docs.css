@@ -1,3 +1,5 @@
+@import "../../../web/src/landing/publicNav.css";
+
 :root {
   --ink: #0c0a09;
   --primary: #292524;
@@ -22,6 +24,30 @@
   --g-sky: #a8c8e8;
   --g-rose: #e8b8c4;
   --shadow-card: 0 24px 80px rgba(12, 10, 9, .08);
+  --lp-bg: var(--canvas);
+  --lp-fg: var(--primary);
+  --lp-fg-2: var(--body);
+  --lp-border: var(--hair);
+  --lp-border-soft: var(--hair-soft);
+  --lp-accent: var(--primary);
+  --lp-accent-on: #fff;
+  --lp-accent-hover: var(--ink);
+  --lp-accent-active: var(--ink);
+  --lp-font-display: "EB Garamond", Georgia, "Times New Roman", serif;
+  --lp-font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --lp-text-sm: 14px;
+  --lp-text-base: 17px;
+  --lp-space-2: 8px;
+  --lp-space-4: 16px;
+  --lp-space-8: 32px;
+  --lp-container-max: 1180px;
+  --lp-gutter: 36px;
+  --lp-public-nav-height: 64px;
+  --lp-radius-pill: 9999px;
+  --lp-focus-ring: 0 0 0 4px rgba(155, 91, 50, 0.24);
+  --lp-motion-fast: 150ms;
+  --lp-motion-base: 240ms;
+  --lp-ease: cubic-bezier(0.2, 0, 0, 1);
   color: var(--ink);
   background: var(--canvas);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -79,95 +105,6 @@ pre code {
 
 .shell {
   min-height: 100vh;
-}
-
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  border-bottom: 1px solid rgba(231, 229, 228, .78);
-  background: rgba(245, 245, 245, .86);
-  backdrop-filter: blur(18px);
-}
-
-.topbar-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  width: min(1200px, calc(100% - 48px));
-  height: 64px;
-  margin: 0 auto;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  font-weight: 600;
-}
-
-.brand-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.brand-word {
-  font-family: "EB Garamond", Cormorant Garamond, serif;
-  font-size: 24px;
-  font-weight: 300;
-  letter-spacing: 0;
-}
-
-.nav {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  color: var(--body);
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.nav a:hover {
-  color: var(--ink);
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.pill,
-.outline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  border-radius: 9999px;
-  padding: 10px 20px;
-  font-size: 15px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.pill {
-  background: var(--primary);
-  color: #fff;
-}
-
-.outline {
-  border: 1px solid var(--hair-strong);
-  color: var(--ink);
-}
-
-.lang {
-  border: 1px solid var(--hair);
-  background: var(--surface);
-  color: var(--body);
 }
 
 .layout {
@@ -614,7 +551,7 @@ h3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .nav {
+  .lp-nav__links {
     display: none;
   }
 }
@@ -624,19 +561,14 @@ h3 {
     overflow-x: hidden;
   }
 
-  .topbar-inner,
+  .lp-nav__inner,
   .layout,
   .footer {
     width: min(100% - 28px, 1200px);
   }
 
-  .actions .pill {
+  .lp-nav__cta a.lp-btn {
     display: none;
-  }
-
-  .pill,
-  .outline {
-    padding: 10px 16px;
   }
 
   h1 {

@@ -1,5 +1,11 @@
 ---
 import "../styles/docs.css";
+import {
+  GITHUB_URL,
+  PUBLIC_BRAND_MARK_SRC,
+  PUBLIC_NAV_LINKS,
+  resolvePublicNavHref,
+} from "../../../web/src/landing/publicNav";
 
 const quickSteps = [
   {
@@ -40,10 +46,14 @@ curl -X POST "$URL/api/auth/setup" \\
 
 const translations = {
   en: {
+    "nav.features": "Features",
+    "nav.capabilities": "Capabilities",
+    "nav.engines": "Engines",
+    "nav.selfHosted": "Self-hosted",
+    "nav.docs": "Docs",
     "nav.quickstart": "Quickstart",
     "nav.collaboration": "Collaboration",
     "nav.agents": "Agents",
-    "nav.selfHosting": "Self-hosting",
     "side.title": "Browse docs",
     "side.quickstart": "Quickstart",
     "side.firstRun": "First run",
@@ -129,10 +139,14 @@ const translations = {
     "toggle": "中文"
   },
   zh: {
+    "nav.features": "功能",
+    "nav.capabilities": "能力",
+    "nav.engines": "引擎",
+    "nav.selfHosted": "自托管",
+    "nav.docs": "文档",
     "nav.quickstart": "快速开始",
     "nav.collaboration": "协作",
     "nav.agents": "Agents",
-    "nav.selfHosting": "自托管",
     "side.title": "浏览文档",
     "side.quickstart": "快速开始",
     "side.firstRun": "第一次跑通",
@@ -219,6 +233,11 @@ const translations = {
   }
 };
 
+const docsNavLinks = PUBLIC_NAV_LINKS.map((link) => ({
+  ...link,
+  labelKey: `nav.${link.key}`,
+}));
+
 const localizedHead = {
   en: {
     title: "open-tag docs",
@@ -251,21 +270,20 @@ const localizedHead = {
   </head>
   <body>
     <div class="shell">
-      <header class="topbar">
-        <div class="topbar-inner">
-          <a class="brand" href="https://getopentag.com/" aria-label="open-tag home" data-home-link>
-            <img class="brand-mark" src="./favicon.svg" alt="" width="34" height="34" />
-            <span class="brand-word">open-tag</span>
+      <header class="lp-nav">
+        <div class="lp-container lp-nav__inner">
+          <a class="lp-brand" href="https://getopentag.com/" aria-label="open-tag home" data-home-link>
+            <img class="lp-brand-mark" src={PUBLIC_BRAND_MARK_SRC} alt="" width="34" height="34" />
+            <span class="lp-brand-word">open<b>-tag</b></span>
           </a>
-          <nav class="nav" aria-label="Main navigation">
-            <a href="#quickstart" data-i18n="nav.quickstart">Quickstart</a>
-            <a href="#collaboration" data-i18n="nav.collaboration">Collaboration</a>
-            <a href="#agents" data-i18n="nav.agents">Agents</a>
-            <a href="#self-hosting" data-i18n="nav.selfHosting">Self-hosting</a>
+          <nav class="lp-nav__links" aria-label="Main navigation">
+            {docsNavLinks.map((link) => (
+              <a href={resolvePublicNavHref(link, "https://docs.getopentag.com", "docs")} data-public-nav-key={link.key} data-i18n={link.labelKey}>{link.label}</a>
+            ))}
           </nav>
-          <div class="actions">
-            <button class="outline lang" type="button" data-lang-toggle data-i18n="toggle">中文</button>
-            <a class="pill" href="https://github.com/fancyboi999/open-tag">GitHub</a>
+          <div class="lp-nav__cta">
+            <button class="lp-btn lp-btn--ghost lp-btn--sm" type="button" data-lang-toggle data-i18n="toggle">中文</button>
+            <a class="lp-btn lp-btn--primary lp-btn--sm" href={GITHUB_URL}>GitHub</a>
           </div>
         </div>
       </header>
@@ -291,10 +309,10 @@ const localizedHead = {
               <p class="lede" data-i18n="hero.lede">
                 open-tag is a Slack-style workspace for humans and AI agents. Channels, DMs, threads, tasks, files, memory, and live runtime status sit in one place. The server coordinates the work; your machines run the agents.
               </p>
-              <div class="hero-actions">
-                <a class="pill" href="#quickstart" data-i18n="hero.primary">Start the quickstart</a>
-                <a class="outline" href="#self-hosting" data-i18n="hero.secondary">Self-host it</a>
-              </div>
+            <div class="hero-actions">
+                <a class="lp-btn lp-btn--primary" href="#quickstart" data-i18n="hero.primary">Start the quickstart</a>
+                <a class="lp-btn lp-btn--ghost" href="#self-hosting" data-i18n="hero.secondary">Self-host it</a>
+            </div>
             </div>
             <figure class="hero-card">
               <img src="./workspace.png" alt="open-tag workspace with shared channels, agents, tasks, and live activity" loading="eager" />
@@ -490,7 +508,7 @@ npm run daemon</code></pre>
         </div>
       </footer>
     </div>
-    <script define:vars={{ translations, localizedHead }}>
+    <script define:vars={{ translations, localizedHead, docsNavLinks }}>
       const readStoredLanguage = () => {
         try {
           return localStorage.getItem("open-tag-docs-lang");
@@ -516,12 +534,18 @@ npm run daemon</code></pre>
 
       const openedLegacyChineseHash = clearLegacyChineseHash();
 
-      const resolveHomeHref = () => {
-        const origin = window.location.origin;
-        return origin === "https://docs.getopentag.com" ? "https://getopentag.com/" : `${origin}/`;
+      const resolveMarketingHomeHref = (origin) => origin === "https://docs.getopentag.com" ? "https://getopentag.com/" : `${origin}/`;
+      const resolvePublicNavHref = (link, origin) => {
+        if (link.key === "docs") return "#top";
+        return new URL(link.marketingHref, resolveMarketingHomeHref(origin)).toString();
       };
 
-      document.querySelector("[data-home-link]")?.setAttribute("href", resolveHomeHref());
+      document.querySelector("[data-home-link]")?.setAttribute("href", resolveMarketingHomeHref(window.location.origin));
+      document.querySelectorAll("[data-public-nav-key]").forEach((node) => {
+        const key = node.getAttribute("data-public-nav-key");
+        const link = docsNavLinks.find((item) => item.key === key);
+        if (link) node.setAttribute("href", resolvePublicNavHref(link, window.location.origin));
+      });
 
       const applyLanguage = (lang) => {
         const dict = translations[lang] || translations.en;
