@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 import { and, desc, eq, notInArray } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { BOOTSTRAP_KEY, hashToken, safeEqual } from "./auth.js";
-import { registerDaemon, unregisterDaemon, resolveDaemonRequest, registerMachineConn, unregisterMachineConn } from "./daemonHub.js";
+import { registerDaemon, unregisterDaemon, resolveDaemonRequest, registerMachineConn, unregisterMachineConn, isCurrentMachineConn } from "./daemonHub.js";
 import { publish } from "./realtime.js";
 import { createLogger } from "../log.js";
 import { MACHINE_REJECTED_CODE } from "../daemonProtocol.js";
@@ -66,9 +66,11 @@ async function onDaemon(ws: WebSocket, key: string): Promise<void> {
     } catch (e: any) { log.error("ws handler error", { type: msg?.type, detail: String(e?.message ?? e) }); }
   });
   ws.on("close", async () => {
-    clearInterval(ping); unregisterDaemon(ws); unregisterMachineConn(ws);
+    clearInterval(ping);
+    const wasCurrent = machineId ? isCurrentMachineConn(machineId, ws) : false;
+    unregisterDaemon(ws); unregisterMachineConn(ws);
     // daemon disconnected → mark this machine offline (otherwise the list keeps showing it online)
-    if (machineId) {
+    if (machineId && wasCurrent) {
       await db.update(schema.machines).set({ status: "offline" }).where(eq(schema.machines.id, machineId)).catch(() => {});
       await publish(serverId!, { type: "machine", online: false, machineId });
     }

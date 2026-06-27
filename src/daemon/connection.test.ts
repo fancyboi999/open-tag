@@ -80,3 +80,19 @@ test("backoff resets to 1s once the server proves it accepted us (sent a message
   t.mock.timers.tick(1000);
   assert.equal(created.length, 3, "after an accepted connection the next reconnect is quick again (1s)");
 });
+
+test("accepted connections watchdog-reconnect when the server stops sending frames", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  const { created, conn } = harness();
+  conn.connect();
+  created[0]!.emit("open");
+  created[0]!.emit("message", Buffer.from(JSON.stringify({ type: "ready:ack" })));
+
+  t.mock.timers.tick(90_000);
+  assert.equal(created[0]!.closed, false, "watchdog should leave a recently accepted connection alone at the timeout boundary");
+  t.mock.timers.tick(1);
+  assert.equal(created[0]!.closed, true, "watchdog should close a connection that stopped receiving server frames");
+  created[0]!.emit("close", 1006, Buffer.from(""));
+  t.mock.timers.tick(1000);
+  assert.equal(created.length, 2, "watchdog-triggered close should use normal reconnect flow");
+});

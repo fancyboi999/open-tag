@@ -5,6 +5,7 @@ import { MACHINE_REJECTED_CODE } from "../daemonProtocol.js";
 
 const INITIAL_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 30000;
+const SERVER_STALE_MS = Number(process.env.OPEN_TAG_DAEMON_SERVER_STALE_MS ?? 90_000);
 
 // Minimal surface of the `ws` client that Connection depends on, so tests can inject a fake socket.
 export interface WsLike {
@@ -18,8 +19,10 @@ export class Connection {
   private ws: WsLike | null = null;
   private delay = INITIAL_BACKOFF_MS;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private watchdog: ReturnType<typeof setTimeout> | null = null;
   private should = true;
   private accepted = false; // per-attempt: flips true once the server sends any frame (proof it accepted us, not rejected)
+  private lastServerFrameAt = 0;
   private log = createLogger("daemon:conn");
 
   constructor(
@@ -32,13 +35,20 @@ export class Connection {
 
   connect(): void { this.should = true; this.doConnect(); }
   send(m: unknown): void { if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m)); }
-  close(): void { this.should = false; if (this.timer) clearTimeout(this.timer); this.ws?.close(); }
+  close(): void {
+    this.should = false;
+    if (this.timer) clearTimeout(this.timer);
+    if (this.watchdog) { clearTimeout(this.watchdog); this.watchdog = null; }
+    this.ws?.close();
+  }
 
   private doConnect(): void {
     if (!this.should) return;
     const wsUrl = this.url.replace(/^http/, "ws") + `/daemon/connect?key=${encodeURIComponent(this.key)}`;
     this.log.info("connecting", { url: this.url });
+    if (this.watchdog) { clearTimeout(this.watchdog); this.watchdog = null; }
     this.accepted = false;
+    this.lastServerFrameAt = 0;
     this.ws = this.mkWs(wsUrl);
     // NB: do NOT reset the backoff on `open`. A rejected key also briefly opens before the server closes it;
     // resetting here would pin the backoff at 1s and turn a permanent rejection into a once-a-second storm.
@@ -47,10 +57,13 @@ export class Connection {
       // The first frame from the server proves it accepted this connection (a rejected key is closed with no
       // frame), so it's now safe to reset the backoff — a later drop is a genuine fresh failure worth a fast retry.
       if (!this.accepted) { this.accepted = true; this.delay = INITIAL_BACKOFF_MS; }
+      this.lastServerFrameAt = Date.now();
+      this.armWatchdog();
       let m: any; try { m = JSON.parse(d.toString()); } catch { return; }
       this.onMsg(m);
     });
     this.ws.on("close", (code: number, reason: any) => {
+      if (this.watchdog) { clearTimeout(this.watchdog); this.watchdog = null; }
       if (code === MACHINE_REJECTED_CODE) {
         // Permanent: this key will never be accepted again. Jump to the max backoff and tell the operator
         // exactly what to do, instead of looping silently every second.
@@ -65,6 +78,16 @@ export class Connection {
       this.scheduleReconnect();
     });
     this.ws.on("error", (e: any) => this.log.error("ws error", { detail: String(e?.message ?? e) }));
+  }
+
+  private armWatchdog(): void {
+    if (this.watchdog) clearTimeout(this.watchdog);
+    this.watchdog = setTimeout(() => {
+      if (!this.accepted || !this.lastServerFrameAt || this.ws?.readyState !== WebSocket.OPEN) return;
+      this.log.warn("server heartbeat stale; closing socket to reconnect", { staleMs: Date.now() - this.lastServerFrameAt });
+      try { this.ws.close(); } catch { /* close event will drive reconnect when possible */ }
+    }, SERVER_STALE_MS + 1);
+    this.watchdog.unref?.();
   }
   private scheduleReconnect(): void {
     if (!this.should || this.timer) return;

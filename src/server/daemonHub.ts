@@ -12,6 +12,7 @@ export function registerDaemon(ws: WebSocket, serverId: string): void { daemons.
 export function unregisterDaemon(ws: WebSocket): void { daemons.delete(ws); }
 export function registerMachineConn(machineId: string, ws: WebSocket): void { machineConns.set(machineId, ws); }
 export function unregisterMachineConn(ws: WebSocket): void { for (const [mid, w] of machineConns) if (w === ws) machineConns.delete(mid); }
+export function isCurrentMachineConn(machineId: string, ws: WebSocket): boolean { return machineConns.get(machineId) === ws; }
 export function daemonCount(serverId: string): number {
   let n = 0; for (const sid of daemons.values()) if (sid === serverId) n++; return n;
 }
