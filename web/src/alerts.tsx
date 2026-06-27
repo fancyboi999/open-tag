@@ -18,14 +18,32 @@ export interface SystemAlert {
   machineId?: string;    // when set, the "View" action navigates to this computer
 }
 
+export function isDaemonOutdated(current: string | undefined, latest: string | undefined): boolean {
+  const cur = parseSemver(current);
+  const next = parseSemver(latest);
+  if (!cur || !next) return false;
+  for (let i = 0; i < 3; i++) {
+    if (cur[i]! < next[i]!) return true;
+    if (cur[i]! > next[i]!) return false;
+  }
+  return false;
+}
+
+function parseSemver(v: string | undefined): [number, number, number] | null {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v ?? "");
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
 export function useSystemAlerts(): SystemAlert[] {
   const { machines, agents, latestDaemonVersion } = useStore();
   const { t } = useTranslation();
   return useMemo(() => {
     const out: SystemAlert[] = [];
     // Outdated daemon: only flag *online* machines (an offline one isn't running anything to be outdated) whose
-    // reported version differs from the latest published one. Grouped into one alert listing every stale machine.
-    const outdated = machines.filter((m) => m.status === "online" && m.daemonVersion && latestDaemonVersion && m.daemonVersion !== latestDaemonVersion);
+    // reported semver is lower than the latest published one. A newer daemon can briefly connect to an older
+    // server during release rollout; that is not outdated and should not page the operator.
+    const outdated = machines.filter((m) => m.status === "online" && isDaemonOutdated(m.daemonVersion, latestDaemonVersion));
     if (outdated.length) {
       const names = outdated.map((m) => m.name || m.hostname || m.id).join(", ");
       out.push({
