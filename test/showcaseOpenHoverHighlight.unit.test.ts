@@ -36,3 +36,11 @@ test("the open case still carries the fill + accent bar the hover fix relies on"
   assert.match(body, /background\s*:\s*var\(--surface-strong\)/, `open case lost its fill: ${body}`);
   assert.match(body, /box-shadow\s*:\s*inset\s+3px\s+0\s+0\s+var\(--g-sky\)/, `open case lost its accent bar: ${body}`);
 });
+
+test("open case is a contained card — content indents off the accent bar (avatar not flush on the bar)", () => {
+  const body = ruleBody(".showcase-case.open .msg");
+  // drop the reused negative side-margins (Chat's .msg uses 0 -12px) so content sits inside the card…
+  assert.match(body, /margin\s*:\s*0\s+0\s+6px/, `open-case .msg must drop its negative side-margins: ${body}`);
+  // …and indent past the 3px inset accent bar so the avatar clears it instead of sitting flush.
+  assert.match(body, /padding-left\s*:\s*18px/, `open-case content must indent off the accent bar: ${body}`);
+});
