@@ -36,5 +36,7 @@ export type HomeView = "landing" | "skeleton" | "redirect";
 export function homeRoute(s: { authState: AuthState; ready: boolean }): HomeView {
   if (s.authState === "anon") return "landing";       // known anonymous → marketing page, no wait
   if (!s.ready) return "skeleton";                    // session resolving (loading or activating) → skeleton
-  return s.authState === "authed" ? "redirect" : "landing"; // settled: authed → workspace, else → Landing
+  // settled (ready=true): authed → workspace. The else is normally "anon" (token proved invalid); a lingering
+  // "loading" here is unreachable (store flips authState+ready together) but defensively falls to Landing too.
+  return s.authState === "authed" ? "redirect" : "landing";
 }

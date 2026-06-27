@@ -43,3 +43,9 @@ test("homeRoute: a fully-bootstrapped authed user is redirected to their workspa
 test("homeRoute: a token that proved invalid (authState settles to anon) falls back to Landing", () => {
   assert.equal(homeRoute({ authState: "anon", ready: true }), "landing");
 });
+
+test("homeRoute: a (defensively-handled, normally unreachable) ready+loading state falls back to Landing", () => {
+  // The store flips authState and ready together, so ready=true is never observed while still "loading";
+  // pin the total function's behavior anyway so the decision table is exhaustively covered.
+  assert.equal(homeRoute({ authState: "loading", ready: true }), "landing");
+});
