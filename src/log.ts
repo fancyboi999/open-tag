@@ -27,8 +27,8 @@ export function createLogger(component: string): Logger {
     try { fs.appendFileSync(file, JSON.stringify(rec) + "\n"); } catch { /* */ }
     const extra = fields && Object.keys(fields).length ? " " + safeJson(fields) : "";
     const line = `${rec.t} ${level.toUpperCase().padEnd(5)} [${component}] ${msg}${extra}`;
-    // Always write to stderr: keeps CLI stdout clean (agents only read command results from stdout)
-    try { process.stderr.write(line + "\n"); } catch { /* */ }
+    const stream = consoleStream(component, level);
+    try { stream.write(line + "\n"); } catch { /* */ }
   }
   return {
     debug: (m, f) => write("debug", m, f),
@@ -37,6 +37,11 @@ export function createLogger(component: string): Logger {
     error: (m, f) => write("error", m, f),
     child: (sub) => createLogger(`${component}:${sub}`),
   };
+}
+
+function consoleStream(component: string, level: Level): NodeJS.WriteStream {
+  if (level === "error" || component === "cli" || component.startsWith("cli:")) return process.stderr;
+  return process.stdout;
 }
 
 function safeJson(o: unknown): string {

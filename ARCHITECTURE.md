@@ -86,7 +86,7 @@ Lets any machine join a server without cloning the repo: `npx @fancyboi999/open-
 - `db/index.ts` / `db/seed.ts` — DB handle (drizzle + postgres) / seed data.
 - `redis.ts` — `nextSeq` (INCR `seq:{server}`) / `nextTaskNumber(serverId, channel?)` (INCR a scope key from `taskNumberKey`: `tasknum:dm:{channelId}` for DMs, `tasknum:{server}` otherwise) / `reconcileCounters` (boot-time durability guard: advances seq + every task-number scope to the live Postgres max) / `publishEvent` (pub/sub real-time fan-out, SSE subscribes `events:{server}`) / `pokeAgent` (RPUSH `wake:{agentId}`, wakes agent's BLPOP long-poll).
 - `env.ts` — Loads root `.env` (**must be the first import** in any module that reads `process.env`; does not override variables already set in the shell environment).
-- `log.ts` — Unified logger writing to `~/.open-tag/logs/`.
+- `log.ts` — Unified logger writing JSONL to `~/.open-tag/logs/` and human-readable console lines to stdout/stderr: non-error server/daemon logs go to stdout so platform loggers do not classify debug/info as errors, true errors go to stderr, and CLI logs stay on stderr so agent-readable command stdout remains clean.
 - `daemonProtocol.ts` — Shared daemon ↔ server WS control-plane constants (e.g. `MACHINE_REJECTED_CODE` = WS close `4001`), imported by **both** `server/ws.ts` and `daemon/connection.ts` so the wire contract has a single source of truth.
 - `cli/index.ts` — **`open-tag` CLI**: subcommand tree mirroring `/agent-api` (message / channel / task / thread / profile / reminder / attachment / search / server / action), directly `fetch(OPEN_TAG_SERVER_URL + /agent-api/...)` with Bearer `OPEN_TAG_AGENT_TOKEN` (per-agent token injected by daemon) + `x-agent-id`. Note: `open-tag message check` is non-blocking; there is **no** `receive` command. `open-tag action prepare --target <ch>` reads action JSON from stdin and posts a card.
 
@@ -156,7 +156,7 @@ cd web && npm run dev  # Vite HMR dev server
 ## V. Cross-cutting concerns
 
 - `env.ts` must be imported before any module that reads `process.env`.
-- `log.ts` spans all three planes; logs land in `~/.open-tag/logs/`.
+- `log.ts` spans all three planes; JSONL logs land in `~/.open-tag/logs/`, while console streams are split so platform logs and CLI stdout semantics stay usable.
 - `redis.ts` seq / task-number / pub-sub / wake queue are shared infrastructure for real-time and sync.
 - `auth.ts` (human/agent) + `ws.ts` (daemon key) + `scopes.ts` (agent permissions) + `capabilities.ts` (human role permissions) are enforced across all routes.
 
