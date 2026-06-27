@@ -6,7 +6,7 @@
 //   2. daemon killed / network partition without a clean WS close — close can lag well past reality.
 // reconcileMachinesOnBoot fixes (1); the heartbeat sweeper fixes (2). Single-instance only (the
 // in-memory daemonHub is the connection authority; one server process owns all daemons).
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, lt, ne } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { publish } from "./realtime.js";
 import { createLogger } from "../log.js";
@@ -26,9 +26,36 @@ export async function reconcileMachinesOnBoot(): Promise<number> {
   return flipped.length;
 }
 
+/** When a machine is confirmed down — offline AND its lastHeartbeat is older than `cutoff` — none of its
+ *  agents can be live, so force every still-live agent (status active OR sleeping) on it to inactive/offline
+ *  and publish the change. The heartbeat gate is what keeps a brief WS blip (offline for a few seconds, then
+ *  reconnects well within STALE_MS) from being mistaken for a dead host. `sessionId` is left intact so the
+ *  next wake still --resumes. An idle agent sits in status="sleeping" (the daemon emits sleeping/sleeping on
+ *  idle sleep), which the old active-only filter skipped — that is the bug this covers: a sleeping agent on a
+ *  downed machine used to stay "sleeping" forever instead of showing offline. Returns the number flipped. */
+export async function reconcileOfflineMachineAgents(cutoff: Date): Promise<number> {
+  const rows = await db
+    .select({ id: schema.agents.id, name: schema.agents.name, serverId: schema.machines.serverId })
+    .from(schema.agents)
+    .innerJoin(schema.machines, eq(schema.agents.machineId, schema.machines.id))
+    .where(and(
+      eq(schema.machines.status, "offline"),
+      lt(schema.machines.lastHeartbeat, cutoff),
+      ne(schema.agents.status, "inactive"),
+    ));
+  for (const a of rows) {
+    await db.update(schema.agents).set({ status: "inactive", activity: "offline" }).where(eq(schema.agents.id, a.id));
+    await publish(a.serverId, { type: "agent", id: a.id, name: a.name, status: "inactive", activity: "offline" });
+  }
+  if (rows.length) log.info("sweeper: offline-machine agents → inactive", { count: rows.length });
+  return rows.length;
+}
+
 /** Backstop for daemons that died without a clean WS close: if a machine's lastHeartbeat is older than
- *  STALE_MS, mark it (and any agents still flagged "active" on it) offline and notify the frontend.
- *  A live daemon bumps lastHeartbeat on every pong, so this never fires on a healthy connection. */
+ *  STALE_MS, mark it offline and notify the frontend. A live daemon bumps lastHeartbeat on every pong, so
+ *  this never fires on a healthy connection. Then reconcile agents on every confirmed-down machine — both the
+ *  ones just offlined here AND ones a clean ws-close already offlined (step 1 only looks at still-"online"
+ *  rows, so it would never revisit a cleanly-closed machine to drag its agents offline). */
 export function startMachineSweeper(): ReturnType<typeof setInterval> {
   const timer = setInterval(async () => {
     try {
@@ -38,14 +65,9 @@ export function startMachineSweeper(): ReturnType<typeof setInterval> {
       for (const m of stale) {
         await db.update(schema.machines).set({ status: "offline" }).where(eq(schema.machines.id, m.id));
         await publish(m.serverId, { type: "machine", online: false, machineId: m.id });
-        const agents = await db.select().from(schema.agents)
-          .where(and(eq(schema.agents.machineId, m.id), eq(schema.agents.status, "active")));
-        for (const a of agents) {
-          await db.update(schema.agents).set({ status: "inactive", activity: "offline" }).where(eq(schema.agents.id, a.id));
-          await publish(m.serverId, { type: "agent", id: a.id, name: a.name, status: "inactive", activity: "offline" });
-        }
-        log.info("sweeper: stale machine → offline", { machineId: m.id, staleAgents: agents.length });
+        log.info("sweeper: stale machine → offline", { machineId: m.id });
       }
+      await reconcileOfflineMachineAgents(cutoff);
     } catch (e: any) { log.error("sweeper error", { detail: String(e?.message ?? e) }); }
   }, SWEEP_MS);
   timer.unref?.(); // don't keep the process alive solely for the sweeper
