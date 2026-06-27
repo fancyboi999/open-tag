@@ -333,6 +333,8 @@
     "markDone": "标记完成(移出 Inbox)",
     "unfollowThread": "取消关注此线程",
     "viewInChannel": "在频道中查看源消息",
+    "unreadThreads": "{{count}} 条未读话题回复",
+    "viewUnreadThread": "查看",
     "threadReplyPlaceholder": "回复线程…(@ 可触发 agent)",
     "membersCount": "成员 ({{count}})",
     "remove": "移出",

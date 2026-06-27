@@ -160,5 +160,16 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
     const withM = await attachMentions(msgs);
     return (sendJson(res, 200, { messages: withM, maxSeq: msgs.length ? msgs[msgs.length - 1]!.seq : since }), true);
   }
+  // Single message by id (serialized like the channel feed). Lets the client open a thread panel whose parent
+  // message isn't in the loaded page (the "jump to unread thread" banner). Declared after /search and /sync so
+  // the bare-id regex never shadows them. Tenant-scoped + channel-read gated (invariant 3).
+  const cone = /^\/api\/messages\/([^/]+)$/.exec(p);
+  if (cone && method === "GET") {
+    const m = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, cone[1]!), eq(schema.messages.serverId, serverId))))[0];
+    if (!m) return (sendErr(res, 404, "message not found"), true);
+    if (!(await canUserReadChannel(serverId, m.channelId, userId))) return (sendErr(res, 404, "message not found"), true); // non-members of private/DM channels are refused (don't leak existence)
+    const [serialized] = await attachMentions([m]);
+    return (sendJson(res, 200, { message: serialized }), true);
+  }
   return false;
 }

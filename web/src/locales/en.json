@@ -333,6 +333,8 @@
     "markDone": "Mark done (remove from Inbox)",
     "unfollowThread": "Unfollow this thread",
     "viewInChannel": "View source message in channel",
+    "unreadThreads": "{{count}} unread thread replies",
+    "viewUnreadThread": "View",
     "threadReplyPlaceholder": "Reply to thread… (@ to trigger an agent)",
     "membersCount": "Members ({{count}})",
     "remove": "Remove",

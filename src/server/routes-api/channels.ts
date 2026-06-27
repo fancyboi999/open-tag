@@ -24,6 +24,28 @@ async function parentChannelIdForThread(thread: typeof schema.channels.$inferSel
   return parent?.channelId ?? null;
 }
 
+// The sidebar/inbox unread badge for a channel aggregates the channel's OWN timeline unread plus the unread of
+// every followed (not-done) thread under it — each thread's unread is rolled onto its parent channel id. Read
+// cursors clear each source independently (read the channel → channel-own portion; open the thread → that
+// thread's portion). Single source of truth shared by GET /channels/unread and POST /:id/read.
+async function unreadMapForUser(userId: string): Promise<Record<string, number>> {
+  const myMems = await db.select().from(schema.channelMembers).where(and(eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));
+  const map: Record<string, number> = {};
+  const chs = myMems.length ? await db.select().from(schema.channels).where(inArray(schema.channels.id, myMems.map((m) => m.channelId))) : [];
+  const byId = new Map(chs.map((c) => [c.id, c]));
+  for (const m of myMems) {
+    const ch = byId.get(m.channelId);
+    if (!ch || ch.deletedAt) continue;
+    if (ch.type === "thread" && m.threadDoneAt) continue;
+    const [r] = await db.select({ n: count() }).from(schema.messages).where(and(eq(schema.messages.channelId, m.channelId), gt(schema.messages.seq, m.lastReadSeq), notSentBy(userId)));
+    const n = Number(r?.n ?? 0);
+    if (n <= 0) continue;
+    const targetId = ch.type === "thread" ? await parentChannelIdForThread(ch) : ch.id;
+    if (targetId) map[targetId] = (map[targetId] ?? 0) + n;
+  }
+  return map;
+}
+
 export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   const { req, res, url, method, p, userId, serverId } = ctx;
   // ── Threads: a thread is a channel with type=thread (and a parentMessageId); there is no separate /api/threads endpoint ──
@@ -119,21 +141,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     return (sendJson(res, 200, out), true);
   }
   if (p === "/api/channels/unread" && method === "GET") {
-    const myMems = await db.select().from(schema.channelMembers).where(and(eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));
-    const map: Record<string, number> = {};
-    const chs = myMems.length ? await db.select().from(schema.channels).where(inArray(schema.channels.id, myMems.map((m) => m.channelId))) : [];
-    const byId = new Map(chs.map((c) => [c.id, c]));
-    for (const m of myMems) {
-      const ch = byId.get(m.channelId);
-      if (!ch || ch.deletedAt) continue;
-      if (ch.type === "thread" && m.threadDoneAt) continue;
-      const [r] = await db.select({ n: count() }).from(schema.messages).where(and(eq(schema.messages.channelId, m.channelId), gt(schema.messages.seq, m.lastReadSeq), notSentBy(userId)));
-      const n = Number(r?.n ?? 0);
-      if (n <= 0) continue;
-      const targetId = ch.type === "thread" ? await parentChannelIdForThread(ch) : ch.id;
-      if (targetId) map[targetId] = (map[targetId] ?? 0) + n;
-    }
-    return (sendJson(res, 200, map), true);
+    return (sendJson(res, 200, await unreadMapForUser(userId)), true);
   }
   // Unified inbox (GET /api/channels/inbox?filter=all|unread|mentions): aggregates all channels/DMs/threads the user has joined, with last message + unread count + mentions. User-side equivalent of the agent's inbox-notice.
   if (p === "/api/channels/inbox" && method === "GET") {
@@ -346,11 +354,17 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     } else if (action === "leave") {
       if (ch.type === "thread") return (sendErr(res, 403, "thread channels cannot be left directly — use the thread unfollow API"), true);
       await db.delete(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, chId!), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));
-    } else { // read: advance cursor to the latest seq
+    } else { // read: advance this container's cursor, then report the parent channel's remaining aggregated unread
       const b = await readJson(req).catch(() => ({}));
       let seq = Number(b?.seq ?? 0);
       if (!seq) { const [m] = await db.select({ s: schema.messages.seq }).from(schema.messages).where(eq(schema.messages.channelId, chId!)).orderBy(desc(schema.messages.seq)).limit(1); seq = Number(m?.s ?? 0); }
       await db.update(schema.channelMembers).set({ lastReadSeq: seq }).where(and(eq(schema.channelMembers.channelId, chId!), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));
+      // Return the authoritative remaining badge for the affected sidebar channel (a thread read rolls onto its
+      // parent) so the client renders an honest count instead of blindly zeroing it — which made already-read
+      // channels "resurrect" as unread once a followed thread still held unopened replies.
+      const parentId = ch.type === "thread" ? await parentChannelIdForThread(ch) : chId!;
+      const remaining = parentId ? ((await unreadMapForUser(userId))[parentId] ?? 0) : 0;
+      return (sendJson(res, 200, { ok: true, channelId: parentId, unread: remaining }), true);
     }
     return (sendJson(res, 200, { ok: true }), true);
   }

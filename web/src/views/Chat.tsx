@@ -121,6 +121,7 @@ export function Chat() {
   const [showMembers, setShowMembers] = useState(false);
   const [thread, setThread] = useState<{ channelId: string; parent: Msg } | null>(null); // currently open thread panel
   const [threadMeta, setThreadMeta] = useState<Record<string, { threadChannelId: string; replyCount: number; unreadCount?: number }>>({}); // parent message id → thread metadata (reply count, unread count)
+  const [unreadThreads, setUnreadThreads] = useState<{ threadChannelId: string; parentMessageId: string; parentChannelId: string; unreadCount: number }[]>([]); // unread that lives in this channel's threads (invisible in the main timeline) → "jump to unread thread" bar
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true); // tracks whether the scroll position is at the bottom; new messages auto-scroll only when already at the bottom, preserving history browsing
   const [showJump, setShowJump] = useState(false); // when not at the bottom, show the "Back to bottom" jump button
@@ -167,6 +168,21 @@ export function Chat() {
     const ids = ms.map((m) => m.id);
     if (ids.length) { try { setThreadMeta(await api("GET", `/api/channels/${cur.id}/threads?parentMessageIds=${ids.join(",")}`) || {}); } catch { setThreadMeta({}); } } else setThreadMeta({});
   })(); }, [cur?.id]);
+  // Surface unread that lives in this channel's threads (folded away, invisible in the main timeline → "滑不到").
+  // Re-runs when the channel's badge changes: entry, a new thread reply bumping it, or opening a thread clearing it.
+  useEffect(() => {
+    if (!cur || cur.type === "dm" || cur.type === "thread") { setUnreadThreads([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await api("GET", "/api/channels/threads/followed");
+        if (cancelled) return;
+        setUnreadThreads((r?.threads || []).filter((th: any) => th.parentChannelId === cur.id && th.unreadCount > 0 && th.parentMessageId)
+          .map((th: any) => ({ threadChannelId: th.threadChannelId, parentMessageId: th.parentMessageId, parentChannelId: th.parentChannelId, unreadCount: th.unreadCount })));
+      } catch { if (!cancelled) setUnreadThreads([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [cur?.id, unread[cur?.id ?? ""]]);
   // LiveAgentBar (sidebar) → open this agent's profile panel on the Activity tab in the right column,
   // reusing the existing avatar-click overlay (setProfile). Consumed once and cleared. MUST be declared
   // after the channel-switch effect above: when the click navigates here from a non-channel view (Saved),
@@ -235,6 +251,19 @@ export function Chat() {
   const doDMHuman = async (uid: string) => { const id = await openDM("user", uid); if (id) nav(`/s/${slug}/channel/${id}`); }; // used by HumanProfile onMessage callback
   // Opening a thread is an explicit "show me this thread" action → it becomes the right-column base layer and clears any profile overlay on top of it (otherwise the just-opened thread would stay hidden behind a stale profile).
   const startThread = async (m: Msg) => { if (!cur) return; const tid = threadMeta[m.id]?.threadChannelId || await openThread(cur.id, m.id); if (tid) { setProfile(null); setThread({ channelId: tid, parent: m }); setThreadMeta((tm) => (tm[m.id] ? { ...tm, [m.id]: { ...tm[m.id]!, unreadCount: 0 } } : tm)); markRead(tid); } }; // opening a thread clears the unread count optimistically and marks the thread channel as read
+  // "Jump to unread thread" bar: open a thread whose parent message may not be in the loaded page — fetch the parent
+  // by id (it isn't on screen to pass through startThread), open the panel, mark it read, and drop it from the bar.
+  const openUnreadThread = async (item: { threadChannelId: string; parentMessageId: string }) => {
+    if (!cur) return;
+    try {
+      const parent = (await api("GET", `/api/messages/${item.parentMessageId}`))?.message as Msg | undefined;
+      if (!parent) return;
+      setProfile(null); setThread({ channelId: item.threadChannelId, parent });
+      setThreadMeta((tm) => (tm[parent.id] ? { ...tm, [parent.id]: { ...tm[parent.id]!, unreadCount: 0 } } : tm));
+      markRead(item.threadChannelId);
+      setUnreadThreads((list) => list.filter((th) => th.threadChannelId !== item.threadChannelId));
+    } catch { /* parent fetch failed (deleted / no access) — leave the bar untouched */ }
+  };
   // Returns the display name of the task assignee, used by the task pill
   const taskAssignee = (m: Msg) => { if (!m.taskAssigneeId) return ""; const a = agents.find((x) => x.id === m.taskAssigneeId); if (a) return " @" + (a.displayName || a.name); const h = humans.find((x) => x.userId === m.taskAssigneeId); return h ? " @" + (h.displayName || h.name) : ""; };
   // Handles task status change / claim from the task badge; socket message:updated event refreshes the message automatically
@@ -272,6 +301,13 @@ export function Chat() {
         {chatTab === "tasks" && cur ? <TaskBoard channelId={cur.id} onOpenThread={startThread} />
           : chatTab === "files" && cur ? <ChannelFiles channelId={cur.id} />
           : <>
+            {chatTab === "chat" && unreadThreads.length > 0 && (
+              <button className="unread-threads-bar" onClick={() => openUnreadThread(unreadThreads[0]!)}>
+                <MessageCircle size={14} />
+                <span className="utb-label">{t("chat.unreadThreads", { count: unreadThreads.reduce((s, th) => s + th.unreadCount, 0) })}</span>
+                <span className="utb-cta">{t("chat.viewUnreadThread")}</span>
+              </button>
+            )}
             <div key={cur?.id} className="scroll ch-view-enter" ref={scrollRef} onScroll={onScroll}>
               {!loaded && <ChatSkeleton />}
               {loaded && !msgs.length && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.channelEmpty")} />}

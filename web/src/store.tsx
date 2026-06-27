@@ -134,7 +134,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const openDM = async (memberType: string, memberId: string) => { const body = memberType === "user" ? { userId: memberId } : { agentId: memberId }; const r = await api("POST", "/api/channels/dm", body); if (r?.id) { await reload(); sockRef.current?.emit("join:channel", r.id); } return r?.id ?? null; };
   const joinChannel = async (id: string) => { await api("POST", `/api/channels/${id}/join`); await reload(); sockRef.current?.emit("join:channel", id); };
   const leaveChannel = async (id: string) => { await api("POST", `/api/channels/${id}/leave`); await reload(); };
-  const markRead = (id: string) => { setUnread((u) => { const n = { ...u }; delete n[id]; return n; }); api("POST", `/api/channels/${id}/read`, {}).catch(() => {}); };
+  // A channel's badge = its own-timeline unread + its followed threads' unread. Reading a container (channel OR
+  // thread) clears only that container's portion; the server returns the affected sidebar channel's authoritative
+  // remaining (a thread read rolls onto its parent). We set the badge to that exact value instead of blind-zeroing
+  // it — blind-zeroing hid still-unopened thread replies, which then "resurrected" on the next unread refetch.
+  const markRead = (id: string) => {
+    api("POST", `/api/channels/${id}/read`, {}).then((r) => {
+      const key = r?.channelId; if (!key) return;
+      setUnread((u) => { const n = { ...u }; if (Number(r.unread) > 0) n[key] = Number(r.unread); else delete n[key]; return n; });
+    }).catch(() => {});
+  };
   const uploadFiles = async (channelId: string, files: FileList | File[]) => {
     const fd = new FormData(); fd.append("channelId", channelId);
     for (const f of Array.from(files)) fd.append("files", f);
