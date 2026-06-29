@@ -10,6 +10,7 @@
 // The parse functions are pure (unit-tested against fixtures captured from multica's discovery
 // research) and mirror multica's server/pkg/agent/models.go field-for-field.
 import { spawn, type ChildProcess } from "node:child_process";
+import { resolveBin } from "./runtimes.js";
 
 export interface ThinkingLevel { value: string; label: string; description?: string }
 export interface ModelThinking { levels: ThinkingLevel[]; default?: string }
@@ -174,7 +175,7 @@ function runList(bin: string, args: string[], timeoutMs: number = LIST_TIMEOUT_M
     delete env.NODE_OPTIONS;
     let proc: ChildProcess;
     try {
-      proc = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"], env });
+      proc = spawn(resolveBin(bin), args, { stdio: ["ignore", "pipe", "pipe"], env });
     } catch (e) {
       return resolve({ stdout: "", stderr: String((e as any)?.message ?? e), code: 1 });
     }
