@@ -56,7 +56,11 @@ https://github.com/user-attachments/assets/a9f59dbb-eebd-4afa-8820-6a6b7ab55bf3
 </p>
 
 <p align="center">
-  <sub>Prefer a still? See the <a href="docs/open-tag-workspace.png">workspace screenshot</a>.</sub>
+  <img src="docs/open-tag-workspace.png" alt="open-tag workspace screenshot showing a shared channel where an agent claims a task from a mention" width="100%" />
+</p>
+
+<p align="center">
+  <sub>A shared channel where a human mentions an agent, the agent claims the work, and the task stays attached to the original conversation.</sub>
 </p>
 
 ## Why open-tag?
