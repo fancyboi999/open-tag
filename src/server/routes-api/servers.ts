@@ -244,6 +244,20 @@ export async function handleServersServerScope(ctx: ServerCtx): Promise<boolean>
     await db.update(schema.machines).set({ apiKeyHash: hashToken(key), apiKeyPrefix: key.slice(0, 14) }).where(eq(schema.machines.id, mid));
     return (sendJson(res, 200, { id: m.id, name: m.name, apiKeyPrefix: key.slice(0, 14), key }), true);
   }
+  // Rename a machine: set a human-friendly display name. Tenant-isolated (machineId must belong to
+  // the path's server) and gated on manageMachines — same guard shape as reconnect/delete above.
+  const renm = /^\/api\/servers\/[^/]+\/machines\/([^/]+)$/.exec(p);
+  if (renm && method === "PATCH") {
+    if (!await requireCap(serverId, userId, "manageMachines")) return (sendErr(res, 403, "need manageMachines capability"), true);
+    const mid = renm[1]!;
+    const b = await readJson(req).catch(() => ({}));
+    const name = String(b.name ?? "").trim();
+    if (!name || name.length > 80) return (sendErr(res, 400, "name must be 1–80 characters"), true);
+    const m = (await db.select().from(schema.machines).where(and(eq(schema.machines.id, mid), eq(schema.machines.serverId, serverId))))[0];
+    if (!m) return (sendErr(res, 404, "machine not found"), true);
+    const [u] = await db.update(schema.machines).set({ name }).where(eq(schema.machines.id, mid)).returning();
+    return (sendJson(res, 200, { id: u!.id, name: u!.name, hostname: u!.hostname, os: u!.os, runtimes: u!.runtimes, status: u!.status, daemonVersion: u!.daemonVersion, isComputer: u!.isComputer, apiKeyPrefix: u!.apiKeyPrefix, lastHeartbeat: u!.lastHeartbeat }), true);
+  }
   // Delete machine: reject if live agents are present, then release soft-deleted agent FK refs
   // before deleting. Wrapped in a transaction to reduce (but not fully eliminate under READ
   // COMMITTED) the TOCTOU window between the live-agent check and the delete.
