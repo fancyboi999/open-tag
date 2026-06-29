@@ -207,13 +207,22 @@ big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents fr
   200, threads GET 200+data, threads POST 200), all pass after fix; public-channel + avatar regressions
   included. Typecheck clean.
 
-### Pending — human-plane task/action-card write endpoints (finer-grained; require prior message UUID)
-- **IDOR-B4 [LOW-MED]** `PATCH /api/tasks/:id/(claim|unclaim|status)`, `DELETE /api/tasks/:id`,
-  `POST /api/tasks/convert-message`, `POST /api/actions/:id/mark-executed` — these write endpoints do
-  not call `canUserReadChannel`. Exploitability is lower than B1/B2/B3 because task/message UUIDs are
-  only returned by already-gated read endpoints; a non-member would need to have obtained the UUID
-  prior to being removed. Fix: add `canUserReadChannel(serverId, task.channelId, userId)` after the
-  message/task fetch in each handler. Kept out of this PR (sec-idor3) to keep the diff surgical.
+- **IDOR-B4 [LOW-MED]** human-plane task/action-card write endpoints lacked the channel-access check —
+  fixed (sec-idor4 PR). `POST /api/tasks/convert-message`, `PATCH /api/tasks/:id/(claim|unclaim|status)`,
+  `DELETE /api/tasks/:id` (`src/server/routes-api/tasks.ts`) and `POST /api/actions/:id/mark-executed`
+  (`src/server/routes-api/messages.ts`) mutated a task/action card identified by a message UUID without
+  verifying the caller could read the message's channel — a same-tenant non-member who had obtained a
+  private/DM channel's message UUID (e.g. before being removed from the channel) could promote / claim /
+  unclaim / re-status / delete its tasks or mark its action cards executed. Each handler now fetches the
+  message by `(id, serverId)` and calls `canUserReadChannel(serverId, m.channelId, userId)`, returning
+  **404** on denial (existence-hiding, consistent with the reactions guard IDOR-B2 — by-message-id writes
+  must not leak "exists but forbidden" vs "doesn't exist"). The guard lives at the **route layer**, not in
+  the shared `core.ts` mutators (`convertMessageToTask`/`claimTask`/`unclaimTask`/`setTaskStatus`/`deleteTask`),
+  which the agent plane gates separately via `resolveMessageId` → `canAgentReadChannel` — putting it in core
+  would double-gate / pollute the agent path. Integration test `test/channelAccessB4.integration.ts`:
+  6 non-member breach cases RED on main (all returned 200), ALL GREEN after fix; 2 regressions (non-member
+  on a public channel → 200, owner on the private channel → 200) stay green. Typecheck clean. (Integration
+  tests are not in CI — run manually, like the B2/B3 guards.)
 
 ### Pending — agent-plane ownership (the channel-access layer above is done; this is a finer-grained check)
 - **C5 [MED]** `POST /agent/task/update`, `/task/unclaim` — an agent that can access the channel can still

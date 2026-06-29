@@ -141,6 +141,7 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
     const b = await readJson(req).catch(() => ({}));
     const m = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, amark[1]!), eq(schema.messages.serverId, serverId))))[0];
     if (!m) return (sendErr(res, 404, "action not found"), true);
+    if (!(await canUserReadChannel(serverId, m.channelId, userId))) return (sendErr(res, 404, "action not found"), true); // invariant 3 (IDOR-B4): non-members of a private/DM channel can't mark its action cards (404 hides existence, matches reactions B2)
     const meta = m.actionMetadata as any;
     if (!meta || meta.kind !== "action-card") return (sendErr(res, 400, "not an action card"), true);
     if (meta.state === "executed") return (sendJson(res, 200, { ok: true, already: true }), true); // idempotent
