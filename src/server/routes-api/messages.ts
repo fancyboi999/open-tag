@@ -66,6 +66,7 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
     if (!messageId) return (sendErr(res, 400, "messageId required"), true);
     const m = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, messageId), eq(schema.messages.serverId, serverId))))[0];
     if (!m) return (sendErr(res, 404, "message not found"), true);
+    if (!(await canUserReadChannel(serverId, m.channelId, userId))) return (sendErr(res, 404, "message not found"), true); // invariant 3 (IDOR-B5): non-members can't bookmark (and thereby read via GET /saved) a private/DM channel's message (404 hides existence, matches reactions B2 / tasks B4)
     await saveMessage(serverId, messageId, "user", userId);
     return (sendJson(res, 200, { ok: true }), true);
   }

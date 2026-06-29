@@ -224,6 +224,28 @@ big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents fr
   on a public channel → 200, owner on the private channel → 200) stay green. Typecheck clean. (Integration
   tests are not in CI — run manually, like the B2/B3 guards.)
 
+- **IDOR-B5 [LOW-MED]** saved-message bookmark endpoint leaked private/DM channel content — fixed
+  (sec-idor5 PR). `POST /api/channels/saved` (`src/server/routes-api/messages.ts`) fetched the target
+  message by `(id, serverId)` but never called `canUserReadChannel`, so a same-tenant non-member who had
+  obtained a private/DM channel's message UUID could bookmark it; `GET /api/channels/saved`
+  (`core.listSaved`) then returns the saved message's **`content`** — turning a write endpoint into a full
+  content-read of a channel the caller cannot see. Surfaced by the IDOR-B4 (sec-idor4) verifier as the
+  same by-message-UUID-without-channel-check pattern. Fix: after the message fetch, call
+  `canUserReadChannel(serverId, m.channelId, userId)` → **404** on denial (existence-hiding, consistent
+  with reactions B2 / tasks B4). Route layer only — `saveMessage`/`listSaved` (`core.ts`) are shared with
+  the agent plane and left untouched. Integration test `test/channelAccessB5.integration.ts`: 3 non-member
+  breach cases RED on main (private save 200, the secret content leaking into GET /saved, DM save 200),
+  ALL GREEN after fix; 2 regressions (non-member→public 200, owner→own-private 200 with content visible)
+  stay green. Typecheck clean. (Not in CI — manual guard, like the B2/B3/B4 siblings.)
+  **Residual (out of scope, LOW — flagged by the sec-idor5 verifier):** the gate is *write-time only* —
+  `GET /api/channels/saved` (`listSaved`) re-reads `content` without re-checking access, so a
+  legitimately-saved bookmark still shows its snapshot if the saver *later* loses access (channel
+  visibility flipped to private, or removed from the channel); and the fix is forward-only (any
+  illegitimate rows created **before** this deploy aren't purged). Both are bookmark-snapshot-retention
+  of already-seen content (the write gate guarantees the saver could read it *at save time*), not
+  never-had-access exposure — revisit only if bookmark-revocation-on-access-loss becomes a product
+  requirement (would need a read-time filter in `listSaved`, which is shared with the agent plane).
+
 ### Pending — agent-plane ownership (the channel-access layer above is done; this is a finer-grained check)
 - **C5 [MED]** `POST /agent/task/update`, `/task/unclaim` — an agent that can access the channel can still
   modify/unclaim **another agent's** task (no `taskAssigneeId === agent.id` check). This is an *ownership*
