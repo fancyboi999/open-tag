@@ -457,16 +457,23 @@ export function Saved() {
   const { slug, listSaved, unsaveMsg } = useStore();
   const nav = useNavigate();
   const { t } = useTranslation();
+  const PAGE = 20;
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
-  const load = (offset = 0) => listSaved(20, offset).then((r) => {
-    setItems((prev) => (offset ? [...prev, ...r.saved] : r.saved));
+  // Paginate by DB-row offset, NOT items.length: listSaved now filters out saved rows whose channel the
+  // caller can't currently read (IDOR-B5 read-time gate), so the visible count is ≤ the rows the server
+  // consumed. Deriving the next offset from items.length would re-request overlapping windows (duplicate
+  // bookmarks) or, when a whole window is filtered out, repeat the same offset forever (stuck "load more").
+  const [nextOffset, setNextOffset] = useState(0);
+  const load = (off = 0) => listSaved(PAGE, off).then((r) => {
+    setItems((prev) => (off ? [...prev, ...r.saved] : r.saved));
     setHasMore(r.hasMore);
+    setNextOffset(off + PAGE);
   }).finally(() => setLoading(false));
   useEffect(() => { load(0); /* eslint-disable-next-line */ }, []);
   const open = (it: any) => nav(`/s/${slug}/channel/${it.channelId}?msg=${it.messageId}`);
-  const unsave = (e: React.MouseEvent, it: any) => { e.stopPropagation(); unsaveMsg(it.messageId); setItems((p) => p.filter((x) => x.messageId !== it.messageId)); };
+  const unsave = (e: React.MouseEvent, it: any) => { e.stopPropagation(); unsaveMsg(it.messageId); setItems((p) => p.filter((x) => x.messageId !== it.messageId)); setNextOffset((n) => Math.max(0, n - 1)); };
   const source = (it: any) => it.channelType === "thread"
     ? <><MessageCircle size={12} /> {t("misc.savedThread")}{it.parentChannelType === "dm" ? "@" : "#"}{it.parentChannelName ?? "?"}</>
     : it.channelType === "private"
@@ -491,7 +498,7 @@ export function Saved() {
               <span className="ib-save on" title={t("misc.savedUnsave")} onClick={(e) => unsave(e, it)}><Bookmark size={15} fill="currentColor" /></span>
             </button>
           ))}
-          {hasMore && !loading && <button className="loadmore" onClick={() => load(items.length)}>{t("misc.savedLoadMore")}</button>}
+          {hasMore && !loading && <button className="loadmore" onClick={() => load(nextOffset)}>{t("misc.savedLoadMore")}</button>}
         </div>
       </main>
     </>

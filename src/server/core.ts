@@ -7,6 +7,7 @@ import { broadcastToDaemons, daemonCount } from "./daemonHub.js";
 import { agentHasScope } from "./scopes.js";
 import { newKey, hashToken } from "./auth.js";
 import { createLogger } from "../log.js";
+import { canUserReadChannel } from "./channelAccess.js";
 
 const log = createLogger("server:core");
 const PORT = Number(process.env.PORT ?? 7777);
@@ -280,9 +281,19 @@ export async function listSaved(serverId: string, memberType: "user" | "agent", 
   const parentMsgById = new Map(parentMsgs.map((m) => [m.id, m]));
   const parentChans = parentMsgs.length ? await db.select().from(schema.channels).where(inArray(schema.channels.id, [...new Set(parentMsgs.map((m) => m.channelId))])) : [];
   const parentChById = new Map(parentChans.map((c) => [c.id, c]));
+  // IDOR-B5 residual (sec-idor6): read-time channel-access gate. A saved row's message may now live in a
+  // channel the saver can no longer read (lost membership / channel turned private) or be an illegitimate
+  // pre-write-gate save — re-check access at read time and drop what the caller can't currently see.
+  // Hides (does not delete): re-gaining access surfaces it again. Same gate as the write path, per plane.
+  const gate = memberType === "user" ? canUserReadChannel : canAgentReadChannel;
+  const accessByChannel = new Map<string, boolean>(
+    await Promise.all([...new Set(msgs.map((m) => m.channelId))].map(
+      async (cid) => [cid, await gate(serverId, cid, memberId)] as const)),
+  );
   const saved = page.map((r) => {
     const m = msgById.get(r.messageId);
     if (!m) return null;
+    if (!accessByChannel.get(m.channelId)) return null; // read-time channel-access gate (IDOR-B5 residual): drop messages in channels the caller can't currently read
     const ch = chById.get(m.channelId);
     const isThread = ch?.type === "thread";
     const pm = isThread && ch?.parentMessageId ? parentMsgById.get(ch.parentMessageId) : undefined;

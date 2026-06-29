@@ -237,14 +237,23 @@ big-bang rewrite (a wrong "fix" to `resolveTarget` can stop legitimate agents fr
   breach cases RED on main (private save 200, the secret content leaking into GET /saved, DM save 200),
   ALL GREEN after fix; 2 regressions (non-member→public 200, owner→own-private 200 with content visible)
   stay green. Typecheck clean. (Not in CI — manual guard, like the B2/B3/B4 siblings.)
-  **Residual (out of scope, LOW — flagged by the sec-idor5 verifier):** the gate is *write-time only* —
-  `GET /api/channels/saved` (`listSaved`) re-reads `content` without re-checking access, so a
-  legitimately-saved bookmark still shows its snapshot if the saver *later* loses access (channel
-  visibility flipped to private, or removed from the channel); and the fix is forward-only (any
-  illegitimate rows created **before** this deploy aren't purged). Both are bookmark-snapshot-retention
-  of already-seen content (the write gate guarantees the saver could read it *at save time*), not
-  never-had-access exposure — revisit only if bookmark-revocation-on-access-loss becomes a product
-  requirement (would need a read-time filter in `listSaved`, which is shared with the agent plane).
+  **Read-time hardening (sec-idor6) — residual now CLOSED.** `GET /api/channels/saved` (`listSaved`) now
+  re-checks channel access at read time too (per-plane: `canUserReadChannel` for humans /
+  `canAgentReadChannel` for agents) and drops any saved message whose channel the caller can't currently
+  read. This closes both leaks the sec-idor5 verifier flagged — a bookmark whose saver *later* lost access
+  (removed / channel turned private), and illegitimate rows created before the write-gate — in one stroke,
+  with **no data migration** (the read-time gate is agnostic to how the row was created). Hides, not
+  deletes: re-gaining access surfaces the bookmark again. Pagination: the **server** keeps the `limit+1`
+  probe (filtered rows occupy a slot, so a page may return < limit items but `hasMore` stays correct — no
+  data dropped, only uneven per-page counts); the **web Saved view** (`web/src/views/misc.tsx`) was updated
+  in the same change to paginate by **DB-row offset** (a fixed `PAGE` step), not `items.length`, else the
+  now-filtered visible count would re-request overlapping windows (duplicate bookmarks) or, on a fully-
+  filtered window, repeat the same offset forever (a stuck "load more"). Browser-verified (chrome-devtools):
+  a 25-saved list with 3 inaccessible private rows renders 22 across two pages — no duplicates, no leaked
+  content. Integration test `test/channelAccessB6.integration.ts`:
+  3 breach cases RED on main (lost-membership snapshot leak, illegitimate-row leak, post-removal list
+  still leaking), ALL GREEN after fix; still-accessible saved (public / own private) stay visible.
+  Typecheck clean. (Not in CI — manual guard, like the B2–B5 siblings.)
 
 ### Pending — agent-plane ownership (the channel-access layer above is done; this is a finer-grained check)
 - **C5 [MED]** `POST /agent/task/update`, `/task/unclaim` — an agent that can access the channel can still
