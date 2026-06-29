@@ -17,7 +17,7 @@ import { PaneEmpty } from "../PaneEmpty.tsx";
 import { ChatSkeleton } from "./Skeleton.tsx";
 import { AgentProfile, HumanProfile, CreateAgentModal } from "./Members.tsx";
 import { ChatSidebar, CreateChannelModal } from "./ChatSidebar.tsx";
-import { AddComputerModal } from "./misc.tsx";
+import { ConnectComputerWizard } from "./ConnectComputerWizard.tsx";
 import { Composer } from "./Composer.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 
@@ -408,7 +408,7 @@ export function Chat() {
                 ? <div className="hint">{t("chat.agentTraceHint")}</div>
                 : traj.map((t, i) => <div className={"traj" + (t.tool ? " tool" : "")} key={i}>{t.tool && <IconWrench size={12} />}{t.name ? "@" + t.name + " · " : ""}{t.text}</div>)}
       </aside>}
-      <AddComputerModal />
+      <ConnectComputerWizard mode="onboard" />
       {showMembers && cur && <ChannelMembersModal channelId={cur.id} channelName={cur.name} onClose={() => setShowMembers(false)} />}
       {showEdit && cur && <EditChannelModal channel={cur} onClose={() => setShowEdit(false)} onDone={async () => { setShowEdit(false); await reload(); }} onDeleted={() => { setShowEdit(false); reload(); nav(`/s/${slug}/channel`); }} />}
       {ctxMenu && (() => {
