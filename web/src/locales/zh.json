@@ -223,6 +223,7 @@
     "wizardConnectedSuccess": "电脑接入成功！",
     "wizardNameLabel": "电脑名称",
     "wizardNameHint": "给这台电脑起一个好记的名字。",
+    "wizardRenameError": "保存名称失败，请重试。",
     "searchSidebarHint": "全文搜索你能看到的频道里的消息。",
     "searchResults": "{{count}} 条结果",
     "searchPlaceholder": "搜消息全文…",

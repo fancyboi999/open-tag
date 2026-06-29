@@ -251,8 +251,9 @@ export async function handleServersServerScope(ctx: ServerCtx): Promise<boolean>
     if (!await requireCap(serverId, userId, "manageMachines")) return (sendErr(res, 403, "need manageMachines capability"), true);
     const mid = renm[1]!;
     const b = await readJson(req).catch(() => ({}));
-    const name = String(b.name ?? "").trim();
-    if (!name || name.length > 80) return (sendErr(res, 400, "name must be 1–80 characters"), true);
+    // name must be a real string — reject non-string payloads (e.g. 12345) instead of coercing them.
+    const name = typeof b.name === "string" ? b.name.trim() : "";
+    if (!name || name.length > 80) return (sendErr(res, 400, "name must be a string of 1–80 characters"), true);
     const m = (await db.select().from(schema.machines).where(and(eq(schema.machines.id, mid), eq(schema.machines.serverId, serverId))))[0];
     if (!m) return (sendErr(res, 404, "machine not found"), true);
     const [u] = await db.update(schema.machines).set({ name }).where(eq(schema.machines.id, mid)).returning();

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useStore } from "../store.tsx";
 import { useTranslation } from "react-i18next";
 import { IconMonitor } from "../icons.tsx";
@@ -35,6 +35,8 @@ export function ConnectComputerWizard({ mode, machine, onClose }: { mode: Mode; 
   const [copied, setCopied] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [renameErr, setRenameErr] = useState("");
+  const gennedRef = useRef(false); // guards the connect-step auto-generate against effect re-runs (incl. StrictMode's double-invoke) so it never creates a second machine
 
   // onboard auto-show gate: only the intro step is conditioned on "no machine yet" — once the user advances
   // to connect (which creates a machine row), keep showing so the command/connected steps don't vanish.
@@ -43,13 +45,25 @@ export function ConnectComputerWizard({ mode, machine, onClose }: { mode: Mode; 
     ? true
     : (!dismissed && !!capabilities.manageMachines && (step === "intro" ? machines.length === 0 : true));
 
+  // The just-touched machine (created or reconnected) and whether its daemon is online yet.
+  const targetId = res?.id ?? machine?.id;
+  const liveMachine = targetId ? machines.find((m) => m.id === targetId) : undefined;
+  const isOnline = liveMachine?.status === "online";
+
   const close = useCallback(() => {
+    // We auto-create a machine on entering the connect step. If the user then cancels/closes before it ever
+    // comes online, delete that row so cancelling doesn't leave (or pile up) orphan offline machines.
+    // reconnect rotates an EXISTING row — never delete it; an online machine means the user effectively
+    // succeeded even without pressing Done — keep it.
+    if (mode !== "reconnect" && res && !isOnline) {
+      api("DELETE", `/api/servers/${serverId}/machines/${res.id}`).then(() => reload()).catch(() => { /* best-effort cleanup */ });
+    }
     if (mode === "onboard") {
       try { sessionStorage.setItem(COMPUTER_DISMISSED_KEY, "1"); if (dontRemind) localStorage.setItem(COMPUTER_OPTOUT_KEY, "1"); } catch { /* storage unavailable — dismiss in memory only */ }
       setDismissed(true);
     }
     onClose?.();
-  }, [mode, dontRemind, onClose]);
+  }, [mode, res, isOnline, dontRemind, onClose, api, serverId, reload]);
 
   // Esc-to-dismiss, only while shown.
   useEffect(() => {
@@ -72,13 +86,11 @@ export function ConnectComputerWizard({ mode, machine, onClose }: { mode: Mode; 
     finally { setBusy(false); }
   }, [mode, machine, api, serverId, reload, t]);
 
-  // Auto-generate once on entering the connect step.
-  useEffect(() => { if (shown && step === "connect" && !res && !busy && !genErr) gen(); }, [shown, step]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // The just-touched machine (created or reconnected) and whether its daemon is online yet.
-  const targetId = res?.id ?? machine?.id;
-  const liveMachine = targetId ? machines.find((m) => m.id === targetId) : undefined;
-  const isOnline = liveMachine?.status === "online";
+  // Auto-generate exactly once when the connect step is first shown. The ref guard (not state) makes this
+  // idempotent even under React StrictMode's double effect invocation, so it never creates a second machine.
+  useEffect(() => {
+    if (shown && step === "connect" && !gennedRef.current) { gennedRef.current = true; gen(); }
+  }, [shown, step, gen]);
 
   // Online transition → connected step. Pre-fill rename with the current name on reconnect.
   useEffect(() => {
@@ -89,12 +101,16 @@ export function ConnectComputerWizard({ mode, machine, onClose }: { mode: Mode; 
   const copy = (text: string) => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); };
 
   const finish = async () => {
-    const newName = nameInput.trim();
+    // Empty input means "use the hostname" (matches the placeholder) — otherwise the machine would keep the
+    // backend default "new machine" name. Only PATCH when the chosen name actually differs from the current one.
+    const chosen = nameInput.trim() || liveMachine?.hostname || "";
     const curName = res?.name ?? machine?.name ?? "";
-    if (newName && newName !== curName && targetId) {
-      setSavingName(true);
-      try { await api("PATCH", `/api/servers/${serverId}/machines/${targetId}`, { name: newName }); await reload(); }
-      finally { setSavingName(false); }
+    if (chosen && chosen !== curName && targetId) {
+      setSavingName(true); setRenameErr("");
+      const r = await api("PATCH", `/api/servers/${serverId}/machines/${targetId}`, { name: chosen }).catch(() => null);
+      setSavingName(false);
+      if (!r || r.error) { setRenameErr(t("misc.wizardRenameError")); return; } // stay on the step so the user can retry instead of losing the rename silently
+      await reload();
     }
     close();
   };
@@ -141,6 +157,7 @@ export function ConnectComputerWizard({ mode, machine, onClose }: { mode: Mode; 
           <label>{t("misc.wizardNameLabel")}</label>
           <input autoFocus value={nameInput} onChange={(e) => setNameInput(e.target.value)} placeholder={liveMachine?.hostname || ""} maxLength={80} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) finish(); }} />
           <p className="wiz-hint">{t("misc.wizardNameHint")}</p>
+          {renameErr ? <p className="form-err">{renameErr}</p> : null}
           <div className="acts"><button className="ok" onClick={finish} disabled={savingName}>{t("misc.connectModalDone")}</button></div>
         </>)}
       </div>

@@ -223,6 +223,7 @@
     "wizardConnectedSuccess": "Computer connected successfully!",
     "wizardNameLabel": "Computer Name",
     "wizardNameHint": "A friendly name for this computer.",
+    "wizardRenameError": "Couldn't save the name. Try again.",
     "searchSidebarHint": "Full-text search across messages in channels you can see.",
     "searchResults": "{{count}} results",
     "searchPlaceholder": "Search messages…",

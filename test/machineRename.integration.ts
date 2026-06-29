@@ -103,6 +103,13 @@ async function main() {
   console.log("\n[5] oversize name (>80) → 400");
   const r5 = await apiCall({ method: "PATCH", path: `/api/servers/${serverId}/machines/${m.id}`, token: ownerToken, serverId, body: { name: "x".repeat(81) } });
   check("oversize name rejected with 400", r5.status === 400);
+
+  console.log("\n[6] non-string name → 400 (no coercion)");
+  const r6 = await apiCall({ method: "PATCH", path: `/api/servers/${serverId}/machines/${m.id}`, token: ownerToken, serverId, body: { name: 12345 } });
+  console.log(`     → status=${r6.status}`);
+  check("non-string name rejected with 400", r6.status === 400);
+  const stillNamed = await db.select().from(schema.machines).where(eq(schema.machines.id, m.id));
+  check("machine name unchanged after non-string reject", stillNamed[0]?.name === "My Laptop");
 }
 
 main().then(cleanup).then(() => { console.log(`\n${failures === 0 ? "ALL PASS ✅" : `${failures} CHECK(S) FAILED ❌`}`); process.exit(failures === 0 ? 0 : 1); })
