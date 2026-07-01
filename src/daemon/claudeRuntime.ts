@@ -1,6 +1,7 @@
 // claude runtime: `claude -p stream-json` continuous session. User messages are written to stdin to drive turns;
 // stdout is parsed as stream-json events.
 import { spawn } from "node:child_process";
+import { resolveBin } from "./runtimes.js";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Runtime, StartOpts, RuntimeCallbacks, RuntimeSession, TrajectoryEntry } from "./runtime.js";
@@ -30,7 +31,7 @@ export const claudeRuntime: Runtime = {
     ];
     if (opts.sessionId) args.push("--resume", opts.sessionId);
 
-    const proc = spawn("claude", args, { cwd: opts.cwd, stdio: ["pipe", "pipe", "pipe"], env: opts.env });
+    const proc = spawn(resolveBin("claude"), args, { cwd: opts.cwd, stdio: ["pipe", "pipe", "pipe"], env: opts.env });
     let sessionId = opts.sessionId ?? null;
     const writeUser = (text: string) => {
       const m = { type: "user", message: { role: "user", content: [{ type: "text", text }] }, ...(sessionId ? { session_id: sessionId } : {}) };
