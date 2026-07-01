@@ -126,6 +126,15 @@ task.command("update").description("update task status (--message-id, or --chann
     await api("POST", "/agent-api/task/update", body);
     console.log(`Updated -> ${opts.status}`);
   });
+task.command("assign").description("hand off a task to another agent (--message-id, or --channel #ch --number N)")
+  .option("--message-id <id>").option("--channel <ch>", "#name / dm:@name (used with --number)").option("--number <n>", "task number #N")
+  .requiredOption("--to <agent>", "@agent handle").action(async (opts) => {
+    const body: Record<string, unknown> = { to: opts.to };
+    if (opts.number != null) { body.channel = opts.channel; body.number = Number(opts.number); } else body.messageId = opts.messageId;
+    const d = await api("POST", "/agent-api/task/assign", body);
+    console.log(`Assigned task #${d.number ?? "?"} -> @${d.to}`);
+    if (d.followUp) console.log(d.followUp);
+  });
 const taskCreate = async (opts: { channel: string; title: string }) => {
   const d = await api("POST", "/agent-api/task/new", { target: opts.channel, title: opts.title });
   for (const t of d.tasks ?? []) console.log(`Created task #${t.number ?? "-"} ${String(t.id).slice(0, 8)}: ${t.content}`);

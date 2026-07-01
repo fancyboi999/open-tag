@@ -618,6 +618,76 @@ export async function unclaimTask(serverId: string, messageId: string, by?: { ty
   return upd;
 }
 
+export async function assignTask(
+  serverId: string,
+  messageId: string,
+  assigneeId: string,
+  by?: { type: "user" | "agent"; id: string },
+) {
+  const target = (await db.select().from(schema.agents).where(and(
+    eq(schema.agents.id, assigneeId),
+    eq(schema.agents.serverId, serverId),
+    isNull(schema.agents.deletedAt),
+  )))[0];
+  if (!target) return null;
+
+  const cur = (await db.select().from(schema.messages).where(and(
+    eq(schema.messages.id, messageId),
+    eq(schema.messages.serverId, serverId),
+    isNotNull(schema.messages.taskStatus),
+  )))[0];
+  if (!cur) return null;
+
+  const nextStatus = cur.taskStatus === "todo" ? "in_progress" : cur.taskStatus;
+  const [upd] = await db.update(schema.messages)
+    .set({
+      taskStatus: nextStatus,
+      taskAssigneeType: "agent",
+      taskAssigneeId: assigneeId,
+      taskClaimedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(schema.messages.id, messageId),
+      eq(schema.messages.serverId, serverId),
+      isNotNull(schema.messages.taskStatus),
+    ))
+    .returning();
+  if (!upd) return null;
+
+  await emitTaskUpdated(serverId, upd);
+  const th = await getOrCreateThread(serverId, upd.id);
+  const threadCh = th.id;
+  if (!upd.threadId) {
+    await db.update(schema.messages).set({ threadId: threadCh }).where(eq(schema.messages.id, upd.id));
+    upd.threadId = threadCh;
+  }
+  await db.insert(schema.channelMembers).values({ channelId: threadCh, memberType: "agent", memberId: assigneeId }).onConflictDoNothing();
+
+  const actor = by ? await actorName(by.type, by.id) : "Someone";
+  const assigneeName = target.displayName || target.name;
+  const sysMsg = await sysTaskMsg(serverId, threadCh, `${actor} assigned #${upd.taskNumber} "${taskTitle(upd.content)}" to ${assigneeName}`, by);
+
+  const cfg = await agentConfig(assigneeId);
+  if (cfg) {
+    broadcastToDaemons(serverId, { type: "agent:start", agentId: assigneeId, config: cfg });
+    broadcastToDaemons(serverId, {
+      type: "agent:deliver",
+      agentId: assigneeId,
+      seq: sysMsg.seq,
+      from: actor,
+      target: threadCh,
+      targetName: `task #${upd.taskNumber}`,
+      msgShort: sysMsg.id.slice(0, 8),
+      isTask: true,
+      message: { content: `#${upd.taskNumber} assigned to you` },
+      mentioned: true,
+    });
+  }
+
+  return upd;
+}
+
 /** Valid task status enum; used by server to reject invalid values with 400. */
 export const TASK_STATUSES = ["todo", "in_progress", "in_review", "done", "closed"] as const;
 

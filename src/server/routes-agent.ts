@@ -1,10 +1,10 @@
 // Agent-side REST: /agent-api/*  (Bearer per-agent token sk_agent_* + x-agent-id; NOT a machine/bootstrap key — see docs/authorization.md §1)
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { and, eq, ne, gt, lt, inArray, asc, desc, ilike, like, sql, isNull } from "drizzle-orm";
+import { and, eq, ne, gt, lt, inArray, asc, desc, ilike, like, sql, isNull, isNotNull } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, agentIdHeader } from "./util.js";
 import { resolveAgent } from "./auth.js";
-import { createMessage, resolveTarget, channelMembers, addChannelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG } from "./core.js";
+import { createMessage, resolveTarget, channelMembers, addChannelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG, assignTask } from "./core.js";
 import { agentHasScope } from "./scopes.js";
 import { parseUpload } from "./attachments.js";
 import { readObject } from "./storage.js";
@@ -24,7 +24,7 @@ function requiredScope(p: string): string | null {
   if (p === "/agent-api/server/info") return "server:read";
   if (p === "/agent-api/channel/join") return "channel:join";
   if (p === "/agent-api/task/list") return "task:read";
-  if (p === "/agent-api/task/claim" || p === "/agent-api/task/update" || p === "/agent-api/task/new") return "task:write";
+  if (p === "/agent-api/task/claim" || p === "/agent-api/task/update" || p === "/agent-api/task/new" || p === "/agent-api/task/assign") return "task:write";
   if (p === "/agent-api/search") return "message:read";
   if (p === "/agent-api/attachment/upload") return "attachment:upload";
   if (p === "/agent-api/thread/reply") return "message:send";
@@ -311,6 +311,43 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     const upd = await setTaskStatus(serverId, mid, b.status, { type: "agent", id: agent.id });
     if (!upd) return (sendErr(res, 404, "task not found"), true);
     return (sendJson(res, 200, { ok: true, status: upd.taskStatus }), true);
+  }
+  if (p === "/agent-api/task/assign" && method === "POST") {
+    const b = await readJson(req);
+    const rawTo = String(b.to ?? "").trim().replace(/^@/, "");
+    if (!rawTo) return (sendErr(res, 400, "to required"), true);
+    const targetAgent = (await db.select().from(schema.agents).where(and(
+      eq(schema.agents.serverId, serverId),
+      eq(schema.agents.name, rawTo),
+      isNull(schema.agents.deletedAt),
+    )))[0];
+    if (!targetAgent) return (sendErr(res, 404, "target agent not found"), true);
+
+    let mid: string | null = null;
+    if (b.number != null && b.channel) {
+      const tgt = await resolveTarget(serverId, String(b.channel), agent.id);
+      if (tgt) mid = (await db.select({ id: schema.messages.id }).from(schema.messages).where(and(
+        eq(schema.messages.channelId, tgt.channelId),
+        eq(schema.messages.taskNumber, Number(b.number)),
+        isNotNull(schema.messages.taskStatus),
+      )))[0]?.id ?? null;
+    } else {
+      mid = await resolveMessageId(serverId, b.messageId, agent.id);
+    }
+    if (!mid) return (sendErr(res, 404, "task not found"), true);
+
+    const assigned = await assignTask(serverId, mid, targetAgent.id, { type: "agent", id: agent.id });
+    if (!assigned) return (sendErr(res, 404, "task not found"), true);
+    const tch = (await db.select().from(schema.channels).where(eq(schema.channels.id, assigned.channelId)))[0];
+    const threadTarget = tch ? `${await addressableTarget(tch, agent.id)}:${assigned.id.slice(0, 8)}` : null;
+    return (sendJson(res, 200, {
+      ok: true,
+      assigned: assigned.id,
+      number: assigned.taskNumber ?? null,
+      to: targetAgent.name,
+      threadTarget,
+      followUp: threadTarget ? `Follow up in the task's thread: open-tag message send --target "${threadTarget}"` : null,
+    }), true);
   }
   // Create new task (agent delegates work to a channel/other agent): reuses createMessage(asTask). Batch {tasks:[{title}]} or single --title
   if (p === "/agent-api/task/new" && method === "POST") {
