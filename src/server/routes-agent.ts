@@ -286,10 +286,11 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     await ensureTaskForAgent(mid); // claiming a plain message converts it to a task first (so it gets a number), then claims
     const r = await claimTask(serverId, mid, "agent", agent.id); // Atomic claim: returns null if already taken
     if (!r) return (sendErr(res, 409, "already claimed", { code: "CLAIM_FAILED" }), true);
-    // Guide agent to follow up in the task's thread (report in task thread, not the main channel)
+    // Guide agent to follow up in the task's thread (report in task thread, not the main channel).
+    // Use a stable thread:<parentShortId> target so it round-trips across public/private/DM contexts
+    // without depending on the caller's view of the parent channel name or DM peer.
     const tm = (await db.select().from(schema.messages).where(eq(schema.messages.id, mid)))[0];
-    const tch = tm ? (await db.select().from(schema.channels).where(eq(schema.channels.id, tm.channelId)))[0] : null;
-    const threadTarget = tch ? `${await addressableTarget(tch, agent.id)}:${mid.slice(0, 8)}` : null;
+    const threadTarget = tm ? `thread:${mid.slice(0, 8)}` : null;
     return (sendJson(res, 200, { ok: true, claimed: mid, number: tm?.taskNumber ?? null, threadTarget,
       followUp: threadTarget ? `Follow up in the task's thread: open-tag message send --target "${threadTarget}"` : null }), true);
   }
@@ -338,8 +339,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
 
     const assigned = await assignTask(serverId, mid, targetAgent.id, { type: "agent", id: agent.id });
     if (!assigned) return (sendErr(res, 404, "task not found"), true);
-    const tch = (await db.select().from(schema.channels).where(eq(schema.channels.id, assigned.channelId)))[0];
-    const threadTarget = tch ? `${await addressableTarget(tch, agent.id)}:${assigned.id.slice(0, 8)}` : null;
+    const threadTarget = `thread:${assigned.id.slice(0, 8)}`;
     return (sendJson(res, 200, {
       ok: true,
       assigned: assigned.id,

@@ -18,6 +18,9 @@ let ownerId = "";
 let serverId = "";
 let channelId = "";
 let channelName = "";
+let privateChannelId = "";
+let privateChannelName = "";
+let dmChannelId = "";
 let assignerId = "";
 let assigneeId = "";
 let assignerToken = "";
@@ -71,6 +74,9 @@ async function setup() {
   const ch = (await db.select().from(schema.channels).where(and(eq(schema.channels.serverId, serverId), eq(schema.channels.name, "all"))))[0]!;
   channelId = ch.id;
   channelName = ch.name;
+  const [priv] = await db.insert(schema.channels).values({ serverId, name: `priv_${ts}`, type: "private" }).returning();
+  privateChannelId = priv!.id;
+  privateChannelName = priv!.name;
 
   const [assigner] = await db.insert(schema.agents).values({
     serverId,
@@ -97,6 +103,14 @@ async function setup() {
   await db.insert(schema.channelMembers).values([
     { channelId, memberType: "agent", memberId: assignerId },
     { channelId, memberType: "agent", memberId: assigneeId },
+    { channelId: privateChannelId, memberType: "agent", memberId: assignerId },
+  ]).onConflictDoNothing();
+
+  const [dm] = await db.insert(schema.channels).values({ serverId, name: `dm:${[ownerId, assignerId].sort().join(":")}`, type: "dm" }).returning();
+  dmChannelId = dm!.id;
+  await db.insert(schema.channelMembers).values([
+    { channelId: dmChannelId, memberType: "user", memberId: ownerId },
+    { channelId: dmChannelId, memberType: "agent", memberId: assignerId },
   ]).onConflictDoNothing();
 
   const cfg = await agentConfig(assignerId);
@@ -134,6 +148,38 @@ async function main() {
   const task2 = await convertMessageToTask(serverId, msg2.id, { type: "user", id: ownerId });
   const byNumber = await call("/agent-api/task/assign", assignerToken, assignerId, { channel: `#${channelName}`, number: task2!.taskNumber, to: `assignee_${ts}` });
   check("assign by channel + task number returns 200", byNumber.status === 200);
+
+  console.log("\n[3] returned threadTarget is readable by assignee in private threads");
+  const privMsg = await createMessage({ serverId, channelId: privateChannelId, senderType: "user", senderId: ownerId, senderName: `owner_assign_${ts}`, content: "private handoff" });
+  const privTask = await convertMessageToTask(serverId, privMsg.id, { type: "user", id: ownerId });
+  const privAssign = await call("/agent-api/task/assign", assignerToken, assignerId, { messageId: privTask!.id, to: `assignee_${ts}` });
+  check("private assign returns 200", privAssign.status === 200);
+  const assigneeCfg = await agentConfig(assigneeId);
+  if (!assigneeCfg?.agentToken) throw new Error("assignee token was not minted");
+  const privReadReq = Object.assign(Readable.from([] as Buffer[]), {
+    method: "GET",
+    url: `/agent-api/message/read?channel=${encodeURIComponent(String((privAssign.body as any).threadTarget))}`,
+    headers: { authorization: `Bearer ${assigneeCfg.agentToken}`, "x-agent-id": assigneeId },
+  }) as unknown as IncomingMessage;
+  const privReadRes = mkRes();
+  await handleAgentApi(privReadReq, privReadRes.res, new URL(`http://localhost/agent-api/message/read?channel=${encodeURIComponent(String((privAssign.body as any).threadTarget))}`), "GET");
+  await privReadRes.done();
+  check("assignee can read thread via returned private threadTarget", privReadRes.status() === 200);
+
+  console.log("\n[4] returned threadTarget is readable by assignee in DM threads");
+  const dmMsg = await createMessage({ serverId, channelId: dmChannelId, senderType: "user", senderId: ownerId, senderName: `owner_assign_${ts}`, content: "dm handoff" });
+  const dmTask = await convertMessageToTask(serverId, dmMsg.id, { type: "user", id: ownerId });
+  const dmAssign = await call("/agent-api/task/assign", assignerToken, assignerId, { messageId: dmTask!.id, to: `assignee_${ts}` });
+  check("dm assign returns 200", dmAssign.status === 200);
+  const dmReadReq = Object.assign(Readable.from([] as Buffer[]), {
+    method: "GET",
+    url: `/agent-api/message/read?channel=${encodeURIComponent(String((dmAssign.body as any).threadTarget))}`,
+    headers: { authorization: `Bearer ${assigneeCfg.agentToken}`, "x-agent-id": assigneeId },
+  }) as unknown as IncomingMessage;
+  const dmReadRes = mkRes();
+  await handleAgentApi(dmReadReq, dmReadRes.res, new URL(`http://localhost/agent-api/message/read?channel=${encodeURIComponent(String((dmAssign.body as any).threadTarget))}`), "GET");
+  await dmReadRes.done();
+  check("assignee can read thread via returned dm threadTarget", dmReadRes.status() === 200);
 }
 
 main()

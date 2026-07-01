@@ -446,6 +446,27 @@ export async function canAgentReadChannel(serverId: string, channelId: string, a
 
 export async function resolveTarget(serverId: string, target: string, selfAgentId: string): Promise<{ channelId: string; threadId: string | null } | null> {
   let t = target.trim();
+  if (t.startsWith("thread:")) {
+    const short = t.slice("thread:".length).trim();
+    if (!/^[0-9a-f]{6,}$/i.test(short)) return null;
+    const parent = (await db.select().from(schema.messages).where(and(
+      eq(schema.messages.serverId, serverId),
+      like(sql`${schema.messages.id}::text`, short.toLowerCase() + "%"),
+    )))[0];
+    if (!parent || parent.senderType === "system") return null;
+    const existing = (await db.select().from(schema.channels).where(and(
+      eq(schema.channels.serverId, serverId),
+      eq(schema.channels.type, "thread"),
+      eq(schema.channels.parentMessageId, parent.id),
+    )))[0];
+    if (existing) {
+      if (!(await canAgentReadChannel(serverId, existing.id, selfAgentId))) return null;
+      return { channelId: existing.id, threadId: null };
+    }
+    if (!(await canAgentReadChannel(serverId, parent.channelId, selfAgentId))) return null;
+    const th = await getOrCreateThread(serverId, parent.id, { type: "agent", id: selfAgentId });
+    return { channelId: th.id, threadId: null };
+  }
   let threadShort: string | null = null;
   const colon = t.lastIndexOf(":");
   if (colon > 0 && !t.slice(colon + 1).includes("@") && /^[0-9a-f]{6,}$/i.test(t.slice(colon + 1))) {
@@ -468,17 +489,29 @@ export async function resolveTarget(serverId: string, target: string, selfAgentI
     baseChannelId = ch?.id ?? null;
   }
   if (!baseChannelId) return null;
-  // Agent ACL: the agent may only resolve a channel it can access (public, a DM it just (g)ot, or a private it
-  // was added to). Blocks resolving a private channel by name the agent was never invited to. A DM is created
-  // above with the agent as a participant, so it always passes here.
-  if (!(await canAgentReadChannel(serverId, baseChannelId, selfAgentId))) return null;
   // 2) No thread suffix → base channel; has suffix → find parent message (short id prefix) → thread channel of that parent message
-  if (!threadShort) return { channelId: baseChannelId, threadId: null };
+  if (!threadShort) {
+    // Agent ACL: the agent may only resolve a base channel it can access (public, a DM it just got, or a private
+    // it was added to). This gate intentionally happens only for non-thread targets; existing thread membership
+    // is enough for the thread case below.
+    if (!(await canAgentReadChannel(serverId, baseChannelId, selfAgentId))) return null;
+    return { channelId: baseChannelId, threadId: null };
+  }
   const parent = (await db.select().from(schema.messages).where(and(eq(schema.messages.serverId, serverId), eq(schema.messages.channelId, baseChannelId), like(sql`${schema.messages.id}::text`, threadShort.toLowerCase() + "%"))))[0];
   // System messages ("X created task / claimed / moved …") are not real conversation anchors and have no
   // "open thread" affordance in the UI — threading onto one buries the reply where no one can reach it.
   // Reject so the caller surfaces a clear error instead of silently creating an unreachable thread.
   if (!parent || parent.senderType === "system") return null;
+  const existing = (await db.select().from(schema.channels).where(and(
+    eq(schema.channels.serverId, serverId),
+    eq(schema.channels.type, "thread"),
+    eq(schema.channels.parentMessageId, parent.id),
+  )))[0];
+  if (existing) {
+    if (!(await canAgentReadChannel(serverId, existing.id, selfAgentId))) return null;
+    return { channelId: existing.id, threadId: null };
+  }
+  if (!(await canAgentReadChannel(serverId, baseChannelId, selfAgentId))) return null;
   const th = await getOrCreateThread(serverId, parent.id, { type: "agent", id: selfAgentId });
   return { channelId: th.id, threadId: null };
 }

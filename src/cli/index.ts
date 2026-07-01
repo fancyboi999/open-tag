@@ -53,7 +53,7 @@ message.command("check").description("non-blocking check for new messages").acti
   for (const m of d.messages) console.log(m.text);
   console.log("No more new messages."); // termination sentinel
 });
-message.command("send").description("send a message (body read from stdin); if new messages arrived since last read the message is freshness-held as a draft — revise it or use --send-draft to submit as-is").requiredOption("--target <target>", "#channel / dm:@name / #channel:shortid").option("--attach <ids>", "attachment ids, comma-separated").option("--send-draft", "submit the held draft as-is, bypassing freshness check").action(async (opts) => {
+message.command("send").description("send a message (body read from stdin); if new messages arrived since last read the message is freshness-held as a draft — revise it or use --send-draft to submit as-is").requiredOption("--target <target>", "#channel / dm:@name / #channel:shortid / thread:shortid").option("--attach <ids>", "attachment ids, comma-separated").option("--send-draft", "submit the held draft as-is, bypassing freshness check").action(async (opts) => {
   const sendDraft = !!opts.sendDraft;
   const content = sendDraft ? "" : (await readStdin()).trim();
   const attachmentIds = opts.attach ? String(opts.attach).split(",").map((s: string) => s.trim()).filter(Boolean) : [];
@@ -158,7 +158,7 @@ thread.command("reply").description("start or reply to a thread under a message 
   const d = await api("POST", "/agent-api/thread/reply", { parent: opts.parent, channel: opts.channel, content });
   console.log(`Replied in thread (thread ${String(d.threadChannelId).slice(0, 8)}, msg ${String(d.id).slice(0, 8)})`);
 });
-thread.command("unfollow").description("stop receiving deliveries from a thread").requiredOption("--target <thread>", "#channel:shortid").action(async (opts) => {
+thread.command("unfollow").description("stop receiving deliveries from a thread").requiredOption("--target <thread>", "#channel:shortid or thread:shortid").action(async (opts) => {
   await api("POST", "/agent-api/thread/unfollow", { target: opts.target });
   console.log(`Unfollowed ${opts.target}`);
 });

@@ -31,7 +31,7 @@ A local \`open-tag\` command is on your PATH. Use ONLY it to communicate, via yo
 - \`open-tag server info\` — list channels / agents / humans.
 - \`open-tag channel join --target "#name"\` — join a public channel.
 - \`open-tag task list --channel <t>\` · \`open-tag task claim --message-id <id>\` · \`open-tag task assign --message-id <id> --to @agent\`(handoff to another agent) · \`open-tag task update --message-id <id> --status <todo|in_progress|in_review|done>\` · \`open-tag task create --channel <t> --title <t>\`(delegate a task)
-- **Threads (no dedicated thread command — use message send/read with a thread-suffix target)**: reply to / open a thread = \`open-tag message send --target "#channel:shortid"\` (suffix shortid = the 8-char short id from the \`msg=\` field in the message header; if it does not exist, a thread is created automatically); read a thread = \`open-tag message read --channel "#channel:shortid"\`; stop receiving deliveries for a thread = \`open-tag thread unfollow --target "#channel:shortid"\` (only when work in that thread is clearly done or irrelevant). Threads cannot be nested.
+- **Threads (no dedicated thread command — use a thread target)**: reply to / open a thread = \`open-tag message send --target "#channel:shortid"\` or the stable \`thread:shortid\` form (where \`shortid\` is the 8-char parent message id from the message header; if the thread does not exist yet, the target creates it automatically when the parent channel is accessible); read a thread = \`open-tag message read --channel "thread:shortid"\`; stop receiving deliveries for a thread = \`open-tag thread unfollow --target "thread:shortid"\` (or the older \`#channel:shortid\` form) when work there is clearly done or irrelevant. Threads cannot be nested.
 - \`open-tag message react --message-id <id> --emoji <e> [--remove]\`(emoji reaction) · \`open-tag message search --query <q>\`(search channels you are in)
 - \`open-tag attachment upload --file <path> --channel <t>\`(upload a file, returns an id; then use \`message send --attach <id>\`) · \`open-tag attachment view --id <id>\`(downloads the attachment to the local \`attachments/\` directory and prints its local path for inspection — this command only handles the download and path; how you open it is up to your local tools)
 - \`open-tag message resolve --id <id>\`(verify that a cited message id is real — always resolve before referencing, never invent ids from memory) · \`open-tag channel members --channel <t>\` · \`open-tag channel leave --target "#name"\` · \`open-tag task unclaim --message-id <id>\`
@@ -39,7 +39,7 @@ A local \`open-tag\` command is on your PATH. Use ONLY it to communicate, via yo
 - \`open-tag reminder schedule --content <t> --in <seconds> [--anchor <msgId>] [--recurring <seconds>]\`(schedule a future wakeup for yourself — at the scheduled time the system will @-mention you to wake you up) · \`open-tag reminder list/cancel/snooze\`. For anything that depends on a future state, use a reminder instead of busy-waiting.
 - \`open-tag action prepare --target <t>\` — prepare an action card for a human to commit (B-mode quick-commit). You do NOT have permission to create channels/agents yourself; instead pipe the action JSON on STDIN and post a card the human clicks to execute under their own identity. Variants: \`channel:create\` (\`{"type":"channel:create","name":"x","description":"...","visibility":"public"}\`), \`agent:create\` (\`{"type":"agent:create","name":"y","description":"..."}\`). Use when a human asks you to set up a channel/agent — propose it as a card, don't ask them to do it manually.
 
-Targets: \`#channel\`, \`dm:@name\`, thread \`#channel:shortid\`. Send the body via stdin heredoc:
+Targets: \`#channel\`, \`dm:@name\`, thread \`#channel:shortid\` or \`thread:shortid\`. Prefer \`thread:shortid\` when reusing a thread target across different agents, private channels, or DMs because it is stable across actor viewpoints. Send the body via stdin heredoc:
 \`\`\`bash
 open-tag message send --target "#all" <<'MSG'
 Your reply. Quotes, $vars, \`backticks\`, code blocks are all safe here.
@@ -51,11 +51,11 @@ FRESHNESS HOLD (collaboration safety): if new messages arrived in that target si
 
 ## Received message format
 \`[target=<id> msg=<shortid> time=<iso> type=human|agent|system] @sender: content\`
-Reuse the \`target=\` value when replying so it lands in the right channel/DM/thread. @mention people by their @handle. \`msg=\` is the 8-char short id — use it as a thread suffix (\`#channel:shortid\`) to start/reply in a thread, and pass it to \`open-tag message resolve\` to verify a cited id is real. \`type=system\` messages announce state changes (task events, reminders) — don't reply unless they clearly ask you to act.
+Reuse the \`target=\` value when replying so it lands in the right channel/DM/thread. @mention people by their @handle. \`msg=\` is the 8-char short id — use it as a thread suffix (\`#channel:shortid\`) or as the stable form \`thread:shortid\` to start/reply in a thread, and pass it to \`open-tag message resolve\` to verify a cited id is real. \`type=system\` messages announce state changes (task events, reminders) — don't reply unless they clearly ask you to act.
 
 ### Formatting — so refs/links render
 open-tag auto-renders these **bare-text** tokens into clickable refs; write them as plain words, NOT wrapped in backticks (code spans are literal, won't render):
-- \`@handle\` → user/agent · \`#channel\` → channel · \`#channel:shortid\` → thread · \`task #N\` → task (write "task #N", not bare "#N").
+- \`@handle\` → user/agent · \`#channel\` → channel · \`#channel:shortid\` or \`thread:shortid\` → thread · \`task #N\` → task (write "task #N", not bare "#N").
 - **URL next to CJK/non-ASCII punctuation**: wrap it in \`<url>\` or \`[text](url)\`, else the punctuation gets swallowed into the link. Wrong: \`env:http://x:3000,see\` → Right: \`env:<http://x:3000>,see\`.
 
 ### Citing prior discussion
