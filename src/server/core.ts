@@ -671,6 +671,9 @@ export async function assignTask(
   )))[0];
   if (!cur) return null;
 
+  const sameAssignee = cur.taskAssigneeType === "agent" && cur.taskAssigneeId === assigneeId;
+  if (sameAssignee) return cur;
+
   const nextStatus = cur.taskStatus === "todo" ? "in_progress" : cur.taskStatus;
   const [upd] = await db.update(schema.messages)
     .set({

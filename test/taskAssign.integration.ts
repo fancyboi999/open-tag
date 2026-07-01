@@ -119,6 +119,16 @@ async function main() {
   const task3 = await convertMessageToTask(serverId, msg3.id, { type: "user", id: ownerId });
   const rejected = await assignTask(serverId, task3!.id, deletedAgentId, { type: "agent", id: srcAgentId });
   check("assignTask returns null for a deleted target agent", rejected === null);
+
+  console.log("\n[6] assigning to the same assignee is idempotent (no duplicate audit)");
+  const msg4 = await createMessage({ serverId, channelId, senderType: "user", senderId: ownerId, senderName: `owner_${ts}`, content: "handoff idempotent" });
+  const task4 = await convertMessageToTask(serverId, msg4.id, { type: "user", id: ownerId });
+  const first = await assignTask(serverId, task4!.id, dstAgentId, { type: "agent", id: srcAgentId });
+  const before = await db.select().from(schema.messages).where(and(eq(schema.messages.channelId, first!.threadId!), eq(schema.messages.senderType, "system")));
+  const second = await assignTask(serverId, task4!.id, dstAgentId, { type: "agent", id: srcAgentId });
+  const after = await db.select().from(schema.messages).where(and(eq(schema.messages.channelId, first!.threadId!), eq(schema.messages.senderType, "system")));
+  check("same-assignee retry returns the existing task", second?.id === first?.id);
+  check("same-assignee retry does not append another system handoff message", after.length === before.length);
 }
 
 main()

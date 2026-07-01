@@ -49,11 +49,10 @@ async function agentChannels(agentId: string) {
 export async function addressableTarget(ch: typeof schema.channels.$inferSelect, selfAgentId: string): Promise<string> {
   // Thread channel: render as #parentChannel:shortid (or dm:@peer:shortid) so the agent can reuse it with message send --target
   if (ch.type === "thread" && ch.parentMessageId) {
-    const parent = (await db.select().from(schema.messages).where(eq(schema.messages.id, ch.parentMessageId)))[0];
-    if (parent) {
-      const pch = (await db.select().from(schema.channels).where(eq(schema.channels.id, parent.channelId)))[0];
-      if (pch) return `${await addressableTarget(pch, selfAgentId)}:${parent.id.slice(0, 8)}`;
-    }
+    // Stable across public/private/DM and across different agent viewpoints: a new assignee may only be
+    // a member of the thread itself, not of the parent DM/private channel, so caller-relative parent targets
+    // like dm:@peer:shortid do not round-trip reliably after handoff. Use thread:<parentShortId> instead.
+    return `thread:${ch.parentMessageId.slice(0, 8)}`;
   }
   if (ch.type === "dm") {
     const members = await db.select().from(schema.channelMembers).where(eq(schema.channelMembers.channelId, ch.id));

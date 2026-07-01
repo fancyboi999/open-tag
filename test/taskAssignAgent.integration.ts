@@ -180,6 +180,19 @@ async function main() {
   await handleAgentApi(dmReadReq, dmReadRes.res, new URL(`http://localhost/agent-api/message/read?channel=${encodeURIComponent(String((dmAssign.body as any).threadTarget))}`), "GET");
   await dmReadRes.done();
   check("assignee can read thread via returned dm threadTarget", dmReadRes.status() === 200);
+
+  console.log("\n[5] assignee message-check surfaces stable thread target for DM handoff");
+  const dmCheckReq = Object.assign(Readable.from([] as Buffer[]), {
+    method: "GET",
+    url: "/agent-api/message/check",
+    headers: { authorization: `Bearer ${assigneeCfg.agentToken}`, "x-agent-id": assigneeId },
+  }) as unknown as IncomingMessage;
+  const dmCheckRes = mkRes();
+  await handleAgentApi(dmCheckReq, dmCheckRes.res, new URL("http://localhost/agent-api/message/check"), "GET");
+  await dmCheckRes.done();
+  const dmCheckBody = dmCheckRes.body();
+  const texts = Array.isArray((dmCheckBody as any).messages) ? (dmCheckBody as any).messages.map((m: any) => String(m.text || "")) : [];
+  check("message check exposes thread:shortid instead of actor-relative dm target", texts.some((txt: string) => txt.includes(`[target=thread:${dmTask!.id.slice(0, 8)}`)));
 }
 
 main()
