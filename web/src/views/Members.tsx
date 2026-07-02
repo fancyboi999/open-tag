@@ -388,8 +388,8 @@ function WorkspaceTab({ id }: { id: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set()); // tracks expanded directories (collapsed by default, toggled via onToggleDir)
   const [copied, setCopied] = useState(false);
   const [showHidden, setShowHidden] = useState(false); // dot-prefixed files hidden by default (like ls; toggle for ls -a behavior)
-  const root = `~/.open-tag/agents/${id}/`; // workspace root path template, matches daemon DATA_DIR
-  useEffect(() => { setSel(null); setExpanded(new Set()); (async () => { const d = await api("GET", `/api/agents/${id}/workspace-files`); if (d.error) { setErr(d.error); setFiles([]); } else { setErr(""); setFiles(d.files || []); } })(); }, [id]);
+  const [root, setRoot] = useState(`~/.open-tag/agents/${id}/`); // shown in root bar + copied by copy button; fallback (old daemon/offline) replaced by the real on-disk path from the API
+  useEffect(() => { setSel(null); setExpanded(new Set()); setRoot(`~/.open-tag/agents/${id}/`); (async () => { const d = await api("GET", `/api/agents/${id}/workspace-files`); if (d.error) { setErr(d.error); setFiles([]); } else { setErr(""); setFiles(d.files || []); if (d.root) setRoot(d.root.endsWith("/") ? d.root : d.root + "/"); } })(); }, [id]);
   const open = async (f: any) => { setMode("preview"); const d = await api("GET", `/api/agents/${id}/workspace-files/read?path=${encodeURIComponent(f.path)}`); setSel({ path: f.path, content: d.content, error: d.error }); };
   const toggleDir = (path: string) => setExpanded((s) => { const n = new Set(s); n.has(path) ? n.delete(path) : n.add(path); return n; });
   const copyRoot = () => navigator.clipboard?.writeText(root).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });

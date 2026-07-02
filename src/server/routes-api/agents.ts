@@ -95,7 +95,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     if (!a) return (sendErr(res, 404, "agent not found"), true);
     if (awsList) {
       const r = await requestDaemon(serverId, { type: "agent:workspace:list", agentId: agId });
-      return (sendJson(res, 200, r.error ? { error: r.error } : { files: r.files ?? [] }), true);
+      return (sendJson(res, 200, r.error ? { error: r.error } : { files: r.files ?? [], root: r.root }), true);
     }
     const r = await requestDaemon(serverId, { type: "agent:workspace:read", agentId: agId, path: url.searchParams.get("path") ?? "" });
     return (sendJson(res, 200, r.error ? { error: r.error } : { path: r.path, content: r.content }), true);

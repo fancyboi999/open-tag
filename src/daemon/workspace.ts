@@ -1,5 +1,5 @@
 // Reads agent workspace (~/.open-tag/agents/<id>/) and exposes file tree / file content via WS-RPC to the server.
-// File tree: returns a flat list of the entire tree {files:[{name,path,isDirectory,size,modifiedAt}]};
+// File tree: returns {root, files:[{name,path,isDirectory,size,modifiedAt}]} — root is the absolute on-disk workspace dir (so the UI shows the real path instead of a hardcoded template that's wrong under a non-default OPEN_TAG_HOME);
 //            read file: returns {path, content}. Security: path must remain inside the workspace root (prevents ../ escape).
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
@@ -36,8 +36,8 @@ async function walk(root: string, rel: string, acc: FileNode[], depth: number): 
 export async function listWorkspace(agentId: string, _subPath = "") {
   // _subPath: passed by callers for protocol alignment with readWorkspaceFile; current implementation always returns the full tree.
   const root = path.join(DATA_DIR, agentId);
-  try { const files: FileNode[] = []; await walk(root, "", files, 0); return { files }; }
-  catch (e: any) { return { error: String(e?.message ?? e) }; }
+  try { const files: FileNode[] = []; await walk(root, "", files, 0); return { files, root }; }
+  catch (e: any) { return { error: String(e?.message ?? e), root }; }
 }
 
 // Extract a frontmatter field: supports inline (description: foo) and YAML block scalars (description: > / | followed by indented lines).
