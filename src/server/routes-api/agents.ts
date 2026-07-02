@@ -32,7 +32,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     // names are excluded by the index predicate, so a deleted agent's name can be reused.
     const [agent] = await db.insert(schema.agents).values({
       serverId, name: b.name, displayName: b.displayName || b.name, description: b.description ?? null,
-      model: b.model || "sonnet", runtime: b.runtime || "claude", machineId: b.machineId ?? null,
+      model: b.model || null, runtime: b.runtime || "claude", machineId: b.machineId ?? null,
       runtimeConfig: { provider: b.provider ?? "default", model: b.model ?? null, reasoningEffort: b.reasoning ?? null, mode: b.fastMode ? "fast" : "default" },
       envVars: b.envVars ?? {}, executionMode: b.fastMode ? "fast" : "auto", creatorType: "user", creatorId: userId,
     }).onConflictDoNothing({ target: [schema.agents.serverId, schema.agents.name], where: isNull(schema.agents.deletedAt) }).returning();

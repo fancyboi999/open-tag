@@ -68,7 +68,7 @@ export const agents = pgTable("agents", {
   status: text("status").default("inactive").notNull(),   // inactive | active | sleeping
   activity: text("activity").default("offline").notNull(),// offline|online|thinking|working
   sessionId: text("session_id"),                  // current runtime session (used with --resume)
-  model: text("model").default("sonnet").notNull(),
+  model: text("model"),                            // model alias or NULL → CLI uses its local default (~/.claude / ~/.codex)
   runtime: text("runtime").default("claude").notNull(),   // claude | codex | kimi
   runtimeConfig: jsonb("runtime_config").$type<Record<string, unknown>>().default({}).notNull(),
   executionMode: text("execution_mode").default("auto").notNull(),

@@ -134,6 +134,7 @@
     "descriptionPlaceholder": "Describe this agent's role…",
     "reasoningLabel": "Reasoning (effort level)",
     "reasoningDefault": "Default (model default)",
+    "useLocalDefault": "Use local default (recommended)",
     "fastMode": "Fast mode (faster / lighter)",
     "creating": "Creating…",
     "create": "Create",

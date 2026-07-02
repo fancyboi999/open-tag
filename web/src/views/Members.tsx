@@ -120,7 +120,7 @@ function Roster({ agents, humans, onCreate, canCreate }: { agents: any[]; humans
                 <div className="card card-link" key={a.id} role="button" tabIndex={0} onClick={() => nav(to)} onKeyDown={(e) => goKey(e, to)}>
                   <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={24} />{a.displayName || a.name} <small className="meta">@{a.name}</small></h3>
                   <div className="meta">{a.description || t("members.generalAgent")}</div>
-                  <div className="kv"><b>{t("common.runtime")}</b> {a.runtime} · {a.model || ""}</div>
+                  <div className="kv"><b>{t("common.runtime")}</b> {a.runtime} · {a.model || t("members.useLocalDefault")}</div>
                   <div className="kv"><b>{t("common.status")}</b> {statusOf(a)}</div>
                 </div>
               );
@@ -230,7 +230,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
               ) : (<>
                 <div className="meta">{a.description || t("members.generalAgent")}</div>
                 <div className="kv"><b>{t("common.runtime")}</b> {a.runtime}</div>
-                <div className="kv"><b>{t("common.model")}</b> {a.model || ""}</div>
+                <div className="kv"><b>{t("common.model")}</b> {a.model || t("members.useLocalDefault")}</div>
                 {a.runtimeConfig?.reasoningEffort && <div className="kv"><b>{t("common.reasoning")}</b> {a.runtimeConfig.reasoningEffort}</div>}
                 <div className="kv"><b>{t("common.status")}</b> <span className="kv-v"><span className={"dot " + live} /> {live}</span></div>
                 <div className="kv"><b>{t("common.session")}</b> {a.sessionId || "(none)"}</div>
@@ -443,6 +443,10 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
   const [modelsLoading, setModelsLoading] = useState(false);
   const [reasoning, setReasoning] = useState(""); // reasoning effort (""=Default/no override); shown when selected model has thinking levels
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
+  // Sentinel + per-runtime capability: claude/codex offer "use local default" (don't pass --model/--effort;
+  // the CLI uses ~/.claude / ~/.codex config). Other runtimes keep their original picker behavior.
+  const LOCAL_DEFAULT = "__default__";
+  const supportsLocalDefault = runtime === "claude" || runtime === "codex";
   useEffect(() => {
     let cancelled = false;
     setModelsLoading(true);
@@ -453,7 +457,11 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
         const ms: typeof models = d.models || [];
         setModels(ms);
         // Preserve the current selection if it still exists in the new list; otherwise fall back to the first option.
-        setModel((prev) => { const kept = ms.find((m) => m.id === prev); return kept ? prev : (ms[0]?.id || ""); });
+        setModel((prev) => {
+          if (supportsLocalDefault && prev === LOCAL_DEFAULT) return prev;
+          const kept = ms.find((m) => m.id === prev);
+          return kept ? prev : (supportsLocalDefault ? LOCAL_DEFAULT : (ms[0]?.id || ""));
+        });
         setReasoning((prev) => { const kept = ms.find((m) => m.id === model); return kept ? prev : (ms[0]?.thinking?.default ?? ""); });
       } catch { if (!cancelled) setModels([]); }
       finally { if (!cancelled) setModelsLoading(false); }
@@ -465,14 +473,19 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
     if (!nm) { setErr(t("members.nameRequired")); return; }
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(nm) || nm.length > 64) { setErr(t("members.nameInvalid")); return; } // @mention handle must be machine-safe; keep regex + length 64 in sync with core.ts AGENT_NAME_RE / MAX_AGENT_NAME
     setBusy(true); setErr("");
-    try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model || null, reasoning: thinkingLevels.length ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) { if (r.started === false) toast.info(t("members.agentCreatedOffline")); onCreated?.({ id: r.id, name: r.name ?? nm }); } onClose(); }
+    try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model && model !== LOCAL_DEFAULT ? model : null, reasoning: thinkingLevels.length ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) { if (r.started === false) toast.info(t("members.agentCreatedOffline")); onCreated?.({ id: r.id, name: r.name ?? nm }); } onClose(); }
     catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
   const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "opencode", label: "OpenCode" }, { value: "kimi", label: "Kimi Code" }, { value: "pi", label: "Pi" }, { value: "cursor", label: "Cursor" }];
   const machineOpts = machines.length ? machines.map((m) => ({ value: m.id, label: m.name || m.hostname || m.id, hint: m.status === "online" ? t("members.machineOnline") : t("members.machineOffline") })) : [];
   const selModel = models.find((m) => m.id === model);
   const thinkingLevels = selModel?.thinking?.levels ?? [];
-  const modelOpts = (models.length ? models : [{ id: "default", label: "Default" }]).map((m) => ({ value: m.id, label: m.label || m.id }));
+  const modelOpts = [
+    ...(supportsLocalDefault ? [{ value: LOCAL_DEFAULT, label: t("members.useLocalDefault") }] : []),
+    ...(models.length
+      ? models.map((m) => ({ value: m.id, label: m.label || m.id }))
+      : supportsLocalDefault ? [] : [{ value: "default", label: "Default" }]),
+  ];
   const modelLoadingOpts = [{ value: "", label: "Detecting models…" }];
   return (
     <div className="modal-bg" onClick={onClose}>

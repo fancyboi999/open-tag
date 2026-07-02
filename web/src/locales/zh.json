@@ -134,6 +134,7 @@
     "descriptionPlaceholder": "描述这个 agent 的角色…",
     "reasoningLabel": "Reasoning(推理力度)",
     "reasoningDefault": "Default(用模型默认)",
+    "useLocalDefault": "使用本地默认（推荐）",
     "fastMode": "Fast mode(更快 / 精简)",
     "creating": "创建中…",
     "create": "创建",
