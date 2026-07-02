@@ -7,9 +7,12 @@ HOME_DIR=$(grep -E "^OPEN_TAG_HOME=" .env | head -1 | cut -d= -f2- | sed "s|^\$H
 RUN="${HOME_DIR:-$HOME/.open-tag}"
 for svc in server daemon; do
   f="$RUN/dev-e2e-$svc.pid"
+  # Kill the whole process tree, not just the recorded npm-exec parent: `kill $pid` alone orphans the
+  # tsx → node children (they keep running, holding the WS open → ghost daemons that cause double-delivery).
+  pkill -f "$PWD/src/$svc/index.ts" 2>/dev/null || true
   if [ -f "$f" ]; then
     pid=$(cat "$f")
-    if kill "$pid" 2>/dev/null; then echo "  stopped $svc ($pid)"; else echo "  $svc not running"; fi
+    kill "$pid" 2>/dev/null && echo "  stopped $svc ($pid)" || echo "  $svc not running"
     rm -f "$f"
   fi
 done

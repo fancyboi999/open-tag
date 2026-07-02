@@ -10,7 +10,17 @@ const machineConns = new Map<string, WebSocket>(); // machineId → ws, so a req
 
 export function registerDaemon(ws: WebSocket, serverId: string): void { daemons.set(ws, serverId); }
 export function unregisterDaemon(ws: WebSocket): void { daemons.delete(ws); }
-export function registerMachineConn(machineId: string, ws: WebSocket): void { machineConns.set(machineId, ws); }
+export function registerMachineConn(machineId: string, ws: WebSocket): void {
+  const prev = machineConns.get(machineId);
+  if (prev && prev !== ws) {
+    // Same machine, new connection (reconnect / orphan / accidental 2nd daemon): evict the previous ws
+    // from the broadcast map and close it. Without this, broadcastToDaemons delivers agent:start / agent:deliver
+    // to BOTH ws → each daemon spawns its own agent instance → double replies + double token spend.
+    daemons.delete(prev);
+    try { if (prev.readyState === 1) prev.close(); } catch { /* */ }
+  }
+  machineConns.set(machineId, ws);
+}
 export function unregisterMachineConn(ws: WebSocket): void { for (const [mid, w] of machineConns) if (w === ws) machineConns.delete(mid); }
 export function isCurrentMachineConn(machineId: string, ws: WebSocket): boolean { return machineConns.get(machineId) === ws; }
 export function daemonCount(serverId: string): number {
