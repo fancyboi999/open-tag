@@ -1,0 +1,72 @@
+# Coolify control-plane stack for open-tag.
+# This file is intentionally image-only so it can be pasted/uploaded into
+# Coolify's Docker Compose UI without referencing this repo's Dockerfile.
+#
+# The daemon and agent CLIs are intentionally NOT part of this stack. They still run on
+# a machine you control and connect back to the published server URL with
+# `npx @fancyboi999/open-tag-daemon@latest --server-url ... --api-key ...`.
+#
+# This file intentionally avoids `ports:` and custom `networks:`:
+# - Coolify handles public routing/reverse proxy itself.
+# - This stack is self-contained, so the built-in stack network is enough.
+
+services:
+  postgres:
+    image: postgres:16.3-alpine
+    environment:
+      - POSTGRES_USER=opentag
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=opentag
+    volumes:
+      - opentag_postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opentag -d opentag"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7.2-alpine
+    volumes:
+      - opentag_redis:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    image: karlorz/open-tag:latest
+    environment:
+      - SERVICE_URL_APP_7788
+      - PORT=7788
+      - DATABASE_URL=postgres://opentag:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/opentag
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${SERVICE_HEX_64_JWT}
+      - DAEMON_BOOTSTRAP_KEY=${SERVICE_HEX_64_DAEMON}
+      - ADMIN_SETUP_TOKEN=${SERVICE_HEX_64_ADMIN_SETUP}
+      - ALLOW_DEV_LOGIN=false
+      - ALLOWED_ORIGIN=${SERVICE_URL_APP_7788}
+      - TRUST_PROXY=true
+      - OPEN_TAG_HOME=/home/node/.open-tag
+      - OPEN_TAG_STORAGE=${OPEN_TAG_STORAGE:-local}
+      - OPEN_TAG_S3_ENDPOINT=${OPEN_TAG_S3_ENDPOINT:-}
+      - OPEN_TAG_S3_BUCKET=${OPEN_TAG_S3_BUCKET:-}
+      - OPEN_TAG_S3_KEY=${OPEN_TAG_S3_KEY:-}
+      - OPEN_TAG_S3_SECRET=${OPEN_TAG_S3_SECRET:-}
+      - OPEN_TAG_S3_REGION=${OPEN_TAG_S3_REGION:-us-east-1}
+    volumes:
+      - opentag_uploads:/home/node/.open-tag/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  opentag_postgres: {}
+  opentag_redis: {}
+  opentag_uploads: {}
