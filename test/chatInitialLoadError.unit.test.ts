@@ -15,7 +15,15 @@ test("initial message load failure exits the skeleton and shows a retryable erro
   assert.match(chatSrc, /loaded && loadError/);
   assert.match(chatSrc, /onClick=\{loadCurrentMessages\}/);
   assert.match(chatSrc, /t\("chat\.loadFailedTitle"\)/);
+  assert.match(chatSrc, /t\("chat\.loadFailedBody"\)/);
   assert.match(chatSrc, /t\("chat\.retryLoad"\)/);
+});
+
+test("initial message load drops stale async results after switching channels", () => {
+  assert.match(chatSrc, /const chId = cur\.id/);
+  assert.match(chatSrc, /if \(curIdRef\.current !== chId\) return;[\s\S]*setMsgs\(ms\)/);
+  assert.match(chatSrc, /catch\s*(?:\([^)]*\))?\s*\{[\s\S]*if \(curIdRef\.current !== chId\) return;[\s\S]*setLoadError\(true\)/);
+  assert.match(chatSrc, /finally\s*\{[\s\S]*if \(curIdRef\.current === chId\) setLoaded\(true\)/);
 });
 
 test("chat load failure copy is localized", () => {
