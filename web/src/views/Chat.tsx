@@ -117,6 +117,7 @@ export function Chat() {
   const [ctxMenu, setCtxMenu] = useState<{ m: Msg; x: number; y: number } | null>(null); // right-clicking a message opens the context action menu
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [loaded, setLoaded] = useState(false); // first fetch for the current channel done — gates the empty-channel state so it never flashes mid-load
+  const [loadError, setLoadError] = useState(false); // first fetch failed — exits the skeleton into a retryable error state
   const [sub, setSub] = useState("");
   const [showMembers, setShowMembers] = useState(false);
   const [thread, setThread] = useState<{ channelId: string; parent: Msg } | null>(null); // currently open thread panel
@@ -159,15 +160,39 @@ export function Chat() {
     setShownChannelId(cur?.id);
     setMsgs([]);
     setLoaded(false);
+    setLoadError(false);
     setHasMore(false);
   }
 
   useEffect(() => { if (!channelId && cur) nav(`/s/${slug}/channel/${cur.id}`, { replace: true }); }, [channelId, cur, slug, nav]);
-  useEffect(() => { if (!cur) return; setThread(null); setProfile(null); loadingOlderRef.current = false; prependRestoreRef.current = null; subscribeChannel(cur.id); (async () => { // switching channels closes any open thread + profile overlay from the previous channel (loaded/msgs/hasMore reset happens synchronously in the render-phase guard above) (the live trace itself persists — accumulated in the store, see store.tsx); join the room while viewing so message:new arrives live (covers public non-member channels + channels relevant after connect)
-    const d = await api("GET", `/api/messages/channel/${cur.id}?limit=${PAGE_SIZE}`); const ms: Msg[] = d.messages || []; setMsgs(ms); setLoaded(true); setHasMore(!!d.hasMore); markRead(cur.id);
-    const ids = ms.map((m) => m.id);
-    if (ids.length) { try { setThreadMeta(await api("GET", `/api/channels/${cur.id}/threads?parentMessageIds=${ids.join(",")}`) || {}); } catch { setThreadMeta({}); } } else setThreadMeta({});
-  })(); }, [cur?.id]);
+  const loadCurrentMessages = async () => {
+    if (!cur) return;
+    const chId = cur.id;
+    setLoaded(false);
+    setLoadError(false);
+    try {
+      const d = await api("GET", `/api/messages/channel/${chId}?limit=${PAGE_SIZE}`);
+      if (curIdRef.current !== chId) return;
+      const ms: Msg[] = d.messages || [];
+      setMsgs(ms);
+      setHasMore(!!d.hasMore);
+      markRead(chId);
+      const ids = ms.map((m) => m.id);
+      if (ids.length) {
+        try { setThreadMeta(await api("GET", `/api/channels/${chId}/threads?parentMessageIds=${ids.join(",")}`) || {}); }
+        catch { setThreadMeta({}); }
+      } else setThreadMeta({});
+    } catch {
+      if (curIdRef.current !== chId) return;
+      setMsgs([]);
+      setThreadMeta({});
+      setHasMore(false);
+      setLoadError(true);
+    } finally {
+      if (curIdRef.current === chId) setLoaded(true);
+    }
+  };
+  useEffect(() => { if (!cur) return; setThread(null); setProfile(null); loadingOlderRef.current = false; prependRestoreRef.current = null; subscribeChannel(cur.id); void loadCurrentMessages(); }, [cur?.id]);
   // Surface unread that lives in this channel's threads (folded away, invisible in the main timeline → "滑不到").
   // Re-runs when the channel's badge changes: entry, a new thread reply bumping it, or opening a thread clearing it.
   useEffect(() => {
@@ -310,8 +335,9 @@ export function Chat() {
             )}
             <div key={cur?.id} className="scroll ch-view-enter" ref={scrollRef} onScroll={onScroll}>
               {!loaded && <ChatSkeleton />}
-              {loaded && !msgs.length && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.channelEmpty")} />}
-              {msgs.map((m) => {
+              {loaded && loadError && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.loadFailedTitle")} sub={<><span>{t("chat.loadFailedBody")}</span><button className="joinbtn" onClick={loadCurrentMessages}>{t("chat.retryLoad")}</button></>} />}
+              {loaded && !loadError && !msgs.length && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.channelEmpty")} />}
+              {!loadError && msgs.map((m) => {
                 const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // used for role description and avatar status dot
                 const tm = threadMeta[m.id];
                 const isMember = m.senderType !== "agent" && m.senderType !== "system"; // human/user senders get a "member" badge
