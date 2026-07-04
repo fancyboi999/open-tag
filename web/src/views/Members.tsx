@@ -476,7 +476,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
     try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model && model !== LOCAL_DEFAULT ? model : null, reasoning: thinkingLevels.length ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) { if (r.started === false) toast.info(t("members.agentCreatedOffline")); onCreated?.({ id: r.id, name: r.name ?? nm }); } onClose(); }
     catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
-  const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "opencode", label: "OpenCode" }, { value: "kimi", label: "Kimi Code" }, { value: "pi", label: "Pi" }, { value: "cursor", label: "Cursor" }];
+  const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "opencode", label: "OpenCode" }, { value: "kimi", label: "Kimi Code" }, { value: "pi", label: "Pi" }, { value: "cursor", label: "Cursor" }, { value: "hermes", label: "Hermes" }];
   const machineOpts = machines.length ? machines.map((m) => ({ value: m.id, label: m.name || m.hostname || m.id, hint: m.status === "online" ? t("members.machineOnline") : t("members.machineOffline") })) : [];
   const selModel = models.find((m) => m.id === model);
   const thinkingLevels = selModel?.thinking?.levels ?? [];

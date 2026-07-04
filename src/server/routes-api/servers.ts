@@ -98,6 +98,7 @@ export async function handleServersServerScope(ctx: ServerCtx): Promise<boolean>
       kimi: [{ id: "default", label: "Default (config.toml)" }],
       opencode: [{ id: "default", label: "Default" }],
       cursor: [{ id: "default", label: "Default (Composer)" }, { id: "sonnet-4", label: "Sonnet 4" }, { id: "sonnet-4-thinking", label: "Sonnet 4 (thinking)" }, { id: "gpt-5", label: "GPT-5" }],
+      hermes: [{ id: "default", label: "Default profile" }],
     };
     // Live discovery for runtimes whose CLI lists its own models: ask THAT machine's daemon to probe,
     // cache briefly, serve the static list on any miss/offline/timeout (machineId "none" = unbound agent).

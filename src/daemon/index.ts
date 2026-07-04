@@ -22,8 +22,12 @@ for (let i = 0; i < args.length; i++) {
 }
 // Default: connect to the server port from .env (worktree/prod each have their own .env port; --server-url overrides).
 if (!serverUrl) serverUrl = `http://localhost:${process.env.PORT ?? 7777}`;
+// Machine daemon connection key fallback. This is the same sk_machine_* value accepted by
+// --api-key; it is not an agent token, user token, or provider credential.
+if (!apiKey) apiKey = process.env.OPEN_TAG_DAEMON_API_KEY ?? "";
 if (!apiKey) {
   console.error("Usage: open-tag-daemon [--server-url <url>] --api-key <machineKey>");
+  console.error("   or: OPEN_TAG_DAEMON_API_KEY=<machineKey> open-tag-daemon [--server-url <url>]");
   process.exit(1);
 }
 

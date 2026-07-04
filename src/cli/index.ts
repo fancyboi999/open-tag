@@ -3,7 +3,7 @@
 // Auth/routing via env vars injected by daemon at spawn time:
 //   OPEN_TAG_SERVER_URL, OPEN_TAG_AGENT_TOKEN (per-agent token, injected by daemon), OPEN_TAG_AGENT_ID (or --agent-id)
 import { Command } from "commander";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, appendFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { createLogger } from "../log.js";
 
@@ -11,6 +11,7 @@ const log = createLogger("cli");
 const BASE = process.env.OPEN_TAG_SERVER_URL ?? "http://localhost:7777";
 const KEY = process.env.OPEN_TAG_AGENT_TOKEN ?? process.env.OPEN_TAG_MACHINE_KEY ?? process.env.OPEN_TAG_API_KEY ?? "poc-secret-key"; // per-agent token takes priority (slice10)
 const AGENT = process.env.OPEN_TAG_AGENT_ID ?? "";
+const TURN_FILE = process.env.OPEN_TAG_TURN_FILE ?? "";
 
 function headers() {
   return { authorization: `Bearer ${KEY}`, "x-agent-id": AGENT, "content-type": "application/json" };
@@ -42,6 +43,15 @@ function readStdin(): Promise<string> {
     let d = ""; process.stdin.on("data", (c) => (d += c)); process.stdin.on("end", () => resolve(d));
   });
 }
+function targetFromText(text: string): string | null {
+  const m = /^\[target=([^\s\]]+)/.exec(text);
+  return m?.[1] ?? null;
+}
+async function recordTurnEvent(event: Record<string, unknown>): Promise<void> {
+  if (!TURN_FILE) return;
+  try { await appendFile(TURN_FILE, JSON.stringify({ ...event, at: Date.now() }) + "\n"); }
+  catch { /* best-effort side channel for local runtime fallback */ }
+}
 
 const program = new Command();
 program.name("open-tag").description("open-tag agent CLI").version("0.1.0");
@@ -49,7 +59,9 @@ program.name("open-tag").description("open-tag agent CLI").version("0.1.0");
 const message = program.command("message").description("message send/receive");
 message.command("check").description("non-blocking check for new messages").action(async () => {
   const d = await api("GET", "/agent-api/message/check");
-  if (!d.messages?.length) return console.log("No new messages.");
+  if (!d.messages?.length) { await recordTurnEvent({ type: "check", count: 0 }); return console.log("No new messages."); }
+  const targets = Array.from(new Set((d.messages ?? []).map((m: any) => targetFromText(String(m.text ?? ""))).filter(Boolean)));
+  await recordTurnEvent({ type: "check", count: d.messages.length, target: targets[targets.length - 1] ?? null, targets });
   for (const m of d.messages) console.log(m.text);
   console.log("No more new messages."); // termination sentinel
 });
@@ -59,7 +71,8 @@ message.command("send").description("send a message (body read from stdin); if n
   const attachmentIds = opts.attach ? String(opts.attach).split(",").map((s: string) => s.trim()).filter(Boolean) : [];
   if (!sendDraft && !content && !attachmentIds.length) { console.error("Error: empty content"); console.error("Next action: pipe body via heredoc on stdin, or use --attach to include attachments"); process.exit(1); }
   const d = await api("POST", "/agent-api/message/send", { target: opts.target, content, attachmentIds, sendDraft });
-  if (d.held) return console.log(d.text); // freshness-hold: prints bounded context + two options, letting the agent revise or use --send-draft
+  if (d.held) { await recordTurnEvent({ type: "held", target: opts.target }); return console.log(d.text); } // freshness-hold: prints bounded context + two options, letting the agent revise or use --send-draft
+  await recordTurnEvent({ type: "send", target: opts.target, id: d.id, seq: d.seq });
   console.log(`Sent to ${opts.target} (msg ${String(d.id).slice(0, 8)}, seq ${d.seq})`);
 });
 message.command("read").description("read channel history (supports anchor flags --before/--after/--around: message short/full id or seq, jumps to the specified context)")
@@ -68,6 +81,7 @@ message.command("read").description("read channel history (supports anchor flags
     const q = new URLSearchParams({ channel: opts.channel, limit: String(opts.limit) });
     if (opts.around) q.set("around", opts.around); else if (opts.before) q.set("before", opts.before); else if (opts.after) q.set("after", opts.after);
     const d = await api("GET", `/agent-api/message/read?${q}`);
+    await recordTurnEvent({ type: "read", target: opts.channel, count: d.messages?.length ?? 0 });
     for (const m of d.messages ?? []) console.log(m.text);
   });
 message.command("react").description("add or remove a reaction emoji on a message (lightweight feedback)").requiredOption("--message-id <id>").requiredOption("--emoji <emoji>", "e.g. 👍 ✅").option("--remove", "remove the reaction instead of adding it").action(async (opts) => {

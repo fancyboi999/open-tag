@@ -129,6 +129,9 @@ export const STARTUP_NUDGE =
 /** Lightweight nudge sent to the agent on resume wakeup. */
 export const RESUME_NUDGE =
   "You were woken because new messages may be waiting. Run `open-tag message check` to read them, handle them, reply with `open-tag message send`, then stop.";
+/** One-shot runtimes need the wakeup itself to be a concrete instruction, not only a generic inbox notice. */
+export const ONE_SHOT_WAKE_NUDGE =
+  "You were woken by a new open-tag delivery. FIRST run `open-tag message check` now, handle the pending message(s), and send exactly one reply with `open-tag message send`. Do not end this turn with stdout only; only `open-tag message send` reaches the human.";
 /** Stdin notification delivered while the agent is busy. Structured, content-free: metadata only — message bodies are retrieved via `open-tag message check`. */
 export function inboxNotice(o: { count: number; from: string; targetName: string; firstShort?: string; latestShort?: string; isTask?: boolean; isDm?: boolean; changedTargets?: number; mentioned?: boolean }): string {
   // Inbox notice format (content-free, metadata only):
@@ -142,5 +145,5 @@ export function inboxNotice(o: { count: number; from: string; targetName: string
 Inbox update: ${o.count} unread message${plural(o.count)} total; ${changed} changed target${plural(changed)}
 ${o.targetName}  pending: ${o.count} message${plural(o.count)}${first} · latest @${o.from}${latest}${suffix}
 ]
-Content-free signal — message bodies are withheld, not absent. Finish your current step, then run \`open-tag message check\` to read and handle. Never conclude "no work" from this notice alone.`;
+Content-free signal — message bodies are withheld, not absent. Finish your current step, then run \`open-tag message check\` to read and handle. If this notice is the only thing in your current turn, check now and reply with \`open-tag message send\`; do not finish with stdout only. Never conclude "no work" from this notice alone.`;
 }

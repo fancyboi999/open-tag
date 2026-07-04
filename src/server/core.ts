@@ -8,6 +8,7 @@ import { agentHasScope } from "./scopes.js";
 import { newKey, hashToken } from "./auth.js";
 import { createLogger } from "../log.js";
 import { canUserReadChannel } from "./channelAccess.js";
+import { canAutoJoinMentionedMembers, isWakeable } from "./agentWakePolicy.js";
 
 const log = createLogger("server:core");
 const PORT = Number(process.env.PORT ?? 7777);
@@ -362,12 +363,14 @@ export async function createMessage(opts: {
   }
 
   let members = await channelMembers(opts.channelId);
-  // Slack-style mention auto-join: @-mentioning someone who isn't in this channel yet pulls them in, so the
+  // Human-authored Slack-style mention auto-join: @-mentioning someone who isn't in this channel yet pulls them in, so the
   // mention is recorded + delivered (wake / inbox) instead of being silently dropped. A thread inherits its
   // parent channel's @-reach (mentionAutoJoinPool — the same parent-channel inheritance canReadChannel uses),
   // so @-ing a teammate who hasn't replied in the thread yet still wakes them. Public channel → whole
   // workspace; private/dm (and their threads) → existing members only, so an @ to a non-member stays a no-op.
-  if (ch && opts.senderType !== "system" && opts.content.includes("@")) {
+  // Agent-authored text must not mutate channel membership: a model casually mentioning @Reviewer should not
+  // pull that agent into a channel and start a reply loop.
+  if (ch && canAutoJoinMentionedMembers(opts.senderType) && opts.content.includes("@")) {
     const joined = await autoJoinMentioned(opts.serverId, opts.channelId, opts.content, members, await mentionAutoJoinPool(opts.serverId, ch), seq - 1);
     if (joined.length) members = [...members, ...joined];
   }
@@ -409,7 +412,7 @@ export async function createMessage(opts: {
     // Ambient wake without @ requires inbox:receive scope; @-mentioned or DM always delivers.
     if (!isDm && !mentioned) {
       const a0 = (await db.select({ scopes: schema.agents.scopes }).from(schema.agents).where(eq(schema.agents.id, mem.id)))[0];
-      if (!agentHasScope(a0?.scopes, "inbox:receive")) continue;
+      if (!isWakeable({ channelType: ch?.type ?? "channel", mentioned, hasInboxScope: agentHasScope(a0?.scopes, "inbox:receive"), senderType: opts.senderType })) continue;
     }
     const cfg = await agentConfig(mem.id);
     if (cfg) broadcastToDaemons(opts.serverId, { type: "agent:start", agentId: mem.id, config: cfg });

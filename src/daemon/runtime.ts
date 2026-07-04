@@ -10,7 +10,7 @@ export interface TrajectoryEntry {
 }
 
 export interface RuntimeCallbacks {
-  onSession(sessionId: string): void;                 // receive/update session id (claude session_id / codex threadId)
+  onSession(sessionId: string | null): void;          // receive/update/clear session id (claude session_id / codex threadId)
   onActivity(activity: string, detail?: string): void; // working|thinking|online|offline
   onTrajectory(entries: TrajectoryEntry[]): void;      // streaming trajectory: thinking/text/tool entries
   onExit(code: number | null): void;
@@ -35,5 +35,6 @@ export interface RuntimeSession {
 export interface Runtime {
   name: string;
   experimental?: boolean;
+  oneShotWake?: boolean;          // runtime needs each wake to be a concrete check/send turn
   start(opts: StartOpts, cb: RuntimeCallbacks): RuntimeSession;
 }

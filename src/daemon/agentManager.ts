@@ -2,17 +2,19 @@
 import { mkdir, writeFile, readFile, access, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { buildSystemPrompt, STARTUP_NUDGE, RESUME_NUDGE, inboxNotice } from "./prompt.js";
+import { buildSystemPrompt, STARTUP_NUDGE, RESUME_NUDGE, ONE_SHOT_WAKE_NUDGE, inboxNotice } from "./prompt.js";
 import { seedMemory, applyProfileToMemory } from "./memory.js";
 import { ensureOpenTagBin } from "./openTagBin.js";
 import { getRuntime } from "./runtimes.js";
-import type { RuntimeSession, RuntimeCallbacks } from "./runtime.js";
+import type { Runtime, RuntimeSession, RuntimeCallbacks } from "./runtime.js";
 import { createLogger } from "../log.js";
 import { agentsDir } from "../paths.js";
 
 const DATA_DIR = agentsDir();
 const IDLE_MS = Number(process.env.OPEN_TAG_IDLE_MS ?? 10 * 60 * 1000); // how long before idle sleep (kills process to save memory; next wake uses --resume)
 const DELIVER_DEBOUNCE_MS = Number(process.env.OPEN_TAG_DELIVER_DEBOUNCE_MS ?? 3000); // batching window for deliveries while agent is busy (saves tokens, reduces interruptions)
+const ONE_SHOT_DELIVER_DEBOUNCE_MS = Number(process.env.OPEN_TAG_ONE_SHOT_DELIVER_DEBOUNCE_MS ?? process.env.OPEN_TAG_HERMES_DELIVER_DEBOUNCE_MS ?? 500); // One-shot runtimes need a short fixed wait when there is only one live notice.
+const PENDING_DELIVER_TTL_MS = Number(process.env.OPEN_TAG_PENDING_DELIVER_TTL_MS ?? 15_000); // start+deliver can arrive back-to-back; keep deliver briefly while start prepares workspace
 
 export interface AgentConfig {
   name: string; displayName: string; description?: string | null;
@@ -22,17 +24,41 @@ export interface AgentConfig {
 interface DeliverBuf { count: number; from: string; target: string; targetName: string; firstShort: string; latestShort: string; isTask: boolean; mentioned: boolean; targets: Set<string>; timer: ReturnType<typeof setTimeout>; }
 export interface DeliverMeta { targetName?: string; msgShort?: string; isTask?: boolean; }
 interface Running { session: RuntimeSession; config: AgentConfig; sessionId: string | null; idleTimer?: ReturnType<typeof setTimeout>; deliverBuf?: DeliverBuf; }
+interface PendingDeliver { from: string; target: string; mentioned: boolean; meta: DeliverMeta; }
+interface PendingDeliverQueue { items: PendingDeliver[]; timer: ReturnType<typeof setTimeout>; }
+interface AgentManagerOptions {
+  dataDir?: string;
+  binDir?: string;
+  deliverDebounceMs?: number;
+  oneShotDeliverDebounceMs?: number;
+  pendingDeliverTtlMs?: number;
+  runtimeResolver?: (name: string) => Runtime | null;
+}
 
 export class AgentManager {
   private agents = new Map<string, Running>();
+  private starting = new Map<string, Promise<void>>();
+  private pendingDelivers = new Map<string, PendingDeliverQueue>();
   private binDir: string;
+  private dataDir: string;
+  private deliverDebounceMs: number;
+  private oneShotDeliverDebounceMs: number;
+  private pendingDeliverTtlMs: number;
+  private runtimeResolver: (name: string) => Runtime | null;
   private log = createLogger("daemon:agents");
-  constructor(private send: (msg: unknown) => void) { this.binDir = ensureOpenTagBin(); }
+  constructor(private send: (msg: unknown) => void, opts: AgentManagerOptions = {}) {
+    this.binDir = opts.binDir ?? ensureOpenTagBin();
+    this.dataDir = opts.dataDir ?? DATA_DIR;
+    this.deliverDebounceMs = opts.deliverDebounceMs ?? DELIVER_DEBOUNCE_MS;
+    this.oneShotDeliverDebounceMs = opts.oneShotDeliverDebounceMs ?? ONE_SHOT_DELIVER_DEBOUNCE_MS;
+    this.pendingDeliverTtlMs = opts.pendingDeliverTtlMs ?? PENDING_DELIVER_TTL_MS;
+    this.runtimeResolver = opts.runtimeResolver ?? getRuntime;
+  }
 
   running(): string[] { return [...this.agents.keys()]; }
   stopAll(): void { for (const id of [...this.agents.keys()]) this.stop(id); }
   // Tear down process: clear timers + remove from map first (critical: deletion before session.stop() lets the onExit has() guard recognize this as an intentional stop, suppressing unexpected sleeping status) + stop runtime. Returns whether the agent was found.
-  private teardown(agentId: string): boolean { const r = this.agents.get(agentId); if (!r) return false; if (r.idleTimer) clearTimeout(r.idleTimer); if (r.deliverBuf) clearTimeout(r.deliverBuf.timer); this.agents.delete(agentId); r.session.stop(); return true; }
+  private teardown(agentId: string): boolean { this.clearPendingDeliver(agentId); const r = this.agents.get(agentId); if (!r) return false; if (r.idleTimer) clearTimeout(r.idleTimer); if (r.deliverBuf) clearTimeout(r.deliverBuf.timer); this.agents.delete(agentId); r.session.stop(); return true; }
   // User-initiated stop: emits inactive/offline
   stop(agentId: string): void { if (!this.teardown(agentId)) return; this.send({ type: "agent:status", agentId, status: "inactive" }); this.send({ type: "agent:activity", agentId, activity: "offline", detail: "" }); }
   // Idle sleep: emits sleeping/sleeping (activity also set to sleeping so the frontend activity+status dual mapping stays consistent; session is preserved for --resume on next wake)
@@ -41,7 +67,7 @@ export class AgentManager {
   async reset(agentId: string, wipeWorkspace = false, clearMemory = false): Promise<void> {
     this.teardown(agentId); // skip stop() to avoid double inactive emit; reset sends its own inactive/offline+detail=reset below
     this.send({ type: "agent:session", agentId, sessionId: null });
-    const dir = path.join(DATA_DIR, agentId);
+    const dir = path.join(this.dataDir, agentId);
     if (wipeWorkspace) {
       try { await rm(dir, { recursive: true, force: true }); this.log.info("workspace wiped", { agentId }); }
       catch (e) { this.log.warn("wipe failed", { agentId, detail: String(e) }); }
@@ -57,7 +83,7 @@ export class AgentManager {
    *  title + `## Role`, preserving the agent's own sections. No-op if the workspace/file doesn't exist
    *  yet (a not-yet-started agent gets fresh values from the DB when start() seeds it). */
   async syncProfile(agentId: string, displayName: string, description?: string | null): Promise<void> {
-    const mem = path.join(DATA_DIR, agentId, "MEMORY.md");
+    const mem = path.join(this.dataDir, agentId, "MEMORY.md");
     let content: string;
     try { content = await readFile(mem, "utf8"); }
     catch { this.log.debug("syncProfile: no MEMORY.md yet", { agentId }); return; }
@@ -78,7 +104,16 @@ export class AgentManager {
 
   async start(agentId: string, config: AgentConfig): Promise<void> {
     if (this.agents.has(agentId)) return;
-    const runtime = getRuntime(config.runtime ?? "claude");
+    const existing = this.starting.get(agentId);
+    if (existing) return existing;
+    const pending = this.startNow(agentId, config).finally(() => this.starting.delete(agentId));
+    this.starting.set(agentId, pending);
+    return pending;
+  }
+
+  private async startNow(agentId: string, config: AgentConfig): Promise<void> {
+    if (this.agents.has(agentId)) return;
+    const runtime = this.runtimeResolver(config.runtime ?? "claude");
     if (!runtime) {
       this.log.error("no runtime", { runtime: config.runtime });
       this.send({ type: "agent:activity", agentId, activity: "offline", detail: `no runtime: ${config.runtime}` });
@@ -86,7 +121,7 @@ export class AgentManager {
     }
     if (runtime.experimental) this.log.warn("experimental runtime", { runtime: runtime.name });
 
-    const dir = path.join(DATA_DIR, agentId);
+    const dir = path.join(this.dataDir, agentId);
     await mkdir(path.join(dir, "notes"), { recursive: true });
     const mem = path.join(dir, "MEMORY.md");
     try { await access(mem); } catch {
@@ -122,23 +157,68 @@ export class AgentManager {
       log: this.log,
     };
 
-    // no await between set and start (single-threaded event loop), so deliver cannot interleave and read an empty session
+    // No await between set and runtime.start (single-threaded event loop), so deliver cannot interleave and read an empty session.
+    // Deliveries that arrived earlier during workspace preparation are flushed just below, except
+    // one-shot runtimes where the wakeup prompt itself is the concrete "check then send" turn.
+    const pendingDeliveryCount = this.pendingDelivers.get(agentId)?.items.length ?? 0;
+    const useOneShotWakeNudge = !!runtime.oneShotWake && pendingDeliveryCount > 0;
     this.agents.set(agentId, running);
     running.session = runtime.start({
       cwd: dir, model: config.model, runtimeConfig: config.runtimeConfig, sessionId: config.sessionId, systemPrompt, env,
-      initialPrompt: config.sessionId ? RESUME_NUDGE : STARTUP_NUDGE,
+      initialPrompt: useOneShotWakeNudge ? ONE_SHOT_WAKE_NUDGE : (config.sessionId ? RESUME_NUDGE : STARTUP_NUDGE),
     }, cb);
 
     this.send({ type: "agent:status", agentId, status: "active" });
     this.send({ type: "agent:activity", agentId, activity: "working", detail: "starting" });
     this.log.info("agent started", { agentId, runtime: runtime.name, model: config.model ?? "(default)", resume: !!config.sessionId, experimental: runtime.experimental ?? false });
     this.resetIdle(agentId);
+    if (useOneShotWakeNudge) {
+      this.clearPendingDeliver(agentId);
+      this.log.debug("pending deliver consumed by one-shot wake nudge", { agentId, runtime: runtime.name, count: pendingDeliveryCount });
+    } else {
+      this.flushPendingDeliver(agentId);
+    }
   }
 
-  /** server agent:deliver — wake a running agent with new messages; agents not yet running will self-check on startup once agent:start arrives. */
+  private queuePendingDeliver(agentId: string, item: PendingDeliver): void {
+    let q = this.pendingDelivers.get(agentId);
+    if (!q) {
+      const timer = setTimeout(() => {
+        this.pendingDelivers.delete(agentId);
+        this.log.debug("pending deliver expired", { agentId });
+      }, this.pendingDeliverTtlMs);
+      q = { items: [], timer };
+      this.pendingDelivers.set(agentId, q);
+    }
+    q.items.push(item);
+    if (q.items.length > 10) q.items.shift();
+    this.log.debug("deliver queued pending start", { agentId, count: q.items.length });
+  }
+
+  private clearPendingDeliver(agentId: string): void {
+    const q = this.pendingDelivers.get(agentId);
+    if (!q) return;
+    clearTimeout(q.timer);
+    this.pendingDelivers.delete(agentId);
+  }
+
+  private flushPendingDeliver(agentId: string): void {
+    const q = this.pendingDelivers.get(agentId);
+    if (!q) return;
+    this.clearPendingDeliver(agentId);
+    this.log.debug("pending deliver -> agent", { agentId, count: q.items.length });
+    for (const item of q.items) this.deliver(agentId, item.from, item.target, item.mentioned, item.meta);
+  }
+
+  private debounceMsFor(r: Running): number {
+    const runtime = this.runtimeResolver(r.config.runtime ?? "claude");
+    return runtime?.oneShotWake ? this.oneShotDeliverDebounceMs : this.deliverDebounceMs;
+  }
+
+  /** server agent:deliver — wake a running agent with new messages; if start is still preparing the workspace, briefly queue and flush once the runtime exists. */
   deliver(agentId: string, from: string, target: string, mentioned = false, meta: DeliverMeta = {}): void {
     const r = this.agents.get(agentId);
-    if (!r) { this.log.debug("deliver: agent not running yet", { agentId }); return; }
+    if (!r) { this.queuePendingDeliver(agentId, { from, target, mentioned, meta }); return; }
     // Delivery batching while busy: multiple messages within 3 s are coalesced into one inbox notice, reducing interruptions and token usage.
     const tname = meta.targetName ?? target;
     const short = meta.msgShort ?? "";
@@ -153,7 +233,7 @@ export class AgentManager {
       const note = inboxNotice({ count: buf.count, from: buf.from, targetName: buf.targetName, firstShort: buf.firstShort, latestShort: buf.latestShort, isTask: buf.isTask, isDm: buf.targetName.startsWith("dm:"), changedTargets: buf.targets.size, mentioned: buf.mentioned });
       try { r.session.deliver(note); this.resetIdle(agentId); this.log.debug("inbox notice -> agent", { agentId, count: buf.count, mentioned: buf.mentioned }); }
       catch (e) { this.log.warn("deliver failed", { agentId, detail: String(e) }); }
-    }, DELIVER_DEBOUNCE_MS);
+    }, this.debounceMsFor(r));
     r.deliverBuf = buf;
   }
 }

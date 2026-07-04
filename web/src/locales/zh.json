@@ -352,6 +352,9 @@
     "join": "加入",
     "noFiles": "本频道暂无文件。在聊天框点回形针上传(会随消息发出,团队都能看到/下载)。",
     "channelEmpty": "还没有消息",
+    "loadFailedTitle": "无法加载此对话",
+    "loadFailedBody": "OpenTag 暂时连不上服务端。确认 control plane 正在运行后重试。",
+    "retryLoad": "重试",
     "jumpToMessage": "跳到原消息",
     "download": "下载",
     "asTask": "作为任务"

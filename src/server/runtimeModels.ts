@@ -13,9 +13,9 @@ export interface ModelOption {
   thinking?: { levels: { value: string; label: string; description?: string }[]; default?: string };
 }
 
-// Runtimes probed live on the machine: opencode/cursor/pi enumerate their model list; claude/codex
+// Runtimes probed live on the machine: opencode/cursor/pi/hermes enumerate their model/profile list; claude/codex
 // keep a static catalog but probe each model's reasoning-effort levels. The rest stay fully static.
-export const DYNAMIC_RUNTIMES = new Set(["opencode", "cursor", "pi", "claude", "codex"]);
+export const DYNAMIC_RUNTIMES = new Set(["opencode", "cursor", "pi", "hermes", "claude", "codex"]);
 
 const TTL_MS = 60_000; // matches multica's 60s model cache — lists rarely change within a minute
 const PROBE_TIMEOUT_MS = 8_000; // bound how long the modal waits on the first probe before fallback
