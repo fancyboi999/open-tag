@@ -35,6 +35,13 @@ export function broadcastToDaemons(serverId: string, msg: unknown): void {
   }
 }
 
+export function sendToMachine(machineId: string, msg: unknown): boolean {
+  const ws = machineConns.get(machineId);
+  if (!ws || ws.readyState !== 1) return false;
+  try { ws.send(JSON.stringify(msg)); return true; }
+  catch { return false; }
+}
+
 // ── WS-RPC: send a request to this server's daemon and await the response carrying the same requestId (file tree/file content, etc.) ──
 const pending = new Map<string, { resolve: (v: any) => void; timer: ReturnType<typeof setTimeout> }>();
 export function requestDaemon(serverId: string, msg: Record<string, unknown>, timeoutMs = 6000): Promise<any> {

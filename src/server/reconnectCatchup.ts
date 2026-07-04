@@ -14,7 +14,7 @@
 import { and, eq, gt, ne, or, isNull, desc } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { agentHasScope } from "./scopes.js";
-import { broadcastToDaemons } from "./daemonHub.js";
+import { sendToMachine } from "./daemonHub.js";
 import { agentConfig } from "./core.js";
 import { createLogger } from "../log.js";
 import { isWakeable } from "./agentWakePolicy.js";
@@ -90,7 +90,13 @@ export async function catchUpAgentsOnMachine(serverId: string, machineId: string
   if (now - (lastRun.get(machineId) ?? 0) < COOLDOWN_MS) { log.debug("catch-up skipped (cooldown)", { machineId }); return; }
   lastRun.set(machineId, now);
 
-  const list = await db.select({ id: schema.agents.id, scopes: schema.agents.scopes })
+  const machine = (await db.select({ runtimes: schema.machines.runtimes }).from(schema.machines).where(and(
+    eq(schema.machines.id, machineId),
+    eq(schema.machines.serverId, serverId),
+  )))[0];
+  const availableRuntimes = new Set(machine?.runtimes ?? []);
+
+  const list = await db.select({ id: schema.agents.id, runtime: schema.agents.runtime, scopes: schema.agents.scopes })
     .from(schema.agents)
     .where(and(eq(schema.agents.machineId, machineId), eq(schema.agents.serverId, serverId), isNull(schema.agents.deletedAt)));
 
@@ -100,18 +106,21 @@ export async function catchUpAgentsOnMachine(serverId: string, machineId: string
     try { backlog = await computeBacklog(a.id, a.scopes); }
     catch (e: any) { log.warn("backlog scan failed", { agentId: a.id, detail: String(e?.message ?? e) }); continue; }
     if (!backlog) continue;
+    if (!availableRuntimes.has(a.runtime)) {
+      log.warn("catch-up skipped unsupported runtime", { agentId: a.id, machineId, runtime: a.runtime });
+      continue;
+    }
     if (!runningIds.includes(a.id)) {
       // hard offline (process dead): start with resume; the startup nudge self-checks the inbox and pulls the missed messages
       const cfg = await agentConfig(a.id);
-      if (cfg) { broadcastToDaemons(serverId, { type: "agent:start", agentId: a.id, config: cfg }); woke++; }
+      if (cfg && sendToMachine(machineId, { type: "agent:start", agentId: a.id, config: cfg })) woke++;
     } else {
       // soft offline (WS dropped, process alive): agent:start is a no-op for a running agent (agentManager.ts),
       // so inject an inbox notice via deliver to drive a `message check`. Body-free: the agent pulls real unread.
-      broadcastToDaemons(serverId, {
+      if (sendToMachine(machineId, {
         type: "agent:deliver", agentId: a.id, seq: 0, from: backlog.from,
         target: "", targetName: backlog.targetName, msgShort: "", isTask: false, mentioned: false,
-      });
-      woke++;
+      })) woke++;
     }
   }
   if (woke) log.info("reconnect catch-up woke agents with backlog", { machineId, woke, scanned: list.length });

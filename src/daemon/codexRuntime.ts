@@ -134,8 +134,16 @@ export const codexRuntime: Runtime = {
     const proc = spawn("codex", ["app-server", "--listen", "stdio://"], { cwd: opts.cwd, stdio: ["pipe", "pipe", "pipe"], env: opts.env });
     const client = new CodexClient(proc, cb);
     let ready = false;
+    let spawnFailed = false;
+    let reportedExit = false;
     const queue: string[] = [];
     let turnBusy = false;
+
+    function reportExit(code: number | null): void {
+      if (reportedExit) return;
+      reportedExit = true;
+      cb.onExit(code);
+    }
 
     client.onTurnDone = () => { turnBusy = false; pump(); };
     function pump(): void {
@@ -144,7 +152,7 @@ export const codexRuntime: Runtime = {
       turnBusy = true;
       cb.onActivity("working", "turn");
       client.request("turn/start", turnParams(opts, client.threadId, text))
-        .catch((e) => { cb.log.warn("codex turn/start failed", { detail: String(e?.message ?? e) }); turnBusy = false; pump(); });
+        .catch((e) => { if (spawnFailed) return; cb.log.warn("codex turn/start failed", { detail: String(e?.message ?? e) }); turnBusy = false; pump(); });
     }
 
     (async () => {
@@ -168,13 +176,22 @@ export const codexRuntime: Runtime = {
         ready = true;
         queue.push(opts.initialPrompt); pump();
       } catch (e) {
+        if (spawnFailed) return;
         cb.log.error("codex init failed", { detail: String((e as any)?.message ?? e) });
         cb.onActivity("offline", "codex init failed");
       }
     })();
 
     proc.stderr?.on("data", (c: Buffer) => { const t = c.toString().trim(); if (t) cb.log.debug("codex stderr", { t: t.slice(0, 300) }); });
-    proc.on("exit", (code) => { client.closeAllPending(new Error("codex exited")); cb.onExit(code); });
+    proc.on("error", (e: NodeJS.ErrnoException) => {
+      spawnFailed = true;
+      const detail = e.code === "ENOENT" ? "codex not found" : "codex spawn failed";
+      client.closeAllPending(new Error(detail));
+      cb.log.error("codex spawn failed", { detail: String(e?.message ?? e), code: e.code ?? "" });
+      cb.onActivity("offline", detail);
+      reportExit(1);
+    });
+    proc.on("exit", (code) => { client.closeAllPending(new Error("codex exited")); reportExit(code); });
 
     return { deliver: (text) => { queue.push(text); pump(); }, stop: () => { try { proc.kill("SIGTERM"); } catch { /* */ } } };
   },
