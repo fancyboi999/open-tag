@@ -356,15 +356,21 @@ async function agentStartContext(serverId: string, agentId: string) {
   return { agent, machine, reason };
 }
 
-async function sendAgentStartToMachine(serverId: string, agentId: string): Promise<{ ok: boolean; machineId?: string; reason?: string }> {
+function sendAgentControl(serverId: string, machineId: string | null, msg: unknown): boolean {
+  if (machineId) return sendToMachine(machineId, msg);
+  broadcastToDaemons(serverId, msg);
+  return true;
+}
+
+async function sendAgentStart(serverId: string, agentId: string): Promise<{ ok: true; machineId: string | null } | { ok: false; reason?: string }> {
   const ctx = await agentStartContext(serverId, agentId);
   const agent = ctx.agent;
   if (!agent) return { ok: false, reason: ctx.reason };
   if (ctx.reason) return { ok: false, reason: ctx.reason };
   const cfg = await agentConfig(agentId);
   if (!cfg) return { ok: false, reason: "agent not found" };
-  const machineId = agent.machineId!;
-  if (!sendToMachine(machineId, { type: "agent:start", agentId, config: cfg })) return { ok: false, reason: "machine offline" };
+  const machineId = agent.machineId;
+  if (!sendAgentControl(serverId, machineId, { type: "agent:start", agentId, config: cfg })) return { ok: false, reason: "machine offline" };
   return { ok: true, machineId };
 }
 
@@ -452,12 +458,12 @@ export async function createMessage(opts: {
       const a0 = (await db.select({ scopes: schema.agents.scopes }).from(schema.agents).where(eq(schema.agents.id, mem.id)))[0];
       if (!isWakeable({ channelType: ch?.type ?? "channel", mentioned, hasInboxScope: agentHasScope(a0?.scopes, "inbox:receive"), senderType: opts.senderType })) continue;
     }
-    const started = await sendAgentStartToMachine(opts.serverId, mem.id);
-    if (!started.ok || !started.machineId) {
+    const started = await sendAgentStart(opts.serverId, mem.id);
+    if (!started.ok) {
       log.warn("agent wake skipped", { agentId: mem.id, reason: started.reason ?? "start failed" });
       continue;
     }
-    sendToMachine(started.machineId, { type: "agent:deliver", agentId: mem.id, seq, from: opts.senderName, target: opts.channelId, targetName, msgShort, isTask: !!opts.asTask, message: { content: opts.content }, mentioned });
+    sendAgentControl(opts.serverId, started.machineId, { type: "agent:deliver", agentId: mem.id, seq, from: opts.senderName, target: opts.channelId, targetName, msgShort, isTask: !!opts.asTask, message: { content: opts.content }, mentioned });
     woken.push(mem.name + (mentioned ? "(@)" : ""));
   }
   log.info("message created", {
@@ -748,9 +754,9 @@ export async function assignTask(
   const assigneeName = target.displayName || target.name;
   const sysMsg = await sysTaskMsg(serverId, threadCh, `${actor} assigned #${upd.taskNumber} "${taskTitle(upd.content)}" to ${assigneeName}`, by);
 
-  const started = await sendAgentStartToMachine(serverId, assigneeId);
-  if (started.ok && started.machineId) {
-    sendToMachine(started.machineId, {
+  const started = await sendAgentStart(serverId, assigneeId);
+  if (started.ok) {
+    sendAgentControl(serverId, started.machineId, {
       type: "agent:deliver",
       agentId: assigneeId,
       seq: sysMsg.seq,
@@ -793,9 +799,9 @@ export async function setTaskStatus(serverId: string, messageId: string, status:
   // Wake the assigned agent (only when changed by someone else). Verified: human changes status → assignee agent fires agent:activity working detail="Message received".
   if (upd.taskAssigneeType === "agent" && upd.taskAssigneeId && by?.id !== upd.taskAssigneeId) {
     await db.insert(schema.channelMembers).values({ channelId: threadCh, memberType: "agent", memberId: upd.taskAssigneeId }).onConflictDoNothing(); // ensure assignee is a thread member, otherwise message check cannot see this system message
-    const started = await sendAgentStartToMachine(serverId, upd.taskAssigneeId);
-    if (started.ok && started.machineId) {
-      sendToMachine(started.machineId, { type: "agent:deliver", agentId: upd.taskAssigneeId, seq: sysMsg.seq, from: actor, target: threadCh, targetName: `task #${upd.taskNumber}`, msgShort: sysMsg.id.slice(0, 8), isTask: true, message: { content: `#${upd.taskNumber} → ${label}` }, mentioned: true });
+    const started = await sendAgentStart(serverId, upd.taskAssigneeId);
+    if (started.ok) {
+      sendAgentControl(serverId, started.machineId, { type: "agent:deliver", agentId: upd.taskAssigneeId, seq: sysMsg.seq, from: actor, target: threadCh, targetName: `task #${upd.taskNumber}`, msgShort: sysMsg.id.slice(0, 8), isTask: true, message: { content: `#${upd.taskNumber} → ${label}` }, mentioned: true });
     } else {
       log.warn("task status wake skipped", { agentId: upd.taskAssigneeId, reason: started.reason ?? "start failed" });
     }
@@ -820,7 +826,7 @@ async function publishAgentState(serverId: string, agentId: string): Promise<voi
 }
 /** Start an agent (requires local daemon to be online). */
 export async function startAgent(serverId: string, agentId: string): Promise<{ ok: boolean; reason?: string }> {
-  const started = await sendAgentStartToMachine(serverId, agentId);
+  const started = await sendAgentStart(serverId, agentId);
   if (!started.ok) return { ok: false, reason: started.reason };
   await db.update(schema.agents).set({ status: "active", activity: "working" }).where(eq(schema.agents.id, agentId));
   await publishAgentState(serverId, agentId);

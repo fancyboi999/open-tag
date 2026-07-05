@@ -7,8 +7,9 @@ export function agentStartBlockReason(
   hasDaemon: boolean,
 ): string | null {
   if (!hasDaemon) return "no daemon online";
-  if (!agent.machineId) return "no machine assigned";
-  if (!machine || machine.id !== agent.machineId || machine.status !== "online") return "machine offline";
+  if (!agent.machineId) return null;
+  if (!machine || machine.id !== agent.machineId) return "machine not found";
+  if (machine.status !== "online") return "machine offline";
   if (!machine.runtimes.includes(agent.runtime)) return `runtime ${agent.runtime} unavailable on selected machine`;
   return null;
 }

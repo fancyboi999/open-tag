@@ -33,3 +33,23 @@ test("blocks start when no daemon is online", () => {
 
   assert.equal(reason, "no daemon online");
 });
+
+test("allows legacy broadcast start when no machine is assigned", () => {
+  const reason = agentStartBlockReason(
+    { machineId: null, runtime: "codex" },
+    null,
+    true,
+  );
+
+  assert.equal(reason, null);
+});
+
+test("reports missing machine separately from offline machine", () => {
+  const reason = agentStartBlockReason(
+    { machineId: "m1", runtime: "codex" },
+    null,
+    true,
+  );
+
+  assert.equal(reason, "machine not found");
+});
