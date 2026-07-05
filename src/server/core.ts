@@ -653,7 +653,7 @@ export async function convertMessageToTask(serverId: string, messageId: string, 
  * Agents see short ids and will use them directly for claim/update/reply → previously the endpoint queried the uuid column with a short id and threw 500.
  * Full uuid → verify existence; short id (6+ hex) → prefix match; neither → null (caller returns 404, never 500).
  */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Resolve a (short or full) message id within a server. ALWAYS pass `agentId` when called on the agent plane
 // (/agent-api/*): without it the channel ACL is skipped, so an agent could resolve a message in a channel it
 // cannot access. The optional default exists only for non-agent internal callers (there are none today).

@@ -4,7 +4,7 @@ import { and, eq, ne, gt, lt, inArray, asc, desc, ilike, like, sql, isNull, isNo
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, agentIdHeader } from "./util.js";
 import { resolveAgent } from "./auth.js";
-import { createMessage, resolveTarget, channelMembers, addChannelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG, assignTask } from "./core.js";
+import { createMessage, resolveTarget, channelMembers, addChannelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG, assignTask, UUID_RE } from "./core.js";
 import { agentHasScope } from "./scopes.js";
 import { parseUpload } from "./attachments.js";
 import { readObject } from "./storage.js";
@@ -468,9 +468,17 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
   }
   // attachment view: fetch attachment by id (text returned inline, binary returns metadata)
   if (p === "/agent-api/attachment/view" && method === "GET") {
-    const id = (url.searchParams.get("id") || "").trim();
+    const id = (url.searchParams.get("id") || "").trim().toLowerCase();
     if (!id) return (sendErr(res, 400, "id required"), true);
-    const a = (await db.select().from(schema.attachments).where(and(eq(schema.attachments.id, id), eq(schema.attachments.serverId, serverId))))[0];
+    // Tolerates short id, mirroring resolveMessageId: agents cite the 8-char prefixes they see in message
+    // text. Without this a short id hits the uuid column raw → 500 (live 2026-07-05: an agent's short-id
+    // views failed and it retried in a loop). Full uuid → exact; 6+ hex chars → prefix; neither → 404.
+    let a: typeof schema.attachments.$inferSelect | undefined;
+    if (UUID_RE.test(id)) {
+      a = (await db.select().from(schema.attachments).where(and(eq(schema.attachments.id, id), eq(schema.attachments.serverId, serverId))))[0];
+    } else if (/^[0-9a-f]{6,}$/.test(id)) {
+      a = (await db.select().from(schema.attachments).where(and(like(sql`${schema.attachments.id}::text`, id + "%"), eq(schema.attachments.serverId, serverId))).limit(1))[0];
+    }
     if (!a) return (sendErr(res, 404, "attachment not found"), true);
     // Agent ACL: the agent may view an attachment only if it uploaded it, or it can access the channel the
     // attachment was posted in — otherwise an attachment id leaks a private channel's file. 404 (don't reveal).
