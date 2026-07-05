@@ -653,19 +653,33 @@ export async function convertMessageToTask(serverId: string, messageId: string, 
  * Agents see short ids and will use them directly for claim/update/reply → previously the endpoint queried the uuid column with a short id and threw 500.
  * Full uuid → verify existence; short id (6+ hex) → prefix match; neither → null (caller returns 404, never 500).
  */
-export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Single definition of the agent-facing id convention: full uuid → exact match; 6+ hex chars → serverId-scoped
+ *  prefix match; anything else (dashes in a partial, LIKE metachars, too short) → null — never a 500 from casting
+ *  a non-uuid into the uuid column. Shared by messages (resolveMessageId) and attachments (attachment/view) so
+ *  the convention cannot drift per-resource. Returns the resolved full id; the caller applies its own ACL. */
+export async function resolveIdOrPrefix(
+  table: typeof schema.messages | typeof schema.attachments,
+  serverId: string,
+  idOrShort: string | undefined | null,
+): Promise<string | null> {
+  const s = (idOrShort ?? "").trim().toLowerCase();
+  if (!s) return null;
+  let r: { id: string } | undefined;
+  if (UUID_RE.test(s)) {
+    r = (await db.select({ id: table.id }).from(table).where(and(eq(table.id, s), eq(table.serverId, serverId))))[0];
+  } else if (/^[0-9a-f]{6,}$/.test(s)) {
+    r = (await db.select({ id: table.id }).from(table).where(and(like(sql`${table.id}::text`, s + "%"), eq(table.serverId, serverId))).limit(1))[0];
+  }
+  return r?.id ?? null;
+}
 // Resolve a (short or full) message id within a server. ALWAYS pass `agentId` when called on the agent plane
 // (/agent-api/*): without it the channel ACL is skipped, so an agent could resolve a message in a channel it
 // cannot access. The optional default exists only for non-agent internal callers (there are none today).
 export async function resolveMessageId(serverId: string, idOrShort: string | undefined | null, agentId?: string): Promise<string | null> {
-  const s = (idOrShort ?? "").trim().toLowerCase();
-  if (!s) return null;
-  let m: { id: string; channelId: string } | undefined;
-  if (UUID_RE.test(s)) {
-    m = (await db.select({ id: schema.messages.id, channelId: schema.messages.channelId }).from(schema.messages).where(and(eq(schema.messages.id, s), eq(schema.messages.serverId, serverId))))[0];
-  } else if (/^[0-9a-f]{6,}$/.test(s)) {
-    m = (await db.select({ id: schema.messages.id, channelId: schema.messages.channelId }).from(schema.messages).where(and(like(sql`${schema.messages.id}::text`, s + "%"), eq(schema.messages.serverId, serverId))).limit(1))[0];
-  }
+  const id = await resolveIdOrPrefix(schema.messages, serverId, idOrShort);
+  if (!id) return null;
+  const m = (await db.select({ id: schema.messages.id, channelId: schema.messages.channelId }).from(schema.messages).where(eq(schema.messages.id, id)))[0];
   if (!m) return null;
   // Agent ACL: on the agent plane (agentId passed), only resolve a message in a channel the agent can access —
   // otherwise an agent could probe/react/claim any message in the server by its (short) id.
