@@ -22,6 +22,9 @@ RUN npm run site:build
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# The entrypoint's npx invocations print "npm notice: new major version available" to stderr on start,
+# which log collectors (e.g. Railway) surface at error level — noise that pollutes @level:error queries.
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/web/dist ./web/dist
 COPY --from=build /app/docs-site/dist ./docs-site/dist
