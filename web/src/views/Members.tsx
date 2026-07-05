@@ -160,7 +160,10 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const onPickAvatar = async (f: File) => { setAvBusy(true); setAvErr(""); try { const url = await uploadAgentAvatar(id, f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { await api("PATCH", "/api/agents/" + id, { avatarUrl: scheme }); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   if (!a) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
-  const ctl = async (action: string) => { const r = await api("POST", `/api/agents/${id}/${action}`); if (r?.error) toast.error(t("members.startFailed")); setTimeout(refetch, 400); }; // start/stop: surface daemon-offline failure (503 → {error}) instead of swallowing it
+  // Surface the server's concrete 503 reason ("no daemon online" / "runtime X unavailable on selected machine" …);
+  // the generic machine-may-be-offline guess alone made users blind-retry (live 2026-07-05: 3× restart → 503).
+  const startFail = (r: any) => toast.error(r?.error && r.error !== "internal" ? `${t("members.startFailedWithReason")}: ${r.error}` : t("members.startFailed"));
+  const ctl = async (action: string) => { const r = await api("POST", `/api/agents/${id}/${action}`); if (r?.error) startFail(r); setTimeout(refetch, 400); }; // start/stop: surface daemon-offline failure (503 → {error}) instead of swallowing it
   // Three restart modes: restart=keep session+workspace; reset=clear session, keep workspace; full=clear session+delete workspace. All modes end with a restart.
   const doRestart = async (mode: "restart" | "reset" | "full") => {
     setShowRestart(false);
@@ -168,7 +171,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
     if (mode === "restart") r = await api("POST", `/api/agents/${id}/restart`);
     else if (mode === "reset") r = await api("POST", `/api/agents/${id}/reset`, { restart: true });
     else r = await api("POST", `/api/agents/${id}/reset`, { wipeWorkspace: true, restart: true });
-    if (r?.error) toast.error(t("members.startFailed")); // pure restart returns 503 when daemon offline; reset/full return ok (restart leg stays best-effort)
+    if (r?.error) startFail(r); // pure restart returns 503 when daemon offline; reset/full return ok (restart leg stays best-effort)
     setTimeout(refetch, 500);
   };
   const del = async () => { if (!(await confirm({ title: t("members.deleteAgentTitle", { name: a.name }), message: t("members.deleteAgentMessage"), confirmLabel: t("members.delete"), danger: true }))) return; await api("DELETE", "/api/agents/" + id); await reload(); onDeleted(); };

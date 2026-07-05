@@ -125,6 +125,7 @@
     "machineOnline": "online",
     "machineOffline": "offline",
     "startFailed": "Couldn't start the agent — its machine may be offline. Check the machine connection and try again.",
+    "startFailedWithReason": "Couldn't start the agent",
     "agentCreatedOffline": "Agent created, but its machine is offline so it hasn't started yet. It'll recover automatically and handle messages once the machine reconnects.",
     "createAgentTitle": "Create Agent",
     "computerLabel": "Computer (host machine)",
