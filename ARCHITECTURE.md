@@ -53,6 +53,7 @@ Agent data plane   Agent process → HTTP /agent-api/*  (Bearer per-agent token 
 - `runtimeModels.ts` — **Dynamic model cache + probe**: `getDynamicModels(machineId, runtime)` — checks an in-memory cache (TTL ~60s, key = `machineId:runtime`), on miss fires a `probe-models` WS-RPC via `requestDaemonByMachine` (`daemonHub`) and awaits the daemon's `models` reply, then sorts with the default model first. `DYNAMIC_RUNTIMES` = `{opencode, cursor, pi, claude, codex}`. Errors / timeouts fall back gracefully (callers use the static `MODELS` table). Cache is intentionally in-process (not Redis) — staleness of 60s is acceptable for model lists; a per-machine-per-runtime TTL means the cache auto-refreshes across runtimes independently.
 - `storage.ts` — Pluggable object storage boundary: default local disk, switchable to any S3-compatible backend (MinIO/Garage/OSS, `OPEN_TAG_S3_*`); `storageKey` is driver-agnostic. `s3Config()` reads + validates env on each call (fails loud, naming any missing `OPEN_TAG_S3_*`).
 - `attachments.ts` / `reminders.ts` / `util.ts` — busboy streaming upload (≤25MB / 10 files; each per-file save self-catches and drains its stream so a failed `saveObject` surfaces as a rejected upload, never an unhandled rejection that crashes the process) / reminder fire → posts system message `@owner reminder:...` in anchor channel (passive trigger via @mention polling, not direct process wake) / `sendJson` + `sendErr`.
+- `ratelimit.ts` — in-memory fixed-window per-IP rate limiting (registration) + `clientIp()`: prefers `X-Real-IP`, falls back to the **first** `X-Forwarded-For` hop, both only under `TRUST_PROXY=true`; socket address otherwise (see AGENTS.md transport flags for the proxy trust model).
 
 ### Local daemon (`src/daemon/`)
 
@@ -102,6 +103,10 @@ Lets any machine join a server without cloning the repo: `npx @fancyboi999/open-
 - `toast.tsx` — Lightweight global toast notifications (`ToastProvider` / `useToast()`, mirrors `ConfirmModal`'s context shape, no third-party lib; mounted in `main.tsx`). One-shot operation feedback where an inline banner doesn't fit — e.g. start/restart an agent whose machine is offline (503), or create an agent that couldn't start (`started:false`).
 - `alerts.tsx` — **System alert center**: `useSystemAlerts()` derives *standing* system warnings from live store state (an online machine whose `daemonVersion` ≠ `latestDaemonVersion` → outdated daemon; an offline machine still hosting agents → those agents can't run), and `NotificationCenter` renders them in a fixed, rail-anchored popover. The rail's warning button (above Settings in `Layout.tsx`) shows only when there are undismissed alerts. Distinct from `toast.tsx`'s one-shot feedback — alerts recompute from state and are individually dismissable (session-scoped). `latestDaemonVersion` is read from `packages/daemon/package.json` by the `/api/servers/:id/machines` route (`routes-api/servers.ts`).
 - `views/Members.tsx` — Members directory: the sidebar groups agents by machine + a humans section; the default roster lists agents and humans as two labelled sections of clickable cards, each navigating into that member's profile. AgentProfile seven-tab panel (overview / activity / workspace / permissions / apps / DM / reminders) + HumanProfile + create-agent modal.
+- `views/ChatSidebar.tsx` — channel/DM sidebar shared by the Chat and Saved views (channel list, DM list, unread badges; hosts `LiveAgentBar` at its bottom).
+- `views/ConnectComputerWizard.tsx` — multi-step connect-a-computer modal behind all three entry points (`onboard` auto-show / Computers `add` / offline-machine `reconnect` with key rotation).
+- `QuickSwitcher.tsx` — Cmd+K global jump palette (channels / DMs / members).
+- `messageRender.tsx` — markdown message renderer: mention links resolved from the message's own structured `mentions[]`, raw HTML downgraded to literal text (`remarkHtmlAsText` — no raw-HTML/XSS surface; see §III).
 - `views/LiveAgentBar.tsx` — Live agent activity bar pinned to the bottom of the sidebar (rendered inside `ChatSidebar`, so it shows in both Chat and Saved views): a workspace-wide pulse of agents currently `working`/`thinking` (status-guarded against stale `activity`), most-active first with a `+N` popover for the rest. Clicking an agent calls the store's `openAgentPanel` signal → `Chat.tsx` opens that agent's profile on the Activity tab in the right column (no page nav, no DM). Complements the per-DM status dots; does not replace them.
 - `views/misc.tsx` — Tasks / Inbox / Computers / Search / Settings.
 - `views/Landing.tsx` / `views/Features.tsx` / `views/ProductMock.tsx` + `landing/` — Public marketing pages: landing (`/`) plus features (`/features`) share the warm-editorial skin (tokens all scoped to `.lp-*`, strictly isolated from app editorial skin — no cross-contamination). Landing covers hero / three-pillar / capability cards × 9 / engine / architecture / CTA / footer; features is a static public case showcase with five channel→task→thread demos and a clickable thread panel. Both pages reuse `ProductMock` so the promo surface mirrors the real app shell (rail, channel sidebar, chat, task pill, thread, agent profile, existing avatar system), with no API or live-agent calls. "Enter workspace" navigates to `/s/:slug` when logged in, otherwise to `/login`. Copy and selling points are grounded in verified capabilities.
@@ -112,9 +117,9 @@ Lets any machine join a server without cloning the repo: `npx @fancyboi999/open-
 
 ### Documentation (`docs/`, `DESIGN.md`, root files)
 
-- `ARCHITECTURE.md` (this file) · `docs/` (**project-authored knowledge**: core-beliefs / generated/db-schema / tech-debt-tracker / PLANS / MISSION / FEATURES).
+- `ARCHITECTURE.md` (this file) · `docs/` (**project-authored knowledge**: core-beliefs / generated/db-schema / tech-debt-tracker + tech-debt-archive / PLANS / MISSION / authorization / code-quality; `docs/exec-plans/` holds active + completed execution plans; `docs/superpowers/` is a read-only archive of earlier plan/spec documents).
 - `docs-site/` — One-page public documentation site built from `DESIGN.md`; deployed to `https://docs.getopentag.com` by GitHub Pages and also built into the app image so self-hosted servers can serve it at `/docs/`.
-- Root `README.md` (how to run — kept current) · `DESIGN.md` (**visual system / frontend design spec**: design tokens + component specs, adopts an editorial design language as the project's own design system; `web/styles.css` implements the relevant subset) · `AGENTS.md` (agent onboarding guide) · `FEATURES.md` (feature checklist; some P4/P6 labels may lag code, see tech-debt-tracker).
+- Root `README.md` (how to run — kept current) · `DESIGN.md` (**visual system / frontend design spec**: design tokens + component specs, adopts an editorial design language as the project's own design system; `web/styles.css` implements the relevant subset) · `AGENTS.md` (agent onboarding guide) · `FEATURES.md` (feature **status** checklist — checkbox + short note; this file's §II stays the authoritative route/API surface).
 
 ### Running the project (`package.json` scripts)
 
@@ -124,6 +129,10 @@ npm run db:push      # push schema
 npm run seed         # seed data
 npm run server       # tsx watch src/server
 npm run daemon       # daemon process
+npm run typecheck    # tsc --noEmit, root + web (run before committing)
+npm run wt:add -- <name>   # isolated parallel-dev worktree (see AGENTS.md); wt:rm tears down
+npm run dev:e2e:up   # isolated live E2E stack with a seeded @dev-bot (dev:e2e:down to stop)
+npm run prod:up      # local prod deploy: web build → db:push:prod → server (prod:down stops)
 npm run pkg:daemon:build  # bundle the publishable @fancyboi999/open-tag-daemon package → packages/daemon/dist
 cd web && npm run dev  # Vite HMR dev server
 ```
@@ -145,7 +154,7 @@ cd web && npm run dev  # Vite HMR dev server
 - **`storageKey` is driver-agnostic**: switching local ↔ S3 requires no changes to business logic.
 - **Agent communication is unified through the `open-tag` CLI** (generated at `~/.open-tag/bin`, injected into the agent's PATH). Claude agents do **not** use MCP. What the agent cannot see in its context effectively does not exist — knowledge is persisted to the workspace `MEMORY.md`.
 - **Agents are single-threaded / one agent = one session (intentional design, not a limitation)**: one agent = one process, one session; turns are **serial** (while busy, deliver-debounce batches incoming messages rather than interrupting). **Parallelism lives at the team level (multiple agents collaborating), not inside a single agent** — "employee mental model" (see §I): scale by hiring more people, not by making one person multi-thread. `Task` and sub-agents are **not blocked** (inherited from the host machine's tooling), but the standing prompt does not encourage their use → **do not build logic that depends on which sub-agents happen to be installed, and do not add `/fork`-style intra-agent parallelism**.
-- **Single file ≤ 1000 lines** (split if exceeded). The former 1093-line `routes-api.ts` is now the `routes-api/` directory (largest module `channels.ts` ~310); the largest single file is now `core.ts` (~630).
+- **Single file ≤ 1000 lines** (split if exceeded). The former 1093-line `routes-api.ts` is now the `routes-api/` directory; the largest single file is currently `src/server/core.ts` — check with `wc -l` rather than trusting a written count (recorded numbers here drifted stale twice).
 
 ## IV. Boundaries (made explicit because they are easy to miss)
 

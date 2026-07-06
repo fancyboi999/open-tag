@@ -528,7 +528,7 @@ sudo systemctl restart open-tag-daemon
 | `REDIS_URL` | yes | — | Redis connection string |
 | `PORT` | no | `7777` | HTTP listen port |
 | `JWT_SECRET` | yes | — | Human session signing key |
-| `DAEMON_BOOTSTRAP_KEY` | yes | `poc-secret-key` | Daemon WS auth key — **always override in production** |
+| `DAEMON_BOOTSTRAP_KEY` | yes | — | Daemon WS auth key (`openssl rand -hex 32`) — the server refuses to start without it |
 | `ADMIN_SETUP_TOKEN` | yes (first deploy only) | — | One-time admin bootstrap; clear after use |
 | `ALLOW_DEV_LOGIN` | no | unset | `true` enables passwordless dev-login — **never set in production** |
 | `OPEN_TAG_HOME` | no | `~/.open-tag` | Base dir for agent workspaces, logs, uploads |
@@ -541,9 +541,10 @@ sudo systemctl restart open-tag-daemon
 | `OPEN_TAG_S3_REGION` | no | `us-east-1` | S3 region |
 | `OPEN_TAG_IDLE_MS` | no | `600000` | Agent idle-sleep timeout in ms (default 10 min) |
 
-> `DAEMON_BOOTSTRAP_KEY` has a built-in fallback value (`poc-secret-key`) in the code so
-> local dev works without config. This fallback is **not a secret** — replace it before
-> any deployment.
+> The server has **no built-in fallback** for `JWT_SECRET` or `DAEMON_BOOTSTRAP_KEY` —
+> `requireEnv()` (`src/server/auth.ts`) fails at startup if either is missing. (The literal
+> `poc-secret-key` you may spot in the repo appears only in the `npm run daemon` dev script's
+> `--api-key` argument, never as a server-side default.)
 
 ---
 

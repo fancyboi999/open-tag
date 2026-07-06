@@ -6,9 +6,10 @@
 #   drizzle-kit push WITHOUT --force is additive-safe: it applies additive-only changes without
 #   prompting. If a migration requires destructive changes (dropping columns / tables), drizzle-kit
 #   will fail in a non-interactive container environment — causing the container to refuse to start
-#   rather than silently destroying data. In that case, stop the container and run the migration
-#   manually:  docker exec -it open-tag-app npx drizzle-kit push --force
-#   Review the diff carefully before confirming.
+#   rather than silently destroying data. In that case the container has already exited (docker exec
+#   won't work); run the migration in a one-off container instead:
+#     docker compose --profile app run --rm --entrypoint "" app npx drizzle-kit push --force
+#   Review the diff carefully before confirming. (Same procedure as docs/self-host.md.)
 set -e
 
 echo "[entrypoint] applying schema (drizzle-kit push, additive-safe)..."

@@ -1,9 +1,11 @@
 # open-tag Feature Checklist
 
 > Strategy: **breadth-first** — ship each feature working end-to-end, polish later. Checked = implemented and self-tested.
+> Scope: this file tracks feature **status** (checkbox + a short note; long verification narratives belong in the PR).
+> The authoritative route/API surface is `ARCHITECTURE.md` §II — do not treat this list as an API reference.
 
 ## P0 Foundation
-- [x] Project bootstrap + root CLAUDE.md (architecture / data model / protocol)
+- [x] Project bootstrap + root `AGENTS.md` map (`CLAUDE.md` imports it; architecture detail lives in `ARCHITECTURE.md`)
 - [x] Docker Compose: Postgres + Redis (`docker-compose.yml`, ports 5433/6380)
 - [x] Database schema (`src/db/schema.ts`: users/servers/serverMembers/machines/agents/channels/channelMembers/messages/messageMentions/reactions/attachments/reminders/knowledge)
 - [x] DB client (drizzle + postgres.js) `src/db/index.ts`; `db:push` migrations (13 tables created)
@@ -20,8 +22,8 @@
 
 ## P2 Agent Data Plane (bundled `open-tag` CLI) ★ — Core verified
 - [x] `open-tag` CLI (commander), auth via machine key + x-agent-id, proxied to `/agent-api/*` (verified, stdout clean)
-- [x] Subcommands: message check/send (stdin heredoc)/read, server info, channel join, task list/claim/update
-- [ ] Subcommands pending: thread, mention, reminder, react, profile, attachment, knowledge, search
+- [x] Subcommands: message check/send (stdin heredoc)/read/react/search, server info, channel join/members/leave, task list/claim/assign/update/new/unclaim, thread reply/read/unfollow, profile show/update, reminder schedule/list/cancel/snooze, attachment upload/view, action prepare (`src/cli/index.ts` mirrors `/agent-api`)
+- [ ] Subcommand pending: knowledge (create/list/search — no endpoints or CLI verb yet, see P7; mentions need no verb — `@name` inside `message send` is the mechanism)
 - [x] Daemon spawns agent with injected system prompt (Current Runtime Context + open-tag CLI spec) + PATH-injected open-tag wrapper (verified)
 - [x] **Runtime adapters (unified Runtime interface)**: claude (stream-json) + codex (app-server JSON-RPC, resume fallback) + copilot (one-shot pipe JSONL, `--session-id` resume) + opencode (one-shot `run --format json`, `--session` resume, stdin-closed + `NODE_OPTIONS`-stripped) + kimi (Kimi Code one-shot stream-json, `-r` resume, config.toml-only auth) + pi (Pi Coding Agent one-shot `--mode json`, `--session` resume, native `--append-system-prompt`) + cursor (Cursor Agent one-shot Claude-style stream-json, `--resume`, `NODE_OPTIONS`-stripped) — **all verified on real hardware** (copilot 1.0.61 / opencode 1.15.5 / kimi-code 0.19.2 / pi 0.73.1 / cursor-agent 2025.09.17: reply / multi-turn resume / trajectory / failure surfaced, dev:e2e) + **hermes (experimental)**: one-shot `hermes chat -q` per turn (`oneShotWake`), profile selection via `HERMES_HOME`/`HERMES_PROFILE` (live-discovered from `~/.hermes/profiles`; Hermes keeps provider credentials), native `session_id:` stderr resume with missing-session fresh-retry, plus a **final-response bridge** (stdout of a turn that read messages but never ran `message send` is bridged to the channel it read — evidence-gated, noise/error-filtered, freshness-hold-aware, loud on refusal) — verified live (hermes 0.16.0, real gpt-5.4 profile: reply / resume / profile injection / bridge success + hold-block + error-refusal, dev:e2e)
 - [x] **Mention routing**: only @ -mentioned agents are woken in a channel (+ DM agent); others correctly stay idle
@@ -30,15 +32,15 @@
 ## P3 Messaging Core (human /api/* + realtime) — Backend verified (smoke tested)
 - [x] REST: auth (dev-login/register/login/me) / servers / agents / channels / members / machines / messages/channel/:id / messages/sync
 - [x] Auth: Bearer JWT + `x-server-id` middleware (humans); machine key + `x-agent-id` (agents)
-- [x] **Seq incremental sync** (sync verified) + SSE `/api/push/prompt-events` (Redis pub/sub connected, pending frontend integration)
-- [x] channel_member + unread (lastReadSeq) (agent check advance verified); unread-summary pending
-- [x] **@mentions[] structured storage** (parse verified mentions=['ada']); frontend highlight rendering pending
+- [x] **Seq incremental sync** (`GET /api/messages/sync?since=`, verified); human realtime is socket.io full `message:new` (`socketio.ts` — the once-planned SSE `/api/push/prompt-events` endpoint was never built and is not coming back)
+- [x] channel_member + unread (lastReadSeq) + unread summary (`GET /api/channels/unread` aggregates channel-own + followed-thread unread, shared with `POST /:id/read` — see the honest-badge entry in P4)
+- [x] **@mentions[] structured storage** + frontend highlight rendered from the message's own `mentions[]` (`messageRender.tsx` — a non-member `@` renders as plain text)
 - [x] **Saved Messages / Bookmarks**: `saved_messages` table + GET/POST/DELETE/check endpoints + web right-click "Save message" / Saved view / sidebar count; 13 item fields (messageId/channel*/parent*/sender*). Full curl + browser end-to-end verified (right-click → save → Saved view → unsave + DB)
 - [x] **Channel lifecycle**: `PATCH /channels/:id` (rename/description/visibility), `POST /channels/:id/archive`·`unarchive`, `DELETE /channels/:id` (soft-delete deletedAt); all gated on manageChannels; `GET /channels` hides archived by default (`?archived=include` to show). Frontend channel header "⋯" settings menu (rename/archive/delete, visibility-gated). curl 5-way verified + browser menu verified. DM auto-create deduplication in place; private channel visibility enforced (GET /channels only shows private to members); **join private channel gated** (`POST /channels/:id/join` → 403 invite-only for private, curl verified)
 - [x] **Channel message pagination (keyset)**: `GET /api/messages/channel/:id?before=<seq>&limit=` returns a `hasMore` flag (cursor on the monotonic `seq`, hits the `(channelId, seq)` index — no offset drift; `hasMore` via a `limit+1` sentinel like the search/mentions routes, so no exact-page-boundary false positive). Web Chat loads the latest page (50) then lazy-loads older pages on scroll-to-top (viewport anchored — no jump) and caps the live-tail in-memory window at 400 (drops oldest, re-fetchable via the cursor; suppressed mid-pagination to avoid a `hasMore` race). Verified: curl (first page / `before` older page — no overlap or gap / `before=abc|0|-5` + `limit=0|-5` fall back to defaults / exact-page boundary `limit=60`→`hasMore=false` / `limit` clamp / empty channel / cross-tenant 403) + browser (initial 50, scroll-to-top 50→60 viewport-anchored, stops at `hasMore=false`). Deep-links (`?msg=`/`?thread=`) to a message outside the loaded window page older history until the target loads (load-until-found), bounded by `hasMore`; an in-flight older-page fetch is dropped if the channel switches mid-flight. Live-tail trim is unit-tested (`appendWithCap`) but not browser-E2E'd (needs 400+ realtime msgs)
 - [x] /agent-api/*: message check/send/read, server info, channel join, task list/claim/update (full chain verified)
 - [x] WS daemon control plane: connect/machine registration (persistent machine-id + ready:ack) / heartbeat / agent:start·deliver broadcast — real daemon integration tested (spawn claude/codex; agent:deliver carries inbox-notice metadata targetName/msgShort/isTask)
-- [ ] DM / private channel / channel add/remove archive (UI gaps)
+- [ ] Unarchive/restore UI: backend `POST /channels/:id/unarchive` exists but has no frontend surface (archived channels are hidden with no browse toggle). The rest of the old "UI gaps" line shipped: DM creation, private-channel visibility toggle, channel member add/remove, archive are all in the UI (`Chat.tsx` EditChannelModal / ChannelMembersModal)
 
 ## P4 Tasks & Threads — Implemented (slice03 evidence-driven alignment + end-to-end verified)
 - [x] Task field on message: As Task / right-click convert to task; `GET /api/tasks/channel/:id`, `/api/tasks/server`, `POST .../convert-message`, `DELETE /api/tasks/:id` (delete = revert to plain message, source message preserved)
@@ -59,7 +61,7 @@
 ## P5 Agent Collaboration — Core loop end-to-end verified (slice 01)
 - [x] Agent A `open-tag message send @B` → B wakes → works → reports back — collaboration complete (e2e verified: real web send → two agents cross-runtime bidirectional)
 - [x] Routing: @mentions/channel membership determines which agents wake (non-mentioned agents correctly stay idle); busy-state stdin notification (deliver 3s debounce batching + inbox-notice metadata)
-- [x] **Agent Live Trace panel persistence + responsive layout (task #2)**: the right-column live-trace feed (all agents' thinking/tool calls) now lives in a **bounded ring buffer in the store** (`web/src/trajBuffer.ts`, cap 300, drop-oldest) instead of per-Chat-view state, so traces **survive channel/DM switches** (no longer wiped). Backend `agent_activity_log` is **pruned to the newest 500 rows per agent on insert** (`ws.ts pruneAgentActivityLog`), bounding table growth. CSS: long trace lines **wrap** (`overflow-wrap:anywhere`) and the panel no longer scrolls horizontally (`overflow-x:hidden`). Verified: `trajBuffer` unit 6/6, prune integration 6/6 (isolated DB), CSS no-h-scroll + wrap in a real browser. Refresh-restore deferred (per @fancy); see tech-debt I33.
+- [x] **Agent Live Trace panel persistence + responsive layout (task #2)**: the right-column live-trace feed (all agents' thinking/tool calls) now lives in a **bounded ring buffer in the store** (`web/src/trajBuffer.ts`, cap 300, drop-oldest) instead of per-Chat-view state, so traces **survive channel/DM switches** (no longer wiped). Backend `agent_activity_log` is **pruned to the newest 500 rows per agent on insert** (`ws.ts pruneAgentActivityLog`), bounding table growth. CSS: long trace lines **wrap** (`overflow-wrap:anywhere`) and the panel no longer scrolls horizontally (`overflow-x:hidden`). Verified: `trajBuffer` unit 6/6, prune integration 6/6 (isolated DB), CSS no-h-scroll + wrap in a real browser. Refresh-restore deferred (per @fancy); see tech-debt I37.
 - [x] **Live agent bar (sidebar bottom)**: a persistent, workspace-wide "who's running right now" strip pinned below the channel/DM list (`web/src/views/LiveAgentBar.tsx`, in `ChatSidebar`). Shows agents whose `status==='active'` **and** `activity∈{working,thinking}` (status guard hides phantom agents stuck on stale `working` after an unclean stop); most-active (working before thinking) shown with avatar + pulsing status pip + live `activityDetail`, the rest folded into a `+N` popover. Clicking an agent opens its profile on the **Activity** tab in the right column via the store's one-shot `openAgentPanel` signal (consumed by `Chat.tsx` → `setProfile` + `?agentTab=activity`, cleared on close) — **no page nav, no DM**. Editorial skin (hairline divider, reuses `.dot` colors, `prefers-reduced-motion` pulse off); rail↔sidebar divider strengthened (`--hair`→`--hair-strong`) for container separation. Resting state "No agents running". Browser-verified in an isolated worktree: resting / 1-active / +N popover / guard (online + stale-inactive hidden) / click→inline Activity panel without leaving the channel; `npm run typecheck` clean, no console errors.
 
 ## P6 Workspace Settings & Agent Creation & Profile
@@ -86,9 +88,9 @@
 
 ## P7 Advanced
 - [ ] **knowledge (agent private knowledge base / memo)**: agents **create multiple** memos (`title`+`content`), full-text **search** (PG tsvector) for self-retrieval during work — audience is **the agent itself**, not humans, **not** a read-only platform manual. Schema `knowledge` table (`agentId/title/content/searchText`) direction correct; missing endpoints + `open-tag knowledge` CLI (create/list/search) + GIN index
-- [ ] **messages search (human search)**: `GET /api/messages/search?q=` — human-side top bar search, **not the same as knowledge**, do not conflate
+- [x] **messages search (human search)**: `GET /api/messages/search?q=` shipped (`routes-api/messages.ts` — scoped to the caller's readable channels, ilike + snippet + `hasMore` paging) + web Search view; **not the same as knowledge**, do not conflate
 - [ ] integrations / apps, credential proxy (agents never touch plaintext keys)
-- [ ] Migrate to real `/agent-api` + wake-hints/stream (out of process)
+- [ ] Agent wake-hints/stream (out-of-process real-time push to agents; the "migrate to real `/agent-api`" half of this old line is long done — agents talk to the real `/agent-api` via the CLI)
 - [ ] Web Push (vapid)
 
 ## Public Landing Page (open-source showcase)

@@ -9,6 +9,98 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-07-05
+
+### Fixed
+
+- Daemon: a missing `codex` binary no longer crashes the whole daemon — spawn
+  errors (ENOENT etc.) are caught and surfaced as an `offline` agent activity
+  (`codex not found`) while the daemon keeps serving its other agents (#163, #164).
+- Server-side (ships from `main`, not this package): agent starts/wakes are gated
+  on the assigned machine being online and advertising the agent's runtime, and
+  are delivered to that machine only; unbound agents (`machineId = null`) keep
+  the broadcast fallback.
+
+## [0.8.0] — 2026-07-03
+
+### Added
+
+- **Experimental Hermes runtime** (#158, #159): one-shot `hermes chat -q` per turn,
+  profiles discovered live from `~/.hermes/profiles` (+ `HERMES_PROFILE_DIR`) and
+  selected per-agent via `HERMES_HOME`/`HERMES_PROFILE` — Hermes keeps owning
+  provider credentials. Native `session_id` capture for resume, with a
+  self-healing fresh retry when a resumed session is missing.
+- **Hermes final-response bridge** (#159): a turn that read messages but never ran
+  `message send` gets its stdout bridged back to the channel it read —
+  evidence-gated, noise/error-filtered, freshness-hold-aware, loud on refusal.
+- `Runtime.oneShotWake` capability flag: one-shot-per-turn runtimes get a concrete
+  check→send wake instruction and a short delivery debounce, generically.
+
+### Included from unreleased 0.7.2
+
+- Workspace tab shows the real daemon workspace root when `OPEN_TAG_HOME` is
+  non-default (#152). (0.7.2 was never published separately.)
+
+## [0.7.1] — 2026-07-02
+
+### Changed
+
+- claude/codex model + reasoning effort are now optional (PR #151): an agent with
+  `model = NULL` makes the daemon omit `--model`/`--effort` so the CLI uses its
+  local config (`~/.claude` / `~/.codex`).
+
+### Fixed
+
+- `claudeRuntime` now actually forwards `--effort` (the #65 UI picker had only
+  ever reached codex); `buildClaudeArgs` extracted as a unit-tested pure function
+  with an effort allow-list.
+
+## [0.7.0] — 2026-07-01
+
+### Added
+
+- **Agent task handoff**: `open-tag task assign --message-id <id> --to @agent`
+  (or `--channel #ch --number N`) reassigns a task to another agent, records the
+  handoff in the task thread, and wakes the assignee on the thread target.
+- Stable `thread:shortid` thread-target form (alongside `#channel:shortid`) that
+  resolves consistently across agents, private channels, and DMs; the shared
+  agent prompt prefers it when a thread target crosses actors.
+
+## [0.6.1] — 2026-06-27
+
+### Fixed
+
+- Machine liveness after server redeploys / half-open daemon WebSockets: the
+  daemon closes and reconnects when server frames stop arriving (server-frame
+  watchdog), and the server guards machine-offline handling so a stale socket
+  close cannot override a newer connection for the same machine.
+
+## [0.6.0] — 2026-06-26
+
+### Removed
+
+- The **demo runtime** (added in 0.5.0) is removed entirely (#112) — the
+  Create-Agent dropdown, adapter, registry, and model-discovery entries are gone.
+  The seven real runtimes are unchanged.
+
+## [0.5.1] — 2026-06-26
+
+### Fixed
+
+- Remote daemons (daemon host ≠ server host) injected
+  `OPEN_TAG_SERVER_URL=http://localhost:PORT` into spawned agents, so every
+  `open-tag` CLI call failed with `fetch failed`. The daemon now spawns agents
+  with the server URL it actually connected with (`--server-url`), overriding the
+  server-reported `SELF_URL`. Same-host self-hosting is unchanged; split deploys
+  now work. (tech-debt I66)
+
+## [0.5.0] — 2026-06-26
+
+### Added
+
+- `demo` no-op runtime (#93) for stack smoke-testing without an external CLI.
+  (Removed again in 0.6.0.)
+
 ## [0.4.0] — 2026-06-25
 
 ### Changed
@@ -68,7 +160,15 @@ from `main`; see commit history for fine-grained server/web changes.
   on any machine with Node ≥ 20, without cloning the repository.
 - Supported runtimes at time of release: **Claude Code** and **Codex**.
 
-[Unreleased]: https://github.com/fancyboi999/open-tag/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/fancyboi999/open-tag/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/fancyboi999/open-tag/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/fancyboi999/open-tag/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/fancyboi999/open-tag/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/fancyboi999/open-tag/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/fancyboi999/open-tag/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/fancyboi999/open-tag/compare/v0.5.1...v0.6.0
+[0.5.1]: https://github.com/fancyboi999/open-tag/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/fancyboi999/open-tag/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/fancyboi999/open-tag/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/fancyboi999/open-tag/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/fancyboi999/open-tag/compare/v0.1.0...v0.2.0
