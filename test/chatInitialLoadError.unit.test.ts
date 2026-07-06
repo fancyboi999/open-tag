@@ -26,6 +26,15 @@ test("initial message load drops stale async results after switching channels", 
   assert.match(chatSrc, /finally\s*\{[\s\S]*if \(curIdRef\.current === chId\) setLoaded\(true\)/);
 });
 
+test("message list render is mutually exclusive with the loading skeleton", () => {
+  // Regression: loadCurrentMessages calls setMsgs(ms) before an awaited threadMeta fetch, and only
+  // sets loaded=true in the finally block after that fetch resolves. If the message-list render isn't
+  // gated on `loaded` too, that in-between render paints the skeleton (`!loaded`) and the real message
+  // list (msgs already populated) stacked on top of each other. Reproduced live: a delayed threads
+  // endpoint made the skeleton and real messages render together in the same scroll container.
+  assert.match(chatSrc, /\{loaded && !loadError && msgs\.map\(/);
+});
+
 test("chat load failure copy is localized", () => {
   assert.equal(en.chat.loadFailedTitle, "Could not load this conversation");
   assert.equal(en.chat.loadFailedBody, "OpenTag could not reach the server. Check that the control plane is running, then retry.");
