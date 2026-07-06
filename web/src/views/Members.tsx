@@ -13,6 +13,7 @@ import { Avatar, AvatarPicker, resolveAvatar } from "../Avatar.tsx";
 import { Select } from "../Select.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 import { useToast } from "../toast.tsx";
+import { startFailReasonKey } from "../startFailReason.ts";
 import i18n from "../i18n";
 
 // Unified agent status label: fine-grained activity (working/thinking/online) takes priority;
@@ -162,7 +163,12 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   if (!a) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
   // Surface the server's concrete 503 reason ("no daemon online" / "runtime X unavailable on selected machine" …);
   // the generic machine-may-be-offline guess alone made users blind-retry (live 2026-07-05: 3× restart → 503).
-  const startFail = (r: any) => toast.error(r?.error && r.error !== "internal" ? `${t("members.startFailedWithReason")}: ${r.error}` : t("members.startFailed"));
+  // Known reasons render localized (startFailReasonKey); unknown ones fall back to the raw server string.
+  const startFail = (r: any) => {
+    if (!r?.error || r.error === "internal") return toast.error(t("members.startFailed"));
+    const known = startFailReasonKey(String(r.error));
+    toast.error(`${t("members.startFailedWithReason")}: ${known ? t(known.key, known.params) : r.error}`);
+  };
   const ctl = async (action: string) => { const r = await api("POST", `/api/agents/${id}/${action}`); if (r?.error) startFail(r); setTimeout(refetch, 400); }; // start/stop: surface daemon-offline failure (503 → {error}) instead of swallowing it
   // Three restart modes: restart=keep session+workspace; reset=clear session, keep workspace; full=clear session+delete workspace. All modes end with a restart.
   const doRestart = async (mode: "restart" | "reset" | "full") => {
