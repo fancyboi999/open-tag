@@ -190,6 +190,13 @@ test("message toolbar stays inside the message border and exposes save/copy/more
   assert.match(ruleBody(".msg-toolbar button.on"), /color\s*:\s*var\(--ink\)/, "saved toolbar button should render as filled/dark");
 });
 
+test("agent status badge fades out on hover so it doesn't collide with the save/copy/more toolbar in the same corner", () => {
+  const activity = ruleBody(".msg-activity");
+  assert.match(activity, /transition\s*:\s*opacity \.5s ease\b/, `activity badge should fade with the same timing as the toolbar it shares a corner with: ${activity}`);
+  const hoverFade = ruleBody(".msg:hover .msg-activity");
+  assert.match(hoverFade, /opacity\s*:\s*0\b/, `activity badge must yield the top-right corner to the toolbar on hover, not overlap it: ${hoverFade}`);
+});
+
 test("reaction footer keeps the upstream add-reaction entry even with no reactions", () => {
   assert.doesNotMatch(chatSrc, /if \(!rs\.length\) return null;/);
   assert.match(chatSrc, /<div className="msg-rx">/);

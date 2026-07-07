@@ -601,7 +601,7 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .agent-reply-placeholder.done{animation:none;color:var(--muted-soft);background:none}
 .agent-reply-placeholder.error{color:var(--status-red);font-style:normal;background:none;animation:none}
 @keyframes agent-thinking-shimmer{0%{background-position:100% 0}50%{background-position:0% 0}100%{background-position:0% 0}}
-.msg-activity{flex:none;font-family:var(--mono);font-size:11px;line-height:1.35;color:var(--muted);background:var(--status-badge-bg);border:0;border-radius:5px;padding:1px 5px;white-space:nowrap}
+.msg-activity{flex:none;font-family:var(--mono);font-size:11px;line-height:1.35;color:var(--muted);background:var(--status-badge-bg);border:0;border-radius:5px;padding:1px 5px;white-space:nowrap;transition:opacity .5s ease}
 .msg-activity.sleeping{color:var(--status-blue);background:var(--status-badge-bg)}
 .msg-activity.online,.msg-activity.active{color:var(--status-green);background:var(--status-badge-bg)}
 .msg-activity.working,.msg-activity.thinking{color:var(--status-orange);background:var(--status-badge-bg)}
@@ -838,6 +838,7 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
 /* ── Message hover floating toolbar (actions float in top-right corner) ──────────── */
 .msg-toolbar{position:absolute;top:7px;right:10px;display:flex;gap:2px;background:transparent;border:0;border-radius:8px;box-shadow:none;padding:0;opacity:0;pointer-events:none;transition:opacity .5s ease;z-index:5}
 .msg:hover .msg-toolbar{opacity:1;pointer-events:auto}
+.msg:hover .msg-activity{opacity:0} /* toolbar and the activity badge share the top-right corner; yield to the toolbar on hover instead of overlapping it */
 .msg-toolbar button{border:0;background:transparent;color:var(--muted);font-size:15px;line-height:1;padding:5px 7px;border-radius:6px;cursor:pointer}
 .msg-toolbar button:hover{background:var(--surface-strong)}
 .msg-toolbar button.on{color:var(--ink)}
