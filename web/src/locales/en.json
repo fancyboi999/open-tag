@@ -291,6 +291,8 @@
   },
   "chat": {
     "close": "Close",
+    "dateToday": "Today",
+    "dateYesterday": "Yesterday",
     "videoUnsupported": " (this codec cannot be previewed in browser, click to download)",
     "addReaction": "Add reaction",
     "createPrivateChannel": "Create private channel #{{name}}",

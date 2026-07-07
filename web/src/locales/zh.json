@@ -291,6 +291,8 @@
   },
   "chat": {
     "close": "关闭",
+    "dateToday": "今天",
+    "dateYesterday": "昨天",
     "videoUnsupported": "(此编码浏览器无法预览,点击下载)",
     "addReaction": "加表情",
     "createPrivateChannel": "创建私有频道 #{{name}}",

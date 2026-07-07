@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Star, Bookmark, AlertTriangle, Lock, MessageCircle, Eye, Plus } from "lucide-react";
-import { useStore, fmtTime } from "../store.tsx";
+import { useStore } from "../store.tsx";
+import { fmtDateTime } from "../format";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { ChatSidebar } from "./ChatSidebar.tsx";
 import { IconMonitor, IconInbox } from "../icons.tsx";
@@ -153,7 +154,7 @@ export function Inbox() {
                 <span className="ib-top">
                   <span className="ib-name">{it.channelName}</span>
                   {it.hasMention && <span className="ib-mention" title={t("misc.inboxMentionTitle")}>@</span>}
-                  <span className="ib-time">{fmtTime(it.lastMessageAt)}</span>
+                  <span className="ib-time">{fmtDateTime(it.lastMessageAt)}</span>
                 </span>
                 <span className="ib-preview"><b>{it.lastMessageSenderName}</b>: {it.lastMessagePreview}</span>
               </span>
@@ -167,7 +168,7 @@ export function Inbox() {
                 <span className="ib-top">
                   <span className="ib-name">{m.channelName}</span>
                   {!m.read && <span className="ib-mention" title={t("misc.inboxMentionTitle")}>@</span>}
-                  <span className="ib-time">{fmtTime(m.createdAt)}</span>
+                  <span className="ib-time">{fmtDateTime(m.createdAt)}</span>
                 </span>
                 <span className="ib-preview"><b>{m.senderName}</b>: {m.preview}</span>
               </span>
@@ -312,7 +313,7 @@ export function Search() {
           {searched && results.length === 0 && <div className="empty">{t("misc.searchNoResults", { q })}</div>}
           {results.map((r) => (
             <div className="card" key={r.id} style={{ cursor: "pointer" }} onClick={() => nav(`/s/${slug}/channel/${r.channelId}?msg=${r.id}`)}>
-              <div className="kv"><b># {r.channelName}</b> · {r.senderName} · {fmtTime(r.createdAt)}</div>
+              <div className="kv"><b># {r.channelName}</b> · {r.senderName} · {fmtDateTime(r.createdAt)}</div>
               <div className="mbody" dangerouslySetInnerHTML={{ __html: hilite(r.snippet || r.content, q) }} />
             </div>
           ))}

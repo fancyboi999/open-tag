@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeSanitize from "rehype-sanitize";
 import { useTranslation } from "react-i18next";
-import { useStore, fmtTime } from "../store.tsx";
+import { useStore } from "../store.tsx";
 import { fmtDateTime } from "../format";
 import { IconMonitor } from "../icons.tsx";
 import { Avatar, AvatarPicker, resolveAvatar } from "../Avatar.tsx";
@@ -353,7 +353,7 @@ function RemindersTab({ id, name }: { id: string; name: string }) {
       : rem.map((r) => (
         <div className="card" key={r.id}>
           <div className="who">{r.content}{r.recurrence ? <span className="meta"> · {t("members.recurrenceEvery", { seconds: r.recurrence })}</span> : null}</div>
-          <div className="meta"><span className={"rem-badge " + (r.status || "scheduled")}>{REM_STATUS[r.status] || r.status}</span> · {fmtTime(r.remindAt)}</div>
+          <div className="meta"><span className={"rem-badge " + (r.status || "scheduled")}>{REM_STATUS[r.status] || r.status}</span> · {fmtDateTime(r.remindAt)}</div>
         </div>
       ))}</div>;
 }

@@ -236,6 +236,11 @@ main.content-col > .scroll::-webkit-scrollbar{background:var(--surface)}
 main.content-col > .scroll::-webkit-scrollbar-track{background:var(--surface)}
 main.content-col > .scroll::-webkit-scrollbar-thumb{background:rgba(87,96,106,.32);border-radius:9999px;border:3px solid var(--surface)}
 .msg{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:12px;width:100%;max-width:var(--chat-card-width);margin:0 auto 8px;padding:7px 12px 5px;position:relative;border-radius:12px;transition:box-shadow .5s ease;box-shadow:inset 0 0 0 .5px rgba(87,96,106,.10)}
+/* date divider between messages sent on different calendar days: a hairline through the middle, cut by a centered pill label */
+.date-divider{position:relative;display:flex;align-items:center;justify-content:center;width:100%;max-width:var(--chat-card-width);margin:14px auto}
+.date-divider::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--hair-strong)}
+.date-divider-label{position:relative;background:var(--surface);padding:0 10px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-soft)}
+.thread-panel .date-divider-label{background:var(--canvas)}
 .msg:hover{background:transparent;box-shadow:inset 0 0 0 .5px rgba(87,96,106,.18),0 6px 18px rgba(15,23,42,.035)}
 .mav{width:32px;height:32px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--ink)}
 .mav.agent{background:radial-gradient(circle at 30% 28%,var(--g-mint),var(--g-lav) 70%,var(--g-sky))}

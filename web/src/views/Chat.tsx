@@ -1,8 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, Fragment, type CSSProperties, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
-import { useStore, fmtTime, type Msg, type Att } from "../store.tsx";
+import { useStore, type Msg, type Att } from "../store.tsx";
+import { fmtDateTime, isSameLocalDay, fmtDateDivider } from "../format";
 import { PAGE_SIZE, appendWithCap, nextScrollState } from "../lib/msgPaging";
 import { AGENT_REPLY_PREVIEW_TYPE, AGENT_REPLY_STREAM_TICK_MS, absorbPersistedAgentMessagePreview, applyAgentReplyPreview, dropAgentReplyPreviewsForMessage, hasStreamingAgentReplyPreview, renderKeyForMessage, tickAgentReplyPreviews, type AgentReplyEvent, type AgentReplyPreviewMsg } from "../lib/agentReplyPreview";
 import { MessageContent } from "../messageRender.tsx";
@@ -117,7 +118,7 @@ function ActionCardMsg({ m }: { m: Msg }) {
     <div className="msg action-card-msg" id={"m-" + m.id} key={m.id}>
       <Avatar seed={m.senderName} url={resolveAvatar(agents.find((a) => a.id === m.senderId)?.avatarUrl, attachmentUrl)} size={36} />
       <div className="msg-col">
-        <div className="msg-head"><span className="who">{m.senderName}</span><span className="member-badge">{t("chat.proposed")}</span><span className="ts">{fmtTime(m.createdAt)}</span></div>
+        <div className="msg-head"><span className="who">{m.senderName}</span><span className="member-badge">{t("chat.proposed")}</span><span className="ts">{fmtDateTime(m.createdAt)}</span></div>
         <div className="action-card">
           <div className="ac-title">{title}</div>
           {a.description ? <div className="ac-detail"><span className="ac-k">{t("chat.description")}</span> {a.description}</div> : null}
@@ -414,7 +415,7 @@ export function Chat() {
               {!loaded && <ChatSkeleton />}
               {loaded && loadError && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.loadFailedTitle")} sub={<><span>{t("chat.loadFailedBody")}</span><button className="joinbtn" onClick={loadCurrentMessages}>{t("chat.retryLoad")}</button></>} />}
               {loaded && !loadError && !msgs.length && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.channelEmpty")} />}
-              {loaded && !loadError && msgs.map((m) => {
+              {loaded && !loadError && msgs.map((m, mIdx) => {
                 const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // used for role description and avatar status dot
                 const agLive = agentLiveState(ag);
                 const agActivity = agentActivityText(ag);
@@ -424,21 +425,30 @@ export function Chat() {
                 const isAgentReplyPreview = m.messageType === AGENT_REPLY_PREVIEW_TYPE;
                 const agentReplyPreview = isAgentReplyPreview ? m as AgentReplyPreviewMsg : undefined;
                 if (agentReplyPreview && !agentReplyPreview.streamVisible) return null;
+                const prevMsg = msgs[mIdx - 1];
+                const dateDivider: ReactNode = m.createdAt && !isSameLocalDay(m.createdAt, prevMsg?.createdAt)
+                  ? <div className="date-divider"><span className="date-divider-label">{fmtDateDivider(m.createdAt, i18n.language, t("chat.dateToday"), t("chat.dateYesterday"))}</span></div>
+                  : null;
                 // action card (agent proposal card) → rendered by dedicated ActionCardMsg component
-                if (m.messageType === "action" && m.actionMetadata?.kind === "action-card") return <ActionCardMsg m={m} key={m.id} />;
+                if (m.messageType === "action" && m.actionMetadata?.kind === "action-card") return <Fragment key={m.id}>{dateDivider}<ActionCardMsg m={m} /></Fragment>;
                 // system messages (task lifecycle events, etc.) → centered grey bar (no avatar, no full message block)
                 // If the system message has thread replies (e.g. showcase case anchors), render a thread-pill below the bar so it's clickable.
                 if (m.senderType === "system") return (
-                  <div className="msg-sys" id={"m-" + m.id} key={m.id}>
-                    <MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} />
-                    {tm?.replyCount ? <button className="thread-pill" onClick={() => startThread(m)}><MessageCircle size={12} /> {t("chat.replyCount", { count: tm.replyCount })}</button> : null}
-                  </div>
+                  <Fragment key={m.id}>
+                    {dateDivider}
+                    <div className="msg-sys" id={"m-" + m.id}>
+                      <MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} />
+                      {tm?.replyCount ? <button className="thread-pill" onClick={() => startThread(m)}><MessageCircle size={12} /> {t("chat.replyCount", { count: tm.replyCount })}</button> : null}
+                    </div>
+                  </Fragment>
                 );
                 const staggerIdx = newMsgOrderRef.current.get(m.id);
                 const isNewMsg = staggerIdx !== undefined;
                 const shouldEnter = isNewMsg || !!agentReplyPreview;
                 return (
-                <div className={"msg" + (shouldEnter ? " msg-enter" : "")} id={"m-" + m.id} key={renderKeyForMessage(m)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ m, x: e.clientX, y: e.clientY }); }} style={isNewMsg ? { "--msg-delay": `${staggerIdx * 60}ms` } as CSSProperties : undefined}>
+                <Fragment key={renderKeyForMessage(m)}>
+                  {dateDivider}
+                  <div className={"msg" + (shouldEnter ? " msg-enter" : "")} id={"m-" + m.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ m, x: e.clientX, y: e.clientY }); }} style={isNewMsg ? { "--msg-delay": `${staggerIdx * 60}ms` } as CSSProperties : undefined}>
                   <div className="msg-toolbar">
                     <button className={isSaved ? "on" : ""} title={isSaved ? t("chat.unsave") : t("chat.saveMessage")} onClick={() => { isSaved ? unsaveMsg(m.id) : saveMsg(m.id); }}><Bookmark size={15} fill={isSaved ? "currentColor" : "none"} /></button>
                     <button title={t("chat.copyMarkdown")} onClick={() => copyMarkdown(m.content)}><Clipboard size={15} /></button>
@@ -460,7 +470,7 @@ export function Chat() {
                         : m.senderId
                           ? <span className="who clickable" onClick={() => setProfile({ type: "human", id: m.senderId! })}>{m.senderName}</span>
                           : <span className="who">{m.senderName}</span>}
-                      <span className="ts">{fmtTime(m.createdAt)}</span></div>
+                      <span className="ts">{fmtDateTime(m.createdAt)}</span></div>
                     {ag && (agActivity || ag.description) ? <div className="msg-subhead">
                       {agActivity ? <code className={"msg-activity " + agLive}>{agActivity}</code> : null}
                       {ag.description ? <span className="msg-role">{ag.description}</span> : null}
@@ -494,7 +504,8 @@ export function Chat() {
                         <Reactions m={m} mine={me?.id ?? ""} onReact={(emoji, remove) => react(m.id, emoji, remove)} />
                       </div>
                   </div>
-                </div>
+                  </div>
+                </Fragment>
                 );
               })}
             </div>
@@ -662,15 +673,17 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
     return () => window.clearInterval(timer);
   }, [streamingPreviewActive]);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [msgs]);
-  const row = (m: Msg) => {
-    if (m.senderType === "system") return <div className="msg-sys" id={"m-" + m.id} key={m.id}>{m.content}</div>; // system messages render as a banner with no avatar
+  const row = (m: Msg, dateDivider?: ReactNode) => {
+    if (m.senderType === "system") return <Fragment key={m.id}>{dateDivider}<div className="msg-sys" id={"m-" + m.id}>{m.content}</div></Fragment>; // system messages render as a banner with no avatar
     const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // agent sender → avatar and name are clickable to open the profile panel
     const live = ag ? ((ag.activity && ag.activity !== "offline" ? ag.activity : ag.status) || "offline") : "offline";
     const isAgentReplyPreview = m.messageType === AGENT_REPLY_PREVIEW_TYPE;
     const agentReplyPreview = isAgentReplyPreview ? m as AgentReplyPreviewMsg : undefined;
     if (agentReplyPreview && !agentReplyPreview.streamVisible) return null;
     return (
-    <div className={"msg" + (agentReplyPreview ? " msg-enter" : "")} key={renderKeyForMessage(m)}>
+    <Fragment key={renderKeyForMessage(m)}>
+      {dateDivider}
+      <div className={"msg" + (agentReplyPreview ? " msg-enter" : "")}>
       {ag ? <span className="msg-av clickable" onClick={() => onOpenProfile("agent", m.senderId!)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={32} />{live !== "offline" && <span className={"av-status " + live} />}</span>
         : m.senderId ? <span className="msg-av clickable" onClick={() => onOpenProfile("human", m.senderId!)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={32} /></span>
         : <Avatar seed={m.senderName} url={senderAvatar(m)} size={32} />}
@@ -678,14 +691,15 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
       <div className="msg-col">
         <div>{ag ? <span className="who clickable" onClick={() => onOpenProfile("agent", m.senderId!)}>{m.senderName}</span>
           : m.senderId ? <span className="who clickable" onClick={() => onOpenProfile("human", m.senderId!)}>{m.senderName}</span>
-          : <span className="who">{m.senderName}</span>}<span className="ts">{fmtTime(m.createdAt)}</span></div>
+          : <span className="who">{m.senderName}</span>}<span className="ts">{fmtDateTime(m.createdAt)}</span></div>
         {isAgentReplyPreview && !m.content
           ? <AgentReplyPreviewBody m={m} />
           : !!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
         {!!m.attachments?.length && <div className="msg-atts">{m.attachments.map((a) => <AttCard key={a.id} a={a} url={attachmentUrl(a.id)} />)}</div>}
         <Reactions m={m} mine={me?.id ?? ""} onReact={(emoji, remove) => react(m.id, emoji, remove)} />
       </div>
-    </div>
+      </div>
+    </Fragment>
     );
   };
   return (
@@ -698,7 +712,13 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
       <div className="scroll" ref={scrollRef}>
         <div className="thread-parent">{row(parent)}</div>
         <div className="thread-sep">{t("chat.replyCount", { count: msgs.length })}</div>
-        {msgs.map(row)}
+        {msgs.map((m, i) => {
+          const prevMsg = msgs[i - 1];
+          const dateDivider: ReactNode = m.createdAt && !isSameLocalDay(m.createdAt, prevMsg?.createdAt)
+            ? <div className="date-divider"><span className="date-divider-label">{fmtDateDivider(m.createdAt, i18n.language, t("chat.dateToday"), t("chat.dateYesterday"))}</span></div>
+            : null;
+          return row(m, dateDivider);
+        })}
       </div>
       {channels.find((c) => c.id === parent.channelId)?.type === "showcase"
         ? <div className="showcase-readonly"><Eye size={14} />{t("chat.showcaseReadOnly")}</div>
@@ -759,7 +779,7 @@ function ChannelFiles({ channelId }: { channelId: string }) {
           <div key={f.id} className="card file-row">
             <a className="file-main" href={attachmentUrl(f.id)} target="_blank" rel="noreferrer">
               {isImage(f.mimeType) ? <img className="file-thumb" src={attachmentUrl(f.id)} alt={f.filename} loading="lazy" /> : <IconFile size={22} />}
-              <div className="grow"><div className="who">{f.filename}</div><div className="meta">{fmtSize(f.sizeBytes)} · {f.uploader?.displayName || f.uploader?.name || (f.uploader?.type === "agent" ? "agent" : t("chat.memberKind"))} · {fmtTime(f.createdAt)}</div></div>
+              <div className="grow"><div className="who">{f.filename}</div><div className="meta">{fmtSize(f.sizeBytes)} · {f.uploader?.displayName || f.uploader?.name || (f.uploader?.type === "agent" ? "agent" : t("chat.memberKind"))} · {fmtDateTime(f.createdAt)}</div></div>
             </a>
             <div className="file-acts">
               {f.messageId && <button title={t("chat.jumpToMessage")} onClick={() => nav(`/s/${slug}/channel/${f.channelId}?msg=${f.messageId}`)}><IconExternalLink size={14} /></button>}

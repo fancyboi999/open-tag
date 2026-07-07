@@ -349,4 +349,3 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, switchServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, visibleAgents, machines, latestDaemonVersion, humans, traj, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
 }
 
-export const fmtTime = (iso?: string) => { try { return iso ? new Date(iso).toLocaleTimeString("zh-CN", { hour12: false }) : ""; } catch { return ""; } };
