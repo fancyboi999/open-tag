@@ -6,12 +6,20 @@ import { useStore } from "../store.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { useEscClose } from "../ConfirmModal.tsx";
 import { LiveAgentBar } from "./LiveAgentBar.tsx";
+import { useToast } from "../toast.tsx";
+
+// Maps the create-channel API's `error` string (e.g. 409 "channel name exists") to a localized toast message.
+// Shared by ChatSidebar's own create-channel button and Chat.tsx's action-card create-channel flow.
+export function channelCreateErrorMsg(t: (key: string) => string, error?: string): string {
+  return error === "channel name exists" ? t("sidebar.createChannelDup") : t("sidebar.createChannelFailed");
+}
 
 // Shared chat sidebar (Saved/Channels/DMs share the same sidebar; persists unchanged when switching between the channel view and the Saved view).
 // Both the Chat view and the Saved view (misc.tsx) render this component so the channel list stays visible when navigating to Saved.
 export function ChatSidebar() {
   const { t } = useTranslation();
   const { api, serverId, channels, dms, unread, agents, visibleAgents, slug, savedIds, capabilities, createChannel, openDM, joinChannel, attachmentUrl } = useStore();
+  const toast = useToast();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const { channelId } = useParams();
   const { pathname } = useLocation();
@@ -32,7 +40,11 @@ export function ChatSidebar() {
     try { await api("PUT", `/api/servers/${serverId}/sidebar-order`, { pinnedChannelIds: next }); } catch { /* rollback deferred to next load */ }
   };
   useEffect(() => { if (!serverId) return; api("GET", `/api/servers/${serverId}/sidebar-order`).then((p) => setPinned(p?.pinnedChannelIds || [])).catch(() => {}); }, [serverId]);
-  const doCreate = async (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => { const r = await createChannel(opts); setMkChan(false); if (r?.id) nav(`/s/${slug}/channel/${r.id}`); };
+  const doCreate = async (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => {
+    const r = await createChannel(opts);
+    if (r?.id) { setMkChan(false); nav(`/s/${slug}/channel/${r.id}`); }
+    else toast.error(channelCreateErrorMsg(t, r?.error)); // keep the modal open so the user can fix the name and retry
+  };
   const doDM = async (agentId: string) => { const id = await openDM("agent", agentId); setDmPick(false); if (id) nav(`/s/${slug}/channel/${id}`); };
 
   const chanRow = (c: any) => (

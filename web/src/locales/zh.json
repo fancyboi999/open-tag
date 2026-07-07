@@ -291,6 +291,8 @@
   },
   "chat": {
     "close": "关闭",
+    "dateToday": "今天",
+    "dateYesterday": "昨天",
     "videoUnsupported": "(此编码浏览器无法预览,点击下载)",
     "addReaction": "加表情",
     "createPrivateChannel": "创建私有频道 #{{name}}",
@@ -479,7 +481,9 @@
     "humanSection": "成员",
     "noMembers": "无可选成员",
     "cancelBtn": "取消",
-    "createBtn": "创建"
+    "createBtn": "创建",
+    "createChannelDup": "同名频道已存在",
+    "createChannelFailed": "创建频道失败"
   },
   "common": {
     "agents": "Agents",
