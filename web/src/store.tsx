@@ -314,6 +314,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         else {
           setAgents((as) => as.map((a) => (a.id === p.agentId ? { ...a, status: p.status ?? a.status, activity: p.activity ?? a.activity, activityDetail: p.detail ?? a.activityDetail } : a))); // real-time status dot + activity text used by header and sidebar
+          // Leaving working/thinking ends this agent's turn — mark the live-trace buffer so the next
+          // fragment for the same agent starts a fresh group instead of running on from a finished turn.
+          if (p.activity && p.activity !== "working" && p.activity !== "thinking") {
+            setTraj((prev) => (prev.some((x) => x.name === p.name && !x.boundary) ? appendCapped(prev, [{ name: p.name, text: "", boundary: true }]) : prev));
+          }
           dispatch({ type: "agent", id: p.agentId, name: p.name, activity: p.activity, status: p.status, detail: p.detail });
         }
       });

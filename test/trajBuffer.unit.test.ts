@@ -2,7 +2,7 @@
 // Run: npx tsx --test --test-force-exit test/trajBuffer.unit.test.ts
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appendCapped, TRAJ_CAP, type TrajItem } from "../web/src/trajBuffer.ts";
+import { appendCapped, groupTraj, TRAJ_CAP, type TrajItem } from "../web/src/trajBuffer.ts";
 
 const mk = (n: number, from = 0): TrajItem[] => Array.from({ length: n }, (_, i) => ({ text: `e${from + i}` }));
 
@@ -42,4 +42,58 @@ test("stays bounded at cap under sustained appends (memory bound)", () => {
 test("default cap is 300", () => {
   assert.equal(TRAJ_CAP, 300);
   assert.equal(appendCapped([], mk(400)).length, 300);
+});
+
+// ── groupTraj: turns raw streamed fragments into message-bar-like groups (avatar + one growing block per turn) ──
+
+test("groupTraj merges consecutive text fragments from the same agent into one running block", () => {
+  const groups = groupTraj([
+    { name: "codex2", text: "先看下 " },
+    { name: "codex2", text: "频道，" },
+    { name: "codex2", text: "确认成员。" },
+  ]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0]!.name, "codex2");
+  assert.deepEqual(groups[0]!.items, [{ kind: "text", text: "先看下 频道，确认成员。" }]);
+});
+
+test("groupTraj keeps tool calls as their own pill, resuming text as a new sub-item after", () => {
+  const groups = groupTraj([
+    { name: "codex2", text: "先读一下消息" },
+    { name: "codex2", text: "open-tag message check", tool: true },
+    { name: "codex2", text: "确认没有别人 claim" },
+  ]);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0]!.items, [
+    { kind: "text", text: "先读一下消息" },
+    { kind: "tool", text: "open-tag message check" },
+    { kind: "text", text: "确认没有别人 claim" },
+  ]);
+});
+
+test("groupTraj starts a new group when a different agent's fragments interleave", () => {
+  const groups = groupTraj([
+    { name: "codex-worker", text: "我先接" },
+    { name: "codex2", text: "我来补一句" },
+    { name: "codex-worker", text: "分工" },
+  ]);
+  assert.equal(groups.length, 3);
+  assert.deepEqual(groups.map((g) => g.name), ["codex-worker", "codex2", "codex-worker"]);
+});
+
+test("groupTraj starts a fresh group for the same agent's next turn after a boundary marker, without rendering the marker itself", () => {
+  const groups = groupTraj([
+    { name: "codex2", text: "先处理任务一" },
+    { name: "codex2", text: "", boundary: true },
+    { name: "codex2", text: "现在处理任务二" },
+  ]);
+  assert.equal(groups.length, 2);
+  assert.deepEqual(groups[0]!.items, [{ kind: "text", text: "先处理任务一" }]);
+  assert.deepEqual(groups[1]!.items, [{ kind: "text", text: "现在处理任务二" }]);
+});
+
+test("groupTraj ignores a boundary marker for an agent that has not produced any content yet", () => {
+  const groups = groupTraj([{ name: "codex2", text: "", boundary: true }, { name: "codex2", text: "开始工作" }]);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0]!.items, [{ kind: "text", text: "开始工作" }]);
 });

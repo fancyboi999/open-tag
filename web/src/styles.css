@@ -482,10 +482,16 @@ main.content-col > .composer{position:absolute;left:0;right:var(--scrollbar-gutt
 aside.traj-col{position:relative;background:var(--canvas);padding:22px 20px;overflow-y:auto;overflow-x:hidden}
 aside.traj-col::before{content:"";position:absolute;top:-60px;right:-80px;width:220px;height:220px;pointer-events:none;background:radial-gradient(circle,var(--g-peach),transparent 68%);opacity:.5;filter:blur(8px)}
 aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
-.traj{position:relative;font-size:15px;margin-bottom:10px;padding-left:12px;border-left:1px solid var(--hair-strong);color:var(--body);overflow-wrap:anywhere;min-width:0}
-.traj.thinking{color:var(--muted);font-style:italic}
-.traj.tool{display:flex;align-items:flex-start;gap:6px;color:var(--muted)}
-.traj.tool svg{flex:none;margin-top:2px;color:var(--muted-soft)}
+/* Live Trace groups: one message-bar-like block per agent/turn (avatar + running text) instead of one line per raw fragment */
+.traj-grp{display:grid;grid-template-columns:26px minmax(0,1fr);column-gap:9px;margin-bottom:14px}
+.traj-av{position:relative;line-height:0;margin-top:1px}
+.traj-head{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:2px}
+.traj-text{position:relative;font-size:14px;line-height:1.55;color:var(--body);overflow-wrap:anywhere;min-width:0}
+.traj-tool{display:flex;align-items:flex-start;gap:6px;font-size:12.5px;color:var(--muted);margin:4px 0}
+.traj-tool svg{flex:none;margin-top:2px;color:var(--muted-soft)}
+.traj-cursor{display:inline-block;width:2px;height:13px;background:var(--ink-2);vertical-align:-2px;margin-left:1px;animation:traj-blink 1s step-end infinite}
+@keyframes traj-blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.traj-cursor{animation:none}}
 .hint{position:relative;font-size:12px;color:var(--muted-soft)}
 
 .modal-bg{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:flex-start;justify-content:center;z-index:50}
@@ -596,6 +602,9 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .msg-activity.working,.msg-activity.thinking{color:var(--status-orange);background:var(--status-badge-bg)}
 .msg-activity.error{color:var(--status-red);background:var(--status-badge-bg)}
 .msg-role{font-size:13px;color:var(--muted-soft);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto}
+/* Agent status badge now lives on the header line itself (pinned right), not on its own subhead line below the name */
+.msg-head .msg-activity{margin-left:auto}
+.msg-head + .mbody{margin-top:8px} /* keeps body breathing room when no subhead follows (the common case now that activity moved into msg-head) */
 .av-status{position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;border:2px solid var(--surface);background:var(--muted-soft)}
 .av-status.sleeping{background:var(--status-blue)}
 .av-status.offline,.av-status.inactive{background:var(--muted-soft)}

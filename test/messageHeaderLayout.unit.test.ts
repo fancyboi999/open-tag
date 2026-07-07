@@ -25,6 +25,29 @@ test("member badge renders on a second header line while agent status text remai
   assert.doesNotMatch(chatSrc, /<div className="msg-head">[\s\S]{0,700}\{isMember \? <span className="member-badge">member<\/span> : null\}/);
 });
 
+test("agent status badge lives in the header line, pinned to the right, not on its own subhead line", () => {
+  // anchor on the per-message `agActivity` computation — unique to the main channel row (the
+  // action-card and thread-panel rows have their own simpler header markup and don't call this)
+  const anchorIdx = chatSrc.indexOf("const agActivity = agentActivityText(ag);");
+  assert.ok(anchorIdx >= 0, "could not find the main message row's agActivity computation");
+  const window = chatSrc.slice(anchorIdx, anchorIdx + 8000);
+
+  const headBlock = /<div className="msg-head">[\s\S]{0,1000}?<\/div>/.exec(window)?.[0];
+  assert.ok(headBlock, `could not locate the .msg-head block after .msg-col: ${window}`);
+  assert.match(headBlock!, /className=\{"msg-activity "\s*\+\s*agLive\}/, `activity badge should render inside .msg-head: ${headBlock}`);
+
+  // the subhead block should only carry the description (msg-role) now, not the activity badge
+  const subheadBlock = /\{ag && ag\.description[\s\S]{0,300}?<\/div> : null\}/.exec(window)?.[0];
+  assert.ok(subheadBlock, `could not locate the description-only subhead block: ${window}`);
+  assert.doesNotMatch(subheadBlock!, /msg-activity/, `activity badge should no longer render inside the description subhead: ${subheadBlock}`);
+
+  const activityCss = ruleBody(".msg-head .msg-activity");
+  assert.match(activityCss, /margin-left\s*:\s*auto\b/, "activity badge should be pinned to the far right of the header line via margin-left:auto");
+
+  const gapCss = ruleBody(".msg-head + .mbody");
+  assert.match(gapCss, /margin-top\s*:\s*8px\b/, "message body should keep breathing room from the header line even when no subhead follows");
+});
+
 test("message avatar is the positioning anchor for the live status dot", () => {
   const body = ruleBody(".msg-av");
   assert.match(body, /position\s*:\s*relative\b/, `avatar wrapper must anchor .av-status: ${body}`);
