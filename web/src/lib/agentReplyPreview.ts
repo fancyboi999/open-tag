@@ -74,11 +74,14 @@ export function applyAgentReplyPreview(messages: Msg[], e: AgentReplyEvent, agen
     });
     return messages;
   }
-  const hasActiveSameTarget = messages.some((m) => m.messageType === AGENT_REPLY_PREVIEW_TYPE && m.channelId === e.channelId && m.senderId === e.agentId);
-  if (e.op !== "start" && hasActiveSameTarget) return messages;
-  const withoutSuperseded = e.op === "start"
-    ? messages.filter((m) => !(m.messageType === AGENT_REPLY_PREVIEW_TYPE && m.channelId === e.channelId && m.senderId === e.agentId))
-    : messages;
+  // Only a "start" may originate a brand-new preview. A "delta" that doesn't match an existing
+  // preview (idx<0) means its stream already finished and was absorbed into a real message (or
+  // was superseded) — silently ignore it instead of spawning an orphan bubble with no persisted
+  // message behind it. This mirrors the idx<0 guard "done"/"error" already had above; a runtime
+  // that keeps streaming trailing text after its `message send` tool call reproduced exactly this
+  // as a channel-looking bubble with nothing in the DB, gone on refresh.
+  if (e.op !== "start") return messages;
+  const withoutSuperseded = messages.filter((m) => !(m.messageType === AGENT_REPLY_PREVIEW_TYPE && m.channelId === e.channelId && m.senderId === e.agentId));
   const preview: AgentReplyPreviewMsg = {
     id,
     seq: Number.MAX_SAFE_INTEGER,
@@ -90,12 +93,12 @@ export function applyAgentReplyPreview(messages: Msg[], e: AgentReplyEvent, agen
     messageType: AGENT_REPLY_PREVIEW_TYPE,
     createdAt: new Date().toISOString(),
     clientRenderKey: id,
-    streamTargetContent: e.op === "delta" ? e.text || "" : "",
-    streamVisible: e.op === "delta",
-    streamVisibleAt: e.op === "delta" ? now : now + AGENT_REPLY_PREVIEW_DELAY_MS,
+    streamTargetContent: "",
+    streamVisible: false,
+    streamVisibleAt: now + AGENT_REPLY_PREVIEW_DELAY_MS,
     streamThinkingVisible: false,
-    streamThinkingAt: e.op === "delta" ? now : now + AGENT_REPLY_PREVIEW_DELAY_MS + AGENT_REPLY_THINKING_DELAY_MS,
-    streamRevealAt: e.op === "delta" ? now : now + AGENT_REPLY_PREVIEW_DELAY_MS,
+    streamThinkingAt: now + AGENT_REPLY_PREVIEW_DELAY_MS + AGENT_REPLY_THINKING_DELAY_MS,
+    streamRevealAt: now + AGENT_REPLY_PREVIEW_DELAY_MS,
   };
   return [...withoutSuperseded, preview];
 }

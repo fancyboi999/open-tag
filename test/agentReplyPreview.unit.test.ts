@@ -297,6 +297,41 @@ test("stale stream delta cannot revive a superseded same-agent preview", () => {
   assert.equal((latestDelta[0] as any)?.streamTargetContent, "new");
 });
 
+test("a late delta for an already-absorbed stream does not spawn a ghost preview (real message already replaced it, no other preview active)", () => {
+  // Simulates: agent posted its real message (tick already swapped the preview array entry to the
+  // real persisted message), then the CLI keeps streaming a trailing remark for the same streamId.
+  // Reproduces a real bug seen live: a claude turn that calls `message send` and then keeps talking
+  // produced a channel-looking bubble with no backing row in the DB, gone on refresh.
+  const realMessage = {
+    id: "real-msg-1",
+    channelId: "chan-1",
+    senderType: "agent",
+    senderId: "agent-1",
+    senderName: "Xiaos",
+    content: "the actual posted reply",
+    messageType: "text",
+    createdAt: new Date().toISOString(),
+    seq: 6,
+  } as any;
+  const afterLateDelta = applyAgentReplyPreview([realMessage], {
+    type: "agent:reply",
+    op: "delta",
+    agentId: "agent-1",
+    channelId: "chan-1",
+    streamId: "stream-1",
+    text: "trailing remark after the tool call",
+  });
+  assert.equal(afterLateDelta.length, 1, "a stray delta with no active preview and no matching stream must not create a new one");
+  assert.equal(afterLateDelta[0], realMessage);
+});
+
+test("a late done/error for an already-absorbed stream is a no-op (already covered by idx<0 guard, kept as a regression pin)", () => {
+  const realMessage = { id: "real-msg-1", channelId: "chan-1", senderType: "agent", senderId: "agent-1", senderName: "Xiaos", content: "posted", messageType: "text", createdAt: new Date().toISOString(), seq: 6 } as any;
+  const before = [realMessage];
+  const afterDone = applyAgentReplyPreview(before, { type: "agent:reply", op: "done", agentId: "agent-1", channelId: "chan-1", streamId: "stream-1" });
+  assert.equal(afterDone, before, "stale done for a vanished stream should return the same array reference untouched");
+});
+
 test("agent reply previews stay independent across agents and channels", () => {
   const first = applyAgentReplyPreview([], {
     type: "agent:reply",
