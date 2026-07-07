@@ -489,12 +489,14 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .modal{background:var(--surface);border-radius:16px;box-shadow:0 4px 16px var(--shadow-3);width:460px;max-width:92vw;margin-top:6vh;max-height:86vh;overflow:auto;padding:24px}
 .modal h3{font-family:var(--serif);font-weight:400;font-size:24px;margin:0 0 16px;color:var(--ink)}
 .modal label{display:block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 5px}
+.modal label .req-mark{color:var(--error);margin-left:3px}
 .modal input,.modal select,.modal textarea{width:100%;font-family:var(--sans);font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--hair-strong);border-radius:8px;padding:9px 12px;outline:none}
 .modal textarea{min-height:64px;resize:vertical}
 .modal .ck{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:14px;color:var(--body)}
 .modal .acts{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
 .modal .acts button{font-size:16px;font-weight:500;border-radius:9999px;padding:9px 20px;cursor:pointer}
 .modal .cancel{background:var(--surface);border:1px solid var(--hair-strong);color:var(--ink)} .modal .ok{background:var(--ink-2);color:var(--on-ink);border:0}
+.modal .ok:disabled{opacity:.5;cursor:default}
 .modal .danger{background:var(--error);color:var(--on-ink);border:0;border-radius:9999px;font-size:14px;font-weight:500;padding:8px 18px;cursor:pointer;font-family:inherit;line-height:1}
 .modal .danger:hover{filter:brightness(.94)}
 .confirm-modal{width:400px}

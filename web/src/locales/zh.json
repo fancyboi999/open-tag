@@ -135,6 +135,8 @@
     "computerLabel": "Computer(运行机器)",
     "computerAriaLabel": "运行机器",
     "noMachineOnline": "(无在线机器)",
+    "noMachineHint": "还没有注册任何机器——先连接一个 daemon，再创建 agent。",
+    "machineRequired": "请选择这个 agent 运行所在的机器",
     "descriptionLabel": "Description(留空=通用 agent)",
     "descriptionPlaceholder": "描述这个 agent 的角色…",
     "reasoningLabel": "Reasoning(推理力度)",

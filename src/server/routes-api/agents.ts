@@ -26,13 +26,21 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     if (!b.name) return (sendErr(res, 400, "name required"), true);
     if (invalidAgentName(b.name)) return (sendErr(res, 400, INVALID_AGENT_NAME), true);
     if (descTooLong(b.description)) return (sendErr(res, 400, DESC_TOO_LONG), true);
+    // A new agent must be created bound to a machine — an unbound (machineId=null) agent can only run via the
+    // legacy broadcastToDaemons fallback (any daemon connected to the server may pick it up), which is a
+    // one-way door (no rebind API yet, see tech-debt I77) and non-deterministic once >1 machine is connected.
+    // The web client's create modal now requires picking one; enforce it here too so no caller can slip past it.
+    if (!b.machineId) return (sendErr(res, 400, "machineId required"), true);
+    const machine = (await db.select({ id: schema.machines.id }).from(schema.machines)
+      .where(and(eq(schema.machines.id, b.machineId), eq(schema.machines.serverId, serverId))))[0];
+    if (!machine) return (sendErr(res, 404, "machine not found"), true); // 404, not 400: existence-hiding for a cross-tenant/bogus id, consistent with this repo's other ownership pre-checks
     // A live agent name must be unique per server — it is the @mention / dm:@<name> routing key, so a duplicate
     // becomes an unreachable routing blind spot. ON CONFLICT against the agents_name_uniq partial index is
     // race-proof (no SELECT-then-INSERT gap): a duplicate live name inserts no row → friendly 409. Soft-deleted
     // names are excluded by the index predicate, so a deleted agent's name can be reused.
     const [agent] = await db.insert(schema.agents).values({
       serverId, name: b.name, displayName: b.displayName || b.name, description: b.description ?? null,
-      model: b.model || null, runtime: b.runtime || "claude", machineId: b.machineId ?? null,
+      model: b.model || null, runtime: b.runtime || "claude", machineId: b.machineId,
       runtimeConfig: { provider: b.provider ?? "default", model: b.model ?? null, reasoningEffort: b.reasoning ?? null, mode: b.fastMode ? "fast" : "default" },
       envVars: b.envVars ?? {}, executionMode: b.fastMode ? "fast" : "auto", creatorType: "user", creatorId: userId,
     }).onConflictDoNothing({ target: [schema.agents.serverId, schema.agents.name], where: isNull(schema.agents.deletedAt) }).returning();

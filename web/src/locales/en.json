@@ -135,6 +135,8 @@
     "computerLabel": "Computer (host machine)",
     "computerAriaLabel": "Host machine",
     "noMachineOnline": "(no machine online)",
+    "noMachineHint": "No machine is registered yet — connect a daemon first, then create the agent.",
+    "machineRequired": "Pick a computer to run this agent on",
     "descriptionLabel": "Description (leave blank for general agent)",
     "descriptionPlaceholder": "Describe this agent's role…",
     "reasoningLabel": "Reasoning (effort level)",
