@@ -479,7 +479,9 @@
     "humanSection": "Members",
     "noMembers": "No members to add",
     "cancelBtn": "Cancel",
-    "createBtn": "Create"
+    "createBtn": "Create",
+    "createChannelDup": "A channel with this name already exists",
+    "createChannelFailed": "Failed to create channel"
   },
   "common": {
     "agents": "Agents",

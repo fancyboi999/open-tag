@@ -479,7 +479,9 @@
     "humanSection": "成员",
     "noMembers": "无可选成员",
     "cancelBtn": "取消",
-    "createBtn": "创建"
+    "createBtn": "创建",
+    "createChannelDup": "同名频道已存在",
+    "createChannelFailed": "创建频道失败"
   },
   "common": {
     "agents": "Agents",

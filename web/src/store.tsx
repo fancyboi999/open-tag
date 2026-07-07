@@ -37,7 +37,7 @@ interface Store {
   reload: () => Promise<void>;
   onEvent: (cb: (e: Ev) => void) => () => void;
   subscribeChannel: (id: string) => void;                         // join the channel/thread's realtime room while it is being viewed (idempotent; re-emitted on reconnect)
-  createChannel: (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => Promise<{ id: string } | null>;
+  createChannel: (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => Promise<{ id?: string; error?: string } | null>;
   markActionExecuted: (messageId: string, result?: { kind: string; id: string; name: string }) => Promise<void>; // mark action card as executed after submission
   createTasks: (channelId: string, titles: string[]) => Promise<any[]>;
   openDM: (memberType: string, memberId: string) => Promise<string | null>;
@@ -118,7 +118,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // channel became relevant (public non-member, thread, or appeared after connect). Tracked so a reconnect re-joins. Idempotent.
   const subscribeChannel = (id: string) => { if (!id) return; subscribedRef.current.add(id); sockRef.current?.emit("join:channel", id); };
 
-  const createChannel = async (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => { const r = await api("POST", "/api/channels", { name: opts.name, description: opts.description, visibility: opts.visibility, agentIds: opts.agentIds ?? [], userIds: opts.userIds ?? [] }); if (r?.id) { await reload(); sockRef.current?.emit("join:channel", r.id); } return r?.id ? r : null; };
+  // Returns the raw response (incl. `error` on failure, e.g. 409 "channel name exists") instead of collapsing
+  // it to null — callers need `error` to surface a toast instead of silently closing the create-channel modal.
+  const createChannel = async (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => { const r = await api("POST", "/api/channels", { name: opts.name, description: opts.description, visibility: opts.visibility, agentIds: opts.agentIds ?? [], userIds: opts.userIds ?? [] }); if (r?.id) { await reload(); sockRef.current?.emit("join:channel", r.id); } return r; };
   // Create workspace → optimistically add it to the server list (POST returns role+capabilities so no re-fetch needed) and
   // return the new slug. The caller navigates client-side to /s/<slug>/channel; the URL drives activation (see main.tsx),
   // so there is no full-page reload — the workspace skeleton shows while the new workspace's data loads.

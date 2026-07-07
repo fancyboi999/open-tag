@@ -17,10 +17,11 @@ import { TaskBoard, ynOptions, ST_LABEL } from "../TaskBoard.tsx";
 import { PaneEmpty } from "../PaneEmpty.tsx";
 import { ChatSkeleton } from "./Skeleton.tsx";
 import { AgentProfile, HumanProfile, CreateAgentModal } from "./Members.tsx";
-import { ChatSidebar, CreateChannelModal } from "./ChatSidebar.tsx";
+import { ChatSidebar, CreateChannelModal, channelCreateErrorMsg } from "./ChatSidebar.tsx";
 import { ConnectComputerWizard } from "./ConnectComputerWizard.tsx";
 import { Composer } from "./Composer.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
+import { useToast } from "../toast.tsx";
 
 const fmtSize = (n?: number) => (!n ? "" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB");
 const isImage = (m?: string) => !!m && m.startsWith("image/");
@@ -104,6 +105,7 @@ function Reactions({ m, mine, onReact }: { m: Msg; mine: string; onReact: (emoji
 function ActionCardMsg({ m }: { m: Msg }) {
   const { t } = useTranslation();
   const { createChannel, markActionExecuted, slug, agents, attachmentUrl } = useStore();
+  const toast = useToast();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const meta = m.actionMetadata!;
@@ -130,7 +132,11 @@ function ActionCardMsg({ m }: { m: Msg }) {
         <CreateChannelModal
           prefill={{ name: a.name, description: a.description ?? "", visibility: a.visibility, agentIds: a.initialAgents ?? [], userIds: a.initialHumans ?? [] }}
           submitLabel={t("chat.createChannel")} onClose={() => setOpen(false)}
-          onCreate={async (opts) => { const r = await createChannel(opts); setOpen(false); if (r?.id) { await markActionExecuted(m.id, { kind: "channel", id: r.id, name: opts.name }); nav(`/s/${slug}/channel/${r.id}`); } }}
+          onCreate={async (opts) => {
+            const r = await createChannel(opts);
+            if (r?.id) { setOpen(false); await markActionExecuted(m.id, { kind: "channel", id: r.id, name: opts.name }); nav(`/s/${slug}/channel/${r.id}`); }
+            else toast.error(channelCreateErrorMsg(t, r?.error)); // keep the modal open so the user can fix the name and retry
+          }}
         />
       )}
       {open && !isChan && (
