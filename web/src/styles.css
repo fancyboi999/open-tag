@@ -623,6 +623,10 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .unread-threads-bar svg{color:var(--amber);flex:none}
 .unread-threads-bar .utb-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .unread-threads-bar .utb-cta{color:var(--amber);font-weight:700;flex:none}
+/* When the bar above is showing, a message scrolled up to the very top edge of .scroll gets its
+   avatar/name/timestamp clipped by the container boundary, leaving bare body text flush against the
+   bar's solid background — reads as one broken box. Fade the top ~32px instead of hard-clipping it. */
+.scroll-fade-top{-webkit-mask-image:linear-gradient(to bottom, transparent, black 32px);mask-image:linear-gradient(to bottom, transparent, black 32px)}
 /* action card (B-mode proposal card). Editorial style: off-white surface + hairline + pill CTA */
 .action-card{margin-top:4px;max-width:440px;background:var(--surface);border:1px solid var(--hair-strong);border-radius:12px;padding:12px 14px}
 .action-card .ac-title{font-size:15px;font-weight:600;color:var(--ink);letter-spacing:.1px}

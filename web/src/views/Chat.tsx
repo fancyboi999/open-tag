@@ -410,7 +410,7 @@ export function Chat() {
                 <span className="utb-cta">{t("chat.viewUnreadThread")}</span>
               </button>
             )}
-            <div key={cur?.id} className="scroll ch-view-enter" ref={scrollRef} onScroll={onScroll}>
+            <div key={cur?.id} className={"scroll ch-view-enter" + (chatTab === "chat" && unreadThreads.length > 0 ? " scroll-fade-top" : "")} ref={scrollRef} onScroll={onScroll}>
               {!loaded && <ChatSkeleton />}
               {loaded && loadError && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.loadFailedTitle")} sub={<><span>{t("chat.loadFailedBody")}</span><button className="joinbtn" onClick={loadCurrentMessages}>{t("chat.retryLoad")}</button></>} />}
               {loaded && !loadError && !msgs.length && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.channelEmpty")} />}
