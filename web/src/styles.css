@@ -475,6 +475,9 @@ main.content-col > .composer{position:absolute;left:0;right:var(--scrollbar-gutt
 .pane-empty svg{color:var(--muted-soft)}
 .pane-empty .pe-title{font-family:var(--serif);font-weight:300;font-size:23px;line-height:1.25;letter-spacing:-.3px;color:var(--ink-2);max-width:34ch}
 .pane-empty .pe-sub{font-size:14px;line-height:1.55;color:var(--muted);max-width:44ch}
+.pane-empty .pe-action{margin-top:4px}
+.pane-empty .pe-cta{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:500;color:var(--on-ink);background:var(--ink-2);border:0;padding:8px 20px;border-radius:9999px;cursor:pointer}
+.pane-empty .pe-cta:hover{background:var(--ink)}
 
 aside.traj-col{position:relative;background:var(--canvas);padding:22px 20px;overflow-y:auto;overflow-x:hidden}
 aside.traj-col::before{content:"";position:absolute;top:-60px;right:-80px;width:220px;height:220px;pointer-events:none;background:radial-gradient(circle,var(--g-peach),transparent 68%);opacity:.5;filter:blur(8px)}
@@ -872,8 +875,8 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
 }
 
 /* ── Primary button press feedback: snap-scale on :active (transform only, layout-safe) ── */
-.send-btn,.modal .ok,.setform .ok,.newtask,.action-card .ac-btn,.perm-head .ok{transition:transform var(--dur-fast)}
-.send-btn:active,.modal .ok:active,.setform .ok:active,.newtask:active,.action-card .ac-btn:active,.perm-head .ok:active{transform:scale(.97)}
+.send-btn,.modal .ok,.setform .ok,.newtask,.action-card .ac-btn,.perm-head .ok,.pe-cta{transition:transform var(--dur-fast)}
+.send-btn:active,.modal .ok:active,.setform .ok:active,.newtask:active,.action-card .ac-btn:active,.perm-head .ok:active,.pe-cta:active{transform:scale(.97)}
 
 /* ── Modal / QuickSwitcher entry animation ── */
 @keyframes modal-enter{from{opacity:0;transform:translateY(6px) scale(.99)}to{opacity:1;transform:none}}
@@ -888,7 +891,7 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
 /* ── Reduced-motion overrides for all new secondary animations (consolidated block) ── */
 @media (prefers-reduced-motion:reduce){
   .modal,.qs,.ch-view-enter,.board-scroll{animation:none}
-  .send-btn,.modal .ok,.setform .ok,.newtask,.action-card .ac-btn,.perm-head .ok{transition:none}
+  .send-btn,.modal .ok,.setform .ok,.newtask,.action-card .ac-btn,.perm-head .ok,.pe-cta{transition:none}
 }
 
 /* ───────── Mobile adaptation (≤820px): three columns → single column, rail moves to bottom tab bar, sidebar becomes drawer, thread/profile goes fullscreen, modal becomes bottom sheet ───────── */

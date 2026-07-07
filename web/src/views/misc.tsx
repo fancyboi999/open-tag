@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Star, Bookmark, AlertTriangle, Lock, MessageCircle, Eye } from "lucide-react";
+import { Star, Bookmark, AlertTriangle, Lock, MessageCircle, Eye, Plus } from "lucide-react";
 import { useStore, fmtTime } from "../store.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { ChatSidebar } from "./ChatSidebar.tsx";
@@ -222,7 +222,7 @@ export function Computers() {
         </div>
       </aside>
       <main className="content-col">
-        {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll"><PaneEmpty icon={<IconMonitor size={30} />} title={t("misc.computersNoMachine")} sub={t("misc.computersNoMachineHint")} /></div></>
+        {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll"><PaneEmpty icon={<IconMonitor size={30} />} title={t("misc.computersNoMachine")} sub={t("misc.computersNoMachineHint")} action={capabilities.manageMachines && <button className="pe-cta" onClick={() => setConnect(true)}><Plus size={15} /> {t("misc.computersConnectBtn")}</button>} /></div></>
           : <>
             <div className="head"><h1>{cur.name || cur.hostname}</h1><small>{cur.status === "online" ? t("misc.computersOnline") : t("misc.computersOffline")} · {t("misc.computersDaemonLabel")} {cur.daemonVersion || "?"}</small>
               {capabilities.manageMachines && <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
