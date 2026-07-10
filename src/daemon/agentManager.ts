@@ -90,7 +90,12 @@ export class AgentManager {
     let content: string;
     try { content = await readFile(mem, "utf8"); }
     catch { this.log.debug("syncProfile: no MEMORY.md yet", { agentId }); return; }
-    const next = applyProfileToMemory(content, displayName || agentId, description);
+    let effectiveDesc = description;
+    try {
+      const f = await readFile(path.join(this.dataDir, agentId, "personality.md"), "utf8");
+      if (f.trim()) effectiveDesc = f;
+    } catch {}
+    const next = applyProfileToMemory(content, displayName || agentId, effectiveDesc);
     if (next !== content) {
       try { await writeFile(mem, next); this.log.info("profile synced to MEMORY.md", { agentId }); }
       catch (e) { this.log.warn("syncProfile write failed", { agentId, detail: String(e) }); return; }
@@ -160,8 +165,15 @@ export class AgentManager {
       await writeFile(mem, seedMemory(config.displayName || config.name, config.description));
     }
 
+    const personalityFile = path.join(dir, "personality.md");
+    let personality: string | null | undefined;
+    try { personality = await readFile(personalityFile, "utf8"); if (!personality.trim()) personality = undefined; }
+    catch { personality = undefined; }
+
+    const effectiveDescription = personality ?? config.description;
+
     const systemPrompt = buildSystemPrompt({
-      name: config.name, displayName: config.displayName, description: config.description,
+      name: config.name, displayName: config.displayName, description: effectiveDescription,
       agentId, serverId: config.serverId, hostname: os.hostname(), os: `${os.platform()} ${os.arch()}`, workspace: dir,
     });
     const env: NodeJS.ProcessEnv = {

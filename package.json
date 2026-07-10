@@ -45,7 +45,7 @@
     "stop:prod": "lsof -ti tcp:7788 -sTCP:LISTEN | xargs kill 2>/dev/null; true",
     "prod:up": "bash scripts/prod-up.sh",
     "prod:down": "bash scripts/prod-down.sh",
-    "daemon": "tsx src/daemon/index.ts --api-key poc-secret-key",
+    "daemon": "tsx src/daemon/index.ts",
     "cli": "tsx src/cli/index.ts",
     "pkg:daemon:build": "node scripts/build-daemon-pkg.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",

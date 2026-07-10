@@ -9,6 +9,15 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-07-10
+
+### Added
+
+- **Personality override**: place a `personality.md` file in the agent workspace
+  (`~/.open-tag/agents/<agent-id>/`) to inject a detailed persona into the system
+  prompt and MEMORY.md `## Role` section, overriding the agent's `description`
+  field. Compatible with agency-agents personality files and any runtime.
+
 ## [0.9.0] — 2026-07-06
 
 ### Added
@@ -206,7 +215,9 @@ from `main`; see commit history for fine-grained server/web changes.
   on any machine with Node ≥ 20, without cloning the repository.
 - Supported runtimes at time of release: **Claude Code** and **Codex**.
 
-[Unreleased]: https://github.com/fancyboi999/open-tag/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/fancyboi999/open-tag/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/fancyboi999/open-tag/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/fancyboi999/open-tag/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/fancyboi999/open-tag/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/fancyboi999/open-tag/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/fancyboi999/open-tag/compare/v0.8.0...v0.8.1

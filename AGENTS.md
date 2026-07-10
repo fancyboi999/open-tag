@@ -35,7 +35,7 @@ its own iterative improvement — autonomously.
 ## Conventions
 
 - TypeScript throughout. Run `npm run typecheck` (root + web) before committing.
-- Agent workspace lives at `~/.open-tag/agents/<agent-id>/` with a `MEMORY.md` per agent.
+- Agent workspace lives at `~/.open-tag/agents/<agent-id>/` with a `MEMORY.md` per agent. Optionally, a `personality.md` file in the same directory overrides the agent's `description` field — place an agency-agents personality file (e.g. from `~/.open-tag/agency-agents/`) there to inject a detailed persona into the system prompt and MEMORY.md `## Role` section.
 - Screenshots / browser-verification captures go in `.shots/` (gitignored — never commit them).
 
 ## Parallel development (worktrees)
