@@ -9,6 +9,12 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-07-11
+
+### Added
+
+- **Agent resource limits (Windows Job Object)**: per-agent CPU and memory limits configured via the web UI (`memoryLimitMb`, `cpuLimitPercent` in agent creation/profile) and enforced on every spawned agent process through a Windows Job Object. Uses `koffi` FFI to call `kernel32.dll` Win32 APIs (`CreateJobObjectW`, `SetInformationJobObject`, `AssignProcessToJobObject`). Non-Windows: no-op.
+
 ## [0.9.1] — 2026-07-10
 
 ### Added

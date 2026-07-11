@@ -18,7 +18,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     // creatorType lets the client distinguish system-seeded showcase agents (creatorType="system") from
     // real members — they stay in the store so #showcase history renders their avatar/name, but are filtered
     // out of member rosters and agent pickers (see web/src/store.tsx visibleAgents).
-    return (sendJson(res, 200, agents.map((a) => ({ id: a.id, name: a.name, displayName: a.displayName, description: a.description, status: a.status, activity: a.activity, model: a.model, runtime: a.runtime, machineId: a.machineId, avatarUrl: a.avatarUrl, creatorType: a.creatorType }))), true);
+    return (sendJson(res, 200, agents.map((a) => ({ id: a.id, name: a.name, displayName: a.displayName, description: a.description, status: a.status, activity: a.activity, model: a.model, runtime: a.runtime, machineId: a.machineId, avatarUrl: a.avatarUrl, creatorType: a.creatorType, memoryLimitMb: a.memoryLimitMb, cpuLimitPercent: a.cpuLimitPercent }))), true);
   }
   if (p === "/api/agents" && method === "POST") {
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
@@ -42,6 +42,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
       serverId, name: b.name, displayName: b.displayName || b.name, description: b.description ?? null,
       model: b.model || null, runtime: b.runtime || "claude", machineId: b.machineId,
       runtimeConfig: { provider: b.provider ?? "default", model: b.model ?? null, reasoningEffort: b.reasoning ?? null, mode: b.fastMode ? "fast" : "default" },
+      memoryLimitMb: b.memoryLimitMb ?? null, cpuLimitPercent: b.cpuLimitPercent ?? null,
       envVars: b.envVars ?? {}, executionMode: b.fastMode ? "fast" : "auto", creatorType: "user", creatorId: userId,
     }).onConflictDoNothing({ target: [schema.agents.serverId, schema.agents.name], where: isNull(schema.agents.deletedAt) }).returning();
     if (!agent) return (sendErr(res, 409, `an agent named "${b.name}" already exists`), true);
@@ -63,7 +64,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
     const b = await readJson(req); const patch: Record<string, unknown> = {};
     if (descTooLong(b.description)) return (sendErr(res, 400, DESC_TOO_LONG), true);
-    for (const k of ["displayName", "description", "model", "runtime", "avatarUrl"]) if (b[k] !== undefined) patch[k] = b[k];
+    for (const k of ["displayName", "description", "model", "runtime", "avatarUrl", "memoryLimitMb", "cpuLimitPercent"]) if (b[k] !== undefined) patch[k] = b[k];
     if (b.envVars !== undefined) patch.envVars = b.envVars;
     await db.update(schema.agents).set(patch).where(and(eq(schema.agents.id, am[1]!), eq(schema.agents.serverId, serverId)));
     // Title/role changed → push the current profile to the daemon so it syncs the workspace MEMORY.md.

@@ -19,6 +19,7 @@ const PENDING_DELIVER_TTL_MS = Number(process.env.OPEN_TAG_PENDING_DELIVER_TTL_M
 export interface AgentConfig {
   name: string; displayName: string; description?: string | null;
   model?: string; runtime?: string; runtimeConfig?: Record<string, unknown> | null; sessionId?: string;
+  memoryLimitMb?: number; cpuLimitPercent?: number;
   serverUrl: string; serverId: string; agentId: string; agentToken?: string; // per-agent token (slice10); re-sent start for a running agent may omit it (daemon ignores)
 }
 interface DeliverBuf { count: number; from: string; target: string; targetName: string; firstShort: string; latestShort: string; isTask: boolean; mentioned: boolean; targets: Set<string>; timer: ReturnType<typeof setTimeout>; streamId?: string; }
@@ -180,6 +181,8 @@ export class AgentManager {
       ...process.env, FORCE_COLOR: "0",
       PATH: `${this.binDir}${path.delimiter}${process.env.PATH ?? ""}`,
       OPEN_TAG_SERVER_URL: config.serverUrl, OPEN_TAG_AGENT_ID: agentId, OPEN_TAG_AGENT_TOKEN: config.agentToken ?? "",
+      OPEN_TAG_MEM_LIMIT_MB: config.memoryLimitMb != null ? String(config.memoryLimitMb) : undefined,
+      OPEN_TAG_CPU_LIMIT_PERCENT: config.cpuLimitPercent != null ? String(config.cpuLimitPercent) : undefined,
     };
     delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT;
 
