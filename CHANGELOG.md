@@ -13,7 +13,7 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ### Added
 
-- **Agent resource limits (Windows Job Object)**: per-agent CPU and memory limits configured via the web UI (`memoryLimitMb`, `cpuLimitPercent` in agent creation/profile) and enforced on every spawned agent process through a Windows Job Object. Uses `koffi` FFI to call `kernel32.dll` Win32 APIs (`CreateJobObjectW`, `SetInformationJobObject`, `AssignProcessToJobObject`). Non-Windows: no-op.
+- **Agent resource limits**: per-agent CPU and memory limits configured via the web UI (`memoryLimitMb`, `cpuLimitPercent` in agent creation/profile) and enforced on every spawned agent process. Three backends: Windows Job Object (`koffi` FFI to `kernel32.dll`), Linux cgroup v2 with cgroup v1 fallback (tested on WSL2), macOS best-effort background priority (`koffi` libc, CPU only). `koffi` is loaded dynamically via `createRequire` — Linux nodes do not need it installed.
 
 ## [0.9.1] — 2026-07-10
 
@@ -221,7 +221,8 @@ from `main`; see commit history for fine-grained server/web changes.
   on any machine with Node ≥ 20, without cloning the repository.
 - Supported runtimes at time of release: **Claude Code** and **Codex**.
 
-[Unreleased]: https://github.com/fancyboi999/open-tag/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/fancyboi999/open-tag/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/fancyboi999/open-tag/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/fancyboi999/open-tag/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/fancyboi999/open-tag/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/fancyboi999/open-tag/compare/v0.8.2...v0.8.3
