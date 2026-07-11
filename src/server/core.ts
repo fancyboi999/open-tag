@@ -890,7 +890,6 @@ export async function startAgent(serverId: string, agentId: string): Promise<{ o
     await markAgentUnavailable(serverId, agentId, "machine offline");
     return { ok: false, reason: "machine offline" };
   }
-  await db.update(schema.agents).set({ status: "active", activity: "working" }).where(eq(schema.agents.id, agentId));
   await publishAgentState(serverId, agentId);
   return { ok: true };
 }
@@ -900,6 +899,17 @@ export async function stopAgent(serverId: string, agentId: string): Promise<bool
     if (!sendAgentControl(serverId, target, { type: "agent:stop", agentId })) log.warn("agent stop target unavailable", { agentId, reason: "machine offline" });
   } else if (target.reason !== "agent not found") {
     log.warn("agent stop target unavailable", { agentId, reason: target.reason });
+  }
+  await db.update(schema.agents).set({ status: "inactive", activity: "offline" }).where(and(eq(schema.agents.id, agentId), eq(schema.agents.serverId, serverId)));
+  await publishAgentState(serverId, agentId);
+  return true;
+}
+export async function dequeueAgent(serverId: string, agentId: string): Promise<boolean> {
+  const target = await agentControlTarget(serverId, agentId);
+  if (target.ok) {
+    if (!sendAgentControl(serverId, target, { type: "agent:dequeue", agentId })) log.warn("agent dequeue target unavailable", { agentId, reason: "machine offline" });
+  } else if (target.reason !== "agent not found") {
+    log.warn("agent dequeue target unavailable", { agentId, reason: target.reason });
   }
   await db.update(schema.agents).set({ status: "inactive", activity: "offline" }).where(and(eq(schema.agents.id, agentId), eq(schema.agents.serverId, serverId)));
   await publishAgentState(serverId, agentId);

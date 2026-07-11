@@ -104,15 +104,31 @@ function InviteHumanModal({ onClose }: { onClose: () => void }) {
 // every card a navigable entry into that member's profile (agent → /agent/:id, human → /human/:userId).
 function Roster({ agents, humans, onCreate, canCreate }: { agents: any[]; humans: any[]; onCreate: () => void; canCreate?: boolean }) {
   const { t } = useTranslation();
-  const { attachmentUrl, slug } = useStore();
+  const { attachmentUrl, slug, api } = useStore();
   const nav = useNavigate();
+  const [budget, setBudget] = useState<any>(null);
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const total = agents.length + humans.length;
   const goKey = (e: React.KeyboardEvent, to: string) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nav(to); } };
+  // Load budget from the first online machine
+  useEffect(() => {
+    const m = agents.find((a) => a.machineId)?.machineId;
+    if (!m) return;
+    api("GET", `/api/servers/${slug}/machines/${m}/budget`).then((r) => { if (r && !r.error) setBudget(r); }).catch(() => {});
+  }, [slug, api]);
+  const fmtMem = (mb: number) => mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb + " MB";
   return (
     <>
       <div className="head"><h1>{t("nav.members")}</h1><small>{t("common.membersCount", { count: total })}</small></div>
       <div className="scroll">
+        {budget && (
+          <div className="card">
+            <div className="meta" style={{ marginBottom: 8 }}>{t("members.resourceBudget")}</div>
+            <div className="kv"><b>Memory</b> {fmtMem(budget.allocatedMemMB)} / {fmtMem(budget.maxAgentMemMB)}</div>
+            <div className="kv"><b>CPU</b> {budget.allocatedCpuPct} / {budget.maxAgentCpuPct}%</div>
+            <div className="kv"><b>Queue</b> {budget.queueLength}</div>
+          </div>
+        )}
         {total === 0 ? <div className="empty">{t("members.rosterEmpty")}{canCreate && <> {t("members.rosterEmptyCreate")} <button className="addbtn" onClick={onCreate}>+</button></>}</div>
           : <>
             {agents.length > 0 && <div className="sec">{t("common.agents")} <span className="cnt">{agents.length}</span></div>}
@@ -192,6 +208,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
       <button className="joinbtn" onClick={onMessage ?? msgAgent}><MessageCircle size={13} style={{ verticalAlign: "-2px" }} /> {t("members.dm")}</button>
       {capabilities.manageAgents && <>
         <button className="joinbtn" onClick={() => ctl(a.status === "active" ? "stop" : "start")}>{a.status === "active" ? t("members.stop") : t("members.start")}</button>
+        {a.status === "queued" && <button className="joinbtn" style={{ color: "var(--status-orange)" }} onClick={() => api("POST", `/api/agents/${id}/dequeue`).then(() => setTimeout(refetch, 300)).catch(() => {})}>✕</button>}
         <button className="joinbtn" onClick={() => setShowRestart(true)}>{t("members.restart")}</button>
         <button className="joinbtn" style={{ color: "var(--error)" }} onClick={del}>{t("members.delete")}</button>
       </>}

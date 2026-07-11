@@ -124,6 +124,7 @@
     "nameInvalid": "Name 必须为 1-64 个字符，以字母开头，且只能包含字母、数字、连字符和下划线",
     "machineOnline": "在线",
     "machineOffline": "离线",
+    "resourceBudget": "資源預算",
     "startFailed": "无法启动 agent —— 所在机器可能离线，请检查机器连接后重试。",
     "startFailedWithReason": "无法启动 agent",
     "startFailReasonNoDaemon": "没有在线的 daemon（机器未连接）",

@@ -2,7 +2,7 @@
   --canvas:#f5f5f5;--canvas-soft:#fafafa;--surface:#fff;--surface-strong:#f0efed;
   --ink:#0c0a09;--ink-2:#292524;--body:#4e4e4e;--muted:#777169;--muted-soft:#a8a29e;
   --hair:#e7e5e4;--hair-strong:#d6d3d1;--card-line:rgba(87,96,106,.22);--card-line-strong:rgba(87,96,106,.35);--card-shadow:rgba(15,23,42,.035);--success:#16a34a;--amber:#b9770e;
-  --status-blue:#92B6FF;--status-green:hsl(137 36% 64%);--status-orange:hsl(46 66% 50%);--status-red:#c36a6a;--status-badge-bg:rgba(240,239,237,.4);
+  --status-blue:#92B6FF;--status-green:hsl(137 36% 64%);--status-orange:hsl(46 66% 50%);--status-red:#c36a6a;--status-yellow:hsl(42 85% 55%);--status-badge-bg:rgba(240,239,237,.4);
   --g-mint:#a7e5d3;--g-lav:#c8b8e0;--g-sky:#a8c8e8;--g-peach:#f4c5a8;
   /* sidecar: UI functional colors not covered by DESIGN.md primary palette, centralized as tokens to prevent scattering (error aligned with DESIGN.md semantic-error) */
   --error:#dc2626;--error-soft:#fef2f2;--error-line:#fecaca;
@@ -115,6 +115,7 @@ button{font-family:inherit}
 .dot.working,.dot.thinking{background:var(--status-orange)}
 .dot.offline,.dot.inactive{background:var(--muted-soft)}
 .dot.error{background:var(--status-red)}
+.dot.queued{background:var(--status-yellow)}
 .dot.working:not(.live-bar__pip){position:relative}
 .dot.working:not(.live-bar__pip)::after{content:"";position:absolute;inset:0;border-radius:50%;background-color:inherit;animation:lb-ping 1.9s cubic-bezier(0,0,.2,1) infinite}
 .av{width:20px;height:20px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--ink)}
@@ -606,6 +607,7 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .msg-activity.online,.msg-activity.active{color:var(--status-green);background:var(--status-badge-bg)}
 .msg-activity.working,.msg-activity.thinking{color:var(--status-orange);background:var(--status-badge-bg)}
 .msg-activity.error{color:var(--status-red);background:var(--status-badge-bg)}
+.msg-activity.queued{color:var(--status-yellow);background:var(--status-badge-bg)}
 .msg-role{font-size:13px;color:var(--muted-soft);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto}
 /* Agent status badge now lives on the header line itself (pinned right), not on its own subhead line below the name */
 .msg-head .msg-activity{margin-left:auto}
@@ -616,6 +618,7 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .av-status.online,.av-status.active{background:var(--status-green)}
 .av-status.working,.av-status.thinking{background:var(--status-orange)}
 .av-status.error{background:var(--status-red)}
+.av-status.queued{background:var(--status-yellow)}
 .av-status.working::after{content:"";position:absolute;inset:0;border-radius:50%;background-color:inherit;animation:lb-ping 1.9s cubic-bezier(0,0,.2,1) infinite}
 .msg-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
 .msg-meta:empty{display:none}

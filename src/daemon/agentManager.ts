@@ -9,6 +9,7 @@ import { getRuntime } from "./runtimes.js";
 import type { Runtime, RuntimeSession, RuntimeCallbacks } from "./runtime.js";
 import { createLogger } from "../log.js";
 import { agentsDir } from "../paths.js";
+import { ResourceBudget } from "./resourceBudget.js";
 
 const DATA_DIR = agentsDir();
 const IDLE_MS = Number(process.env.OPEN_TAG_IDLE_MS ?? 10 * 60 * 1000); // how long before idle sleep (kills process to save memory; next wake uses --resume)
@@ -24,7 +25,8 @@ export interface AgentConfig {
 }
 interface DeliverBuf { count: number; from: string; target: string; targetName: string; firstShort: string; latestShort: string; isTask: boolean; mentioned: boolean; targets: Set<string>; timer: ReturnType<typeof setTimeout>; streamId?: string; }
 export interface DeliverMeta { targetName?: string; msgShort?: string; isTask?: boolean; streamId?: string; }
-interface Running { session: RuntimeSession; config: AgentConfig; sessionId: string | null; idleTimer?: ReturnType<typeof setTimeout>; deliverBuf?: DeliverBuf; }
+interface Running { session: RuntimeSession; config: AgentConfig; sessionId: string | null; idleTimer?: ReturnType<typeof setTimeout>; deliverBuf?: DeliverBuf; allocatedMemMB: number; allocatedCpuPct: number; }
+interface QueuedStart { agentId: string; config: AgentConfig; enqueuedAt: number; }
 interface PendingDeliver { from: string; target: string; mentioned: boolean; meta: DeliverMeta; }
 interface PendingDeliverQueue { items: PendingDeliver[]; timer: ReturnType<typeof setTimeout>; }
 interface ActiveReplyPreview { channelId: string; streamId: string; name: string; }
@@ -49,8 +51,11 @@ export class AgentManager {
   private oneShotDeliverDebounceMs: number;
   private pendingDeliverTtlMs: number;
   private runtimeResolver: (name: string) => Runtime | null;
+  private budget: ResourceBudget;
+  private startQueue: QueuedStart[] = [];
   private log = createLogger("daemon:agents");
   constructor(private send: (msg: unknown) => void, opts: AgentManagerOptions = {}) {
+    this.budget = new ResourceBudget();
     this.binDir = opts.binDir ?? ensureOpenTagBin();
     this.dataDir = opts.dataDir ?? DATA_DIR;
     this.deliverDebounceMs = opts.deliverDebounceMs ?? DELIVER_DEBOUNCE_MS;
@@ -61,12 +66,44 @@ export class AgentManager {
 
   running(): string[] { return [...this.agents.keys()]; }
   stopAll(): void { for (const id of [...this.agents.keys()]) this.stop(id); }
+  budgetStatus() { return this.budget.status(); }
+  queuedAgents(): QueuedStart[] { return [...this.startQueue]; }
+  /** Remove a queued start request (user cancelled). */
+  dequeue(agentId: string): void {
+    const idx = this.startQueue.findIndex((q) => q.agentId === agentId);
+    if (idx === -1) return;
+    this.startQueue.splice(idx, 1);
+    this.budget.queueLength = this.startQueue.length;
+    this.send({ type: "agent:status", agentId, status: "inactive" });
+    this.send({ type: "agent:activity", agentId, activity: "offline", detail: "dequeued" });
+    this.log.info("dequeued", { agentId });
+  }
+
   // Tear down process: clear timers + remove from map first (critical: deletion before session.stop() lets the onExit has() guard recognize this as an intentional stop, suppressing unexpected sleeping status) + stop runtime. Returns whether the agent was found.
-  private teardown(agentId: string): boolean { this.clearPendingDeliver(agentId); this.finishReplyPreview(agentId); const r = this.agents.get(agentId); if (!r) return false; if (r.idleTimer) clearTimeout(r.idleTimer); if (r.deliverBuf) clearTimeout(r.deliverBuf.timer); this.agents.delete(agentId); r.session.stop(); return true; }
+  private teardown(agentId: string): boolean { this.clearPendingDeliver(agentId); this.finishReplyPreview(agentId); const r = this.agents.get(agentId); if (!r) return false; if (r.idleTimer) clearTimeout(r.idleTimer); if (r.deliverBuf) clearTimeout(r.deliverBuf.timer); this.agents.delete(agentId); this.budget.release(r.allocatedMemMB, r.allocatedCpuPct); this.tryDequeue(); r.session.stop(); return true; }
   // User-initiated stop: emits inactive/offline
   stop(agentId: string): void { if (!this.teardown(agentId)) return; this.send({ type: "agent:status", agentId, status: "inactive" }); this.send({ type: "agent:activity", agentId, activity: "offline", detail: "" }); }
   // Idle sleep: emits sleeping/sleeping (activity also set to sleeping so the frontend activity+status dual mapping stays consistent; session is preserved for --resume on next wake)
   sleep(agentId: string): void { if (!this.teardown(agentId)) return; this.log.info("sleep", { agentId }); this.send({ type: "agent:status", agentId, status: "sleeping" }); this.send({ type: "agent:activity", agentId, activity: "sleeping", detail: "" }); }
+  /** Try to start the next queued agent if budget allows. */
+  private tryDequeue(): void {
+    for (let i = 0; i < this.startQueue.length; i++) {
+      const q = this.startQueue[i]!;
+      const mem = q.config.memoryLimitMb ?? 0;
+      const cpu = q.config.cpuLimitPercent ?? 0;
+      if ((mem <= 0 && cpu <= 0) || this.budget.canAllocate(mem, cpu)) {
+        this.startQueue.splice(i, 1);
+        const agentId = q.agentId;
+        this.budget.queueLength = this.startQueue.length;
+        this.budget.allocate(Math.max(mem, 0), Math.max(cpu, 0));
+        this.log.info("dequeue -> start", { agentId });
+        this.send({ type: "agent:status", agentId, status: "inactive" });
+        void this.startNow(agentId, q.config).finally(() => this.starting.delete(agentId));
+        return;
+      }
+    }
+  }
+
   /** Reset: stop the process + clear the server-side session (next start will not --resume); wipeWorkspace deletes the entire workspace; clearMemory clears MEMORY.md only. */
   async reset(agentId: string, wipeWorkspace = false, clearMemory = false): Promise<void> {
     this.teardown(agentId); // skip stop() to avoid double inactive emit; reset sends its own inactive/offline+detail=reset below
@@ -138,15 +175,44 @@ export class AgentManager {
     if (!preview) return;
     this.activeReplyPreviews.delete(agentId);
     this.send({ type: "agent:reply", agentId, channelId: preview.channelId, streamId: preview.streamId, name: preview.name, op });
+    // Queue is waiting → sleep this agent so the next one can run
+    if (op === "done" && this.startQueue.length > 0) {
+      const r = this.agents.get(agentId);
+      if (r) {
+        this.log.info("reply done, queue waiting — sleeping agent", { agentId });
+        this.sleep(agentId);
+      }
+    }
   }
 
   async start(agentId: string, config: AgentConfig): Promise<void> {
     if (this.agents.has(agentId)) return;
     const existing = this.starting.get(agentId);
     if (existing) return existing;
-    const pending = this.startNow(agentId, config).finally(() => this.starting.delete(agentId));
-    this.starting.set(agentId, pending);
-    return pending;
+    // Already queued — update config and return
+    if (this.startQueue.some((q) => q.agentId === agentId)) {
+      const idx = this.startQueue.findIndex((q) => q.agentId === agentId);
+      if (idx !== -1) this.startQueue[idx]!.config = config;
+      return;
+    }
+
+    const mem = config.memoryLimitMb ?? 0;
+    const cpu = config.cpuLimitPercent ?? 0;
+
+    // No limits or budget available → start directly
+    if ((mem <= 0 && cpu <= 0) || this.budget.canAllocate(mem, cpu)) {
+      this.budget.allocate(Math.max(mem, 0), Math.max(cpu, 0));
+      const pending = this.startNow(agentId, config).finally(() => this.starting.delete(agentId));
+      this.starting.set(agentId, pending);
+      return pending;
+    }
+
+    // Budget insufficient → queue
+    this.startQueue.push({ agentId, config, enqueuedAt: Date.now() });
+    this.budget.queueLength = this.startQueue.length;
+    this.send({ type: "agent:status", agentId, status: "queued" });
+    this.send({ type: "agent:activity", agentId, activity: "offline", detail: "queued" });
+    this.log.info("queued", { agentId, memMB: mem, cpuPct: cpu });
   }
 
   private async startNow(agentId: string, config: AgentConfig): Promise<void> {
@@ -186,7 +252,7 @@ export class AgentManager {
     };
     delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT;
 
-    const running: Running = { session: undefined as unknown as RuntimeSession, config, sessionId: config.sessionId ?? null };
+    const running: Running = { session: undefined as unknown as RuntimeSession, config, sessionId: config.sessionId ?? null, allocatedMemMB: Math.max(config.memoryLimitMb ?? 0, 0), allocatedCpuPct: Math.max(config.cpuLimitPercent ?? 0, 0) };
     const cb: RuntimeCallbacks = {
       onSession: (sid) => { running.sessionId = sid; this.send({ type: "agent:session", agentId, sessionId: sid }); },
       onActivity: (activity, detail) => {
@@ -198,7 +264,10 @@ export class AgentManager {
       onExit: (code) => {
         this.log.info("agent exited", { agentId, code });
         if (!this.agents.has(agentId)) return; // intentional stop/sleep/reset already called teardown (removed from map) — they sent their own status, don't overwrite
+        const r = this.agents.get(agentId);
+        if (r) this.budget.release(r.allocatedMemMB, r.allocatedCpuPct);
         this.agents.delete(agentId);
+        this.tryDequeue();
         // Process died on its own (not intentionally stopped): keep status=sleeping (session preserved, @ can --resume to recover);
         // Non-zero exit code (crash/signal kill) → activity=error to surface the failure; clean exit → sleeping.
         const crashed = code !== 0;

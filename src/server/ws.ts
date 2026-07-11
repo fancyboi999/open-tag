@@ -1,7 +1,7 @@
 // daemon control plane: WS /daemon/connect?key= (ServerToMachine / MachineToServer)
 import { WebSocketServer, type WebSocket } from "ws";
 import type { Server } from "node:http";
-import { and, desc, eq, notInArray } from "drizzle-orm";
+import { and, desc, eq, notInArray, or } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { BOOTSTRAP_KEY, hashToken, safeEqual } from "./auth.js";
 import { registerDaemon, unregisterDaemon, resolveDaemonRequest, registerMachineConn, unregisterMachineConn, isCurrentMachineConn } from "./daemonHub.js";
@@ -118,12 +118,12 @@ async function onReady(serverId: string, key: string, msg: any): Promise<string>
   // (the case where both server and daemon restarted) → set inactive, so the next spawn lets agentConfig re-mint the token normally (otherwise a stale active leaves agentToken undefined → agent 401).
   // When only the server restarts and the daemon stays alive → runningAgents includes the live agent → no false reset (keeps zero-desync).
   const runningIds: string[] = Array.isArray(msg.runningAgents) ? msg.runningAgents : [];
-  const onMachine = await db.select().from(schema.agents).where(and(eq(schema.agents.machineId, machineId), eq(schema.agents.status, "active")));
+  const onMachine = await db.select().from(schema.agents).where(and(eq(schema.agents.machineId, machineId), or(eq(schema.agents.status, "active"), eq(schema.agents.status, "queued"))));
   for (const a of onMachine) {
     if (runningIds.includes(a.id)) continue;
     await db.update(schema.agents).set({ status: "inactive", activity: "offline" }).where(eq(schema.agents.id, a.id));
     await publish(serverId, { type: "agent", id: a.id, name: a.name, status: "inactive", activity: "offline" });
-    log.info("reconciled stale-active agent → inactive", { agentId: a.id, machineId });
+    log.info("reconciled stale-active/queued agent → inactive", { agentId: a.id, machineId });
   }
   // Reconnect catch-up: wake agents on this machine that accumulated a wakeable backlog while it was offline,
   // so missed @/DM messages get processed instead of sitting unread forever (the symmetric counterpart to the

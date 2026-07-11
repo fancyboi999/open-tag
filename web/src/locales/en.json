@@ -124,6 +124,7 @@
     "nameInvalid": "Name must be 1-64 characters, start with a letter, and contain only letters, numbers, hyphens, and underscores",
     "machineOnline": "online",
     "machineOffline": "offline",
+    "resourceBudget": "Resource Budget",
     "startFailed": "Couldn't start the agent — its machine may be offline. Check the machine connection and try again.",
     "startFailedWithReason": "Couldn't start the agent",
     "startFailReasonNoDaemon": "no daemon online (machine not connected)",
