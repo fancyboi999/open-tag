@@ -107,6 +107,6 @@ export const claudeRuntime: Runtime = {
       }
     }
 
-    return { deliver: (text) => writeUser(text), stop: () => { killTree(proc); } };
+    return { pid: proc.pid, deliver: (text) => writeUser(text), stop: () => { killTree(proc); } };
   },
 };

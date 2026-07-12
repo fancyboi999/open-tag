@@ -172,12 +172,10 @@ Three separate auth planes — do not conflate them (`src/server/auth.ts`):
 - **agent** → per-agent token (`Bearer sk_agent_*` + `x-agent-id`), `resolveAgent`, `/agent-api/*`.
 - **daemon** → bootstrap/machine key over WS `/daemon/connect?key=` (`ws.ts`).
 
-Resource-control env vars (optional, per-platform):
-- `OPEN_TAG_MEM_LIMIT_MB` — per-agent process memory hard limit in MB. 0 (default) = no limit.
-- `OPEN_TAG_CPU_LIMIT_PERCENT` — per-agent CPU usage limit as % of one core (1-100). 0 = no limit.
-  Enforced per platform: Windows Job Object, Linux cgroup v2 (cgroup v1 fallback for WSL2), macOS
-  background priority via `setpriority` (CPU-only best-effort). See `src/daemon/resourceLimit.ts`.
-  `koffi` (Windows + macOS) is loaded dynamically — Linux nodes do not need it installed.
+Resource-control env vars (optional):
+- `OPEN_TAG_PRESSURE_MEM_MB` (default 500) — when free system memory drops below this (MB), new
+  agents are queued and running agents receive a per-process cap at their current RSS + fair-share
+  margin via the Job Object or cgroup. See `src/daemon/resourceBudget.ts`.
 
 Required env vars — server **will not start** without these:
 - `JWT_SECRET` — signing key for human session JWTs. Generate: `openssl rand -hex 32`.

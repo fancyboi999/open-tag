@@ -65,7 +65,7 @@ class PiRun {
   private queue: string[] = [];
   private turnBusy = false;
   private stopped = false;
-  private proc: ChildProcess | null = null;
+  proc: ChildProcess | null = null;
   private sessionId: string | null;
   private everSucceeded = false;
   private readonly promptFile: string;
@@ -157,6 +157,6 @@ export const piRuntime: Runtime = {
   experimental: true,
   start(opts: StartOpts, cb: RuntimeCallbacks): RuntimeSession {
     const run = new PiRun(opts, cb);
-    return { deliver: (text) => run.enqueue(text), stop: () => run.stop() };
+    return { get pid() { return run.proc?.pid ?? 0; }, deliver: (text) => run.enqueue(text), stop: () => run.stop() };
   },
 };

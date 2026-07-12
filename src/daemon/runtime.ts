@@ -28,6 +28,7 @@ export interface StartOpts {
 }
 
 export interface RuntimeSession {
+  pid?: number;
   deliver(text: string): void;     // deliver a new message / wake up → drives one turn (claude=stdin write; codex=turn/start)
   stop(): void;
 }

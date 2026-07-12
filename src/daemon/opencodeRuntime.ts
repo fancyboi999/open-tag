@@ -87,7 +87,7 @@ class OpencodeRun {
   private queue: string[] = [];
   private turnBusy = false;
   private stopped = false;
-  private proc: ChildProcess | null = null;
+  proc: ChildProcess | null = null;
   private sessionId: string | null;
   private everSucceeded = false;
   private readonly env: NodeJS.ProcessEnv;
@@ -173,6 +173,6 @@ export const opencodeRuntime: Runtime = {
   experimental: true,
   start(opts: StartOpts, cb: RuntimeCallbacks): RuntimeSession {
     const run = new OpencodeRun(opts, cb);
-    return { deliver: (text) => run.enqueue(text), stop: () => run.stop() };
+    return { get pid() { return run.proc?.pid ?? 0; }, deliver: (text) => run.enqueue(text), stop: () => run.stop() };
   },
 };

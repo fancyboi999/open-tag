@@ -92,7 +92,7 @@ class CopilotRun {
   private queue: string[] = [];
   private turnBusy = false;
   private stopped = false;
-  private proc: ChildProcess | null = null;
+  proc: ChildProcess | null = null;
   private readonly sessionId: string;
   private everSucceeded = false;
   private readonly env: NodeJS.ProcessEnv;
@@ -179,6 +179,6 @@ export const copilotRuntime: Runtime = {
   experimental: true,
   start(opts: StartOpts, cb: RuntimeCallbacks): RuntimeSession {
     const run = new CopilotRun(opts, cb);
-    return { deliver: (text) => run.enqueue(text), stop: () => run.stop() };
+    return { get pid() { return run.proc?.pid ?? 0; }, deliver: (text) => run.enqueue(text), stop: () => run.stop() };
   },
 };

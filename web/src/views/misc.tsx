@@ -194,9 +194,16 @@ export function Computers() {
   const [updateGuide, setUpdateGuide] = useState<{ id: string; name: string; currentVersion: string; latestVersion: string; apiKeyPrefix?: string } | null>(null);
   const [delErr, setDelErr] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [budget, setBudget] = useState<any>(null);
   const cur = machines.find((m) => m.id === machineId) || machines[0];
+  const fmtMem = (mb: number) => mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb + " MB";
   const onMachine = agents.filter((a) => a.machineId === cur?.id);
   const canUpdateDaemon = isDaemonUpdateAvailable(cur, latestDaemonVersion);
+  // Load resource budget for the selected machine
+  useEffect(() => {
+    if (!cur) { setBudget(null); return; }
+    api("GET", `/api/servers/${slug}/machines/${cur.id}/budget`).then((r) => { if (r && !r.error) setBudget(r); }).catch(() => setBudget(null));
+  }, [slug, cur?.id]);
   const removeMachine = async () => {
     if (!cur) return;
     setDelErr("");
@@ -242,6 +249,14 @@ export function Computers() {
               </div>
               <div className="sec">{t("common.detectedRuntimes")} <span className="cnt">{(cur.runtimes || []).length}</span></div>
               <div className="rt-list">{(cur.runtimes || []).length ? (cur.runtimes || []).map((r) => <span key={r} className="rt-chip">{RT_LABEL[r] || r}</span>) : <span className="empty">{t("misc.computersNoRuntime")}</span>}</div>
+              {budget && (
+                <div className="card">
+                  <div className="meta" style={{ marginBottom: 8 }}>{t("members.resourceBudget")}</div>
+                  <div className="kv"><b>Agent budget</b> {fmtMem(budget.freememMB)} free · CPU {budget.totalCpuCores * 100 - budget.cpuUsagePct}% free</div>
+                  <div className="kv"><b>Running</b> {budget.agentCount} agents</div>
+                  <div className="kv"><b>Queue</b> {budget.queueLength}</div>
+                </div>
+              )}
               <div className="sec">{t("misc.computersAgentsSection")} <span className="cnt">{onMachine.length}</span></div>
               {onMachine.length ? onMachine.map((a) => (
                 <button key={a.id} className="item" onClick={() => nav(`/s/${slug}/agent/${a.id}`)}>

@@ -104,31 +104,15 @@ function InviteHumanModal({ onClose }: { onClose: () => void }) {
 // every card a navigable entry into that member's profile (agent → /agent/:id, human → /human/:userId).
 function Roster({ agents, humans, onCreate, canCreate }: { agents: any[]; humans: any[]; onCreate: () => void; canCreate?: boolean }) {
   const { t } = useTranslation();
-  const { attachmentUrl, slug, api } = useStore();
+  const { attachmentUrl, slug } = useStore();
   const nav = useNavigate();
-  const [budget, setBudget] = useState<any>(null);
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const total = agents.length + humans.length;
   const goKey = (e: React.KeyboardEvent, to: string) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nav(to); } };
-  // Load budget from the first online machine
-  useEffect(() => {
-    const m = agents.find((a) => a.machineId)?.machineId;
-    if (!m) return;
-    api("GET", `/api/servers/${slug}/machines/${m}/budget`).then((r) => { if (r && !r.error) setBudget(r); }).catch(() => {});
-  }, [slug, api]);
-  const fmtMem = (mb: number) => mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb + " MB";
   return (
     <>
       <div className="head"><h1>{t("nav.members")}</h1><small>{t("common.membersCount", { count: total })}</small></div>
       <div className="scroll">
-        {budget && (
-          <div className="card">
-            <div className="meta" style={{ marginBottom: 8 }}>{t("members.resourceBudget")}</div>
-            <div className="kv"><b>Memory</b> {fmtMem(budget.allocatedMemMB)} / {fmtMem(budget.maxAgentMemMB)}</div>
-            <div className="kv"><b>CPU</b> {budget.allocatedCpuPct} / {budget.maxAgentCpuPct}%</div>
-            <div className="kv"><b>Queue</b> {budget.queueLength}</div>
-          </div>
-        )}
         {total === 0 ? <div className="empty">{t("members.rosterEmpty")}{canCreate && <> {t("members.rosterEmptyCreate")} <button className="addbtn" onClick={onCreate}>+</button></>}</div>
           : <>
             {agents.length > 0 && <div className="sec">{t("common.agents")} <span className="cnt">{agents.length}</span></div>}
@@ -169,7 +153,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const [sp, setSp] = useSearchParams();
   const tab = sp.get("agentTab") || "profile";
   const [a, setA] = useState<any>(null);
-  const [edit, setEdit] = useState(false); const [dn, setDn] = useState(""); const [ds, setDs] = useState(""); const [edMem, setEdMem] = useState(""); const [edCpu, setEdCpu] = useState(""); // profile edit state (displayName/description/limits)
+  const [edit, setEdit] = useState(false); const [dn, setDn] = useState(""); const [ds, setDs] = useState(""); // profile edit state (displayName/description)
   const [showRestart, setShowRestart] = useState(false);
   const [avBusy, setAvBusy] = useState(false); const [avErr, setAvErr] = useState(""); const [signedAvatar, setSignedAvatar] = useState<string | null>(null);
   const refetch = async () => { const data = await api("GET", "/api/agents/" + id); setA(data); setSignedAvatar(resolveAvatar(data?.avatarUrl, attachmentUrl)); };
@@ -198,8 +182,8 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
     setTimeout(refetch, 500);
   };
   const del = async () => { if (!(await confirm({ title: t("members.deleteAgentTitle", { name: a.name }), message: t("members.deleteAgentMessage"), confirmLabel: t("members.delete"), danger: true }))) return; await api("DELETE", "/api/agents/" + id); await reload(); onDeleted(); };
-  const startEdit = () => { setDn(a.displayName || a.name); setDs(a.description || ""); setEdMem(a.memoryLimitMb != null ? String(a.memoryLimitMb) : ""); setEdCpu(a.cpuLimitPercent != null ? String(a.cpuLimitPercent) : ""); setEdit(true); };
-  const saveProfile = async () => { await api("PATCH", "/api/agents/" + id, { displayName: dn.trim() || a.name, description: ds.trim(), memoryLimitMb: edMem ? parseInt(edMem, 10) : null, cpuLimitPercent: edCpu ? parseInt(edCpu, 10) : null }); setEdit(false); await refetch(); await reload(); }; // profile tab: editable displayName/description
+  const startEdit = () => { setDn(a.displayName || a.name); setDs(a.description || ""); setEdit(true); };
+  const saveProfile = async () => { await api("PATCH", "/api/agents/" + id, { displayName: dn.trim() || a.name, description: ds.trim() }); setEdit(false); await refetch(); await reload(); }; // profile tab: editable displayName/description
   const live = statusOf(a);
   const msgAgent = async () => { const cid = await openDM("agent", id); if (cid) nav(`/s/${slug}/channel/${cid}`); };
   // Header action bar: Message available to everyone; start/stop/restart/delete gated by manageAgents capability
@@ -252,8 +236,6 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
                   <label>{t("members.displayName")}</label><input value={dn} onChange={(e) => setDn(e.target.value)} placeholder={a.name} />
                   <label>{t("members.agentDescriptionLabel")}</label><textarea value={ds} maxLength={3000} onChange={(e) => setDs(e.target.value)} placeholder={t("members.agentDescriptionPlaceholder")} />
                   <div className="ta-count">{ds.trim().length}/3000</div>
-                  <label>Memory Limit (MB)</label><input type="number" min={0} step={100} value={edMem} onChange={(e) => setEdMem(e.target.value)} placeholder="Unlimited" />
-                  <label>CPU Limit (%)</label><input type="number" min={0} max={100} value={edCpu} onChange={(e) => setEdCpu(e.target.value)} placeholder="Unlimited" />
                   <div className="setrow"><button className="ok" onClick={saveProfile}>{t("members.save")}</button><button className="cancel" onClick={() => setEdit(false)}>{t("members.cancel")}</button></div>
                 </div>
               ) : (<>
@@ -263,8 +245,6 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
                 {a.runtimeConfig?.reasoningEffort && <div className="kv"><b>{t("common.reasoning")}</b> {a.runtimeConfig.reasoningEffort}</div>}
                 <div className="kv"><b>{t("common.status")}</b> <span className="kv-v"><span className={"dot " + live} /> {live}</span></div>
                 <div className="kv"><b>{t("common.session")}</b> {a.sessionId || "(none)"}</div>
-                {a.memoryLimitMb != null && <div className="kv"><b>Memory Limit</b> {a.memoryLimitMb} MB</div>}
-                {a.cpuLimitPercent != null && <div className="kv"><b>CPU Limit</b> {a.cpuLimitPercent}%</div>}
                 <div className="kv"><b>{t("common.workspace")}</b> ~/.open-tag/agents/{a.id}</div>
                 {a.createdAt && <div className="kv"><b>{t("common.created")}</b> {fmtDateTime(a.createdAt)}</div>}
                 {capabilities.manageAgents && <div className="task-acts" style={{ marginTop: 14 }}>
@@ -471,7 +451,6 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
   const [machineId, setMachineId] = useState(machines[0]?.id || "");
   const [runtime, setRuntime] = useState("claude"); const [model, setModel] = useState("");
   const [models, setModels] = useState<{ id: string; label?: string; thinking?: { levels: { value: string; label: string; description?: string }[]; default?: string } }[]>([]);   const [fast, setFast] = useState(false);
-  const [memLimit, setMemLimit] = useState(""); const [cpuLimit, setCpuLimit] = useState("");
   const [modelsLoading, setModelsLoading] = useState(false);
   const [reasoning, setReasoning] = useState(""); // reasoning effort (""=Default/no override); shown when selected model has thinking levels
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
@@ -507,7 +486,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(nm) || nm.length > 64) { setErr(t("members.nameInvalid")); return; } // @mention handle must be machine-safe; keep regex + length 64 in sync with core.ts AGENT_NAME_RE / MAX_AGENT_NAME
     setBusy(true); setErr("");
     try {
-      const r = await api("POST", "/api/agents", { machineId, name: nm, description: desc.trim() || null, runtime, model: model && model !== LOCAL_DEFAULT ? model : null, reasoning: thinkingLevels.length ? (reasoning || null) : null, fastMode: fast, memoryLimitMb: memLimit ? parseInt(memLimit, 10) : null, cpuLimitPercent: cpuLimit ? parseInt(cpuLimit, 10) : null });
+      const r = await api("POST", "/api/agents", { machineId, name: nm, description: desc.trim() || null, runtime, model: model && model !== LOCAL_DEFAULT ? model : null, reasoning: thinkingLevels.length ? (reasoning || null) : null, fastMode: fast });
       if (r?.error) { setErr(r.error); return; } // api() resolves the JSON body even on 4xx (fetch only throws on network failure) — an unchecked error here previously closed the modal silently with no feedback, e.g. once the backend started rejecting a stale/deleted machineId.
       await reload();
       if (r?.id) { if (r.started === false) toast.info(t("members.agentCreatedOffline")); onCreated?.({ id: r.id, name: r.name ?? nm }); }
@@ -548,8 +527,6 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
             options={[{ value: "", label: t("members.reasoningDefault") }, ...thinkingLevels.map((l) => ({ value: l.value, label: l.label }))]} />
         </>}
         <label className="ck-row"><input type="checkbox" checked={fast} onChange={(e) => setFast(e.target.checked)} /><span>{t("members.fastMode")}</span></label>
-        <label>Memory Limit (MB)</label><input type="number" min={0} step={100} value={memLimit} onChange={(e) => setMemLimit(e.target.value)} placeholder="e.g. 2048 (optional)" />
-        <label>CPU Limit (%)</label><input type="number" min={0} max={100} value={cpuLimit} onChange={(e) => setCpuLimit(e.target.value)} placeholder="e.g. 50 (optional)" />
         {err && <div className="form-err">{err}</div>}
         <div className="acts"><button className="cancel" onClick={onClose}>{t("members.cancel")}</button><button className="ok" onClick={create} disabled={busy || !machineId} title={!machineId ? t("members.machineRequired") : undefined}>{busy ? t("members.creating") : t("members.create")}</button></div>
       </div>

@@ -13,7 +13,7 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ### Added
 
-- **Agent resource limits**: per-agent CPU and memory limits configured via the web UI (`memoryLimitMb`, `cpuLimitPercent` in agent creation/profile) and enforced on every spawned agent process. Three backends: Windows Job Object (`koffi` FFI to `kernel32.dll`), Linux cgroup v2 with cgroup v1 fallback (tested on WSL2), macOS best-effort background priority (`koffi` libc, CPU only). `koffi` is loaded dynamically via `createRequire` — Linux nodes do not need it installed.
+- **Dynamic memory pressure system**: replaced static per-agent resource limits with system-wide memory pressure management. When free memory drops below 500 MB (`OPEN_TAG_PRESSURE_MEM_MB`), new agents are queued and running agents are capped at their current RSS + a fair-share margin. The Windows Job Object and Linux cgroup handles are still created for pressure-ready enforcement.
 
 ## [0.9.1] — 2026-07-10
 

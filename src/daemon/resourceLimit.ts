@@ -12,23 +12,13 @@ try { koffi = _require("koffi"); } catch { /* */ }
 const log = createLogger("daemon:limit");
 const platform = process.platform;
 
-export interface ResourceLimits {
-  memoryLimitMB: number;
-  cpuLimitPercent: number;
-}
-
-export function applyResourceLimits(child: ChildProcess, limits?: ResourceLimits): void {
+export function applyResourceLimits(child: ChildProcess): void {
   if (child.pid === undefined) return;
-
-  const memLimitMB = limits?.memoryLimitMB ?? (Number(process.env.OPEN_TAG_MEM_LIMIT_MB) || 0);
-  const cpuLimitPct = limits?.cpuLimitPercent ?? (Number(process.env.OPEN_TAG_CPU_LIMIT_PERCENT) || 0);
-  if (memLimitMB <= 0 && cpuLimitPct <= 0) return;
 
   try {
     switch (platform) {
-      case "win32": return applyWin32(child, memLimitMB, cpuLimitPct);
-      case "linux": return applyLinux(child, memLimitMB, cpuLimitPct);
-      case "darwin": return applyDarwin(child, cpuLimitPct);
+      case "win32": return setupWin32Job(child);
+      case "linux": return setupLinuxCgroup(child);
       default: log.debug("unsupported platform, skipping", { platform }); return;
     }
   } catch (err) {
@@ -41,6 +31,7 @@ export function applyResourceLimits(child: ChildProcess, limits?: ResourceLimits
 const JOB_OBJECT_LIMIT_PROCESS_MEMORY = 0x00000100;
 const JOB_OBJECT_CPU_RATE_CONTROL_ENABLE = 0x1;
 const JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP = 0x4;
+const JOB_OBJECT_CPU_RATE_CONTROL_SOFT_CAP = 0x8;
 const PROCESS_SET_QUOTA = 0x0100;
 const PROCESS_TERMINATE = 0x0001;
 const JobObjectExtendedLimitInformation = 9;
@@ -66,6 +57,7 @@ interface Win32Api {
     dwProcessId: number,
   ) => bigint;
   AssignProcessToJobObject: (hJob: bigint, hProcess: bigint) => boolean;
+  SetProcessWorkingSetSizeEx: (hProcess: bigint, min: bigint, max: bigint, flags: number) => boolean;
   CloseHandle: (hObject: bigint) => boolean;
   ExtendedLimitInfo: ReturnType<typeof koffi.struct>;
   CpuRateControlInfo: ReturnType<typeof koffi.struct>;
@@ -129,6 +121,7 @@ function initWinApi(): Win32Api {
       "bool",
       ["void*", "void*"],
     ),
+    SetProcessWorkingSetSizeEx: lib.func("SetProcessWorkingSetSizeEx", "bool", ["void*", "int64", "int64", "uint32"]),
     CloseHandle: lib.func("CloseHandle", "bool", ["void*"]),
     ExtendedLimitInfo,
     CpuRateControlInfo,
@@ -137,75 +130,20 @@ function initWinApi(): Win32Api {
 
 const jobHandles = new Map<number, bigint>();
 
-function applyWin32(child: ChildProcess, memLimitMB: number, cpuLimitPct: number): void {
+function setupWin32Job(child: ChildProcess): void {
   const pid = child.pid!;
   const a = (winApi ??= initWinApi());
-
   const jobHandle = a.CreateJobObjectW(null, null);
   if (typeof jobHandle !== "bigint" || jobHandle === 0n) {
     log.error("CreateJobObjectW failed", { pid });
     return;
   }
 
-  const z = 0n;
-  const extInfo = {
-    BasicLimitInformation: {
-      PerProcessUserTimeLimit: z,
-      PerJobUserTimeLimit: z,
-      LimitFlags: memLimitMB > 0 ? JOB_OBJECT_LIMIT_PROCESS_MEMORY : 0,
-      MinimumWorkingSetSize: z,
-      MaximumWorkingSetSize: z,
-      ActiveProcessLimit: 0,
-      Affinity: z,
-      PriorityClass: 0,
-      SchedulingClass: 0,
-    },
-    IoInfo: {
-      ReadOperationCount: z,
-      WriteOperationCount: z,
-      OtherOperationCount: z,
-      ReadTransferCount: z,
-      WriteTransferCount: z,
-      OtherTransferCount: z,
-    },
-    ProcessMemoryLimit: memLimitMB > 0 ? BigInt(memLimitMB) * 1024n * 1024n : z,
-    JobMemoryLimit: z,
-    PeakProcessMemoryUsed: z,
-    PeakJobMemoryUsed: z,
-  };
-
-  const extOk = a.SetExtendedLimitInfo(
-    jobHandle,
-    JobObjectExtendedLimitInformation,
-    extInfo,
-    koffi.sizeof(a.ExtendedLimitInfo),
-  );
-  if (!extOk) log.error("SetExtendedLimitInfo failed", { pid, memLimitMB });
-
-  if (cpuLimitPct > 0) {
-    const cpuOk = a.SetCpuRateInfo(
-      jobHandle,
-      JobObjectCpuRateControlInformation,
-      {
-        ControlFlags:
-          JOB_OBJECT_CPU_RATE_CONTROL_ENABLE |
-          JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP,
-        CpuRate: Math.min(10000, Math.round(cpuLimitPct * 100)),
-      },
-      koffi.sizeof(a.CpuRateControlInfo),
-    );
-    if (!cpuOk) log.error("SetCpuRateInfo failed", { pid, cpuLimitPct });
-  }
-
-  const procHandle = a.OpenProcess(
-    PROCESS_SET_QUOTA | PROCESS_TERMINATE,
-    0,
-    pid,
-  );
+  const procHandle = a.OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, 0, pid);
   if (typeof procHandle === "bigint" && procHandle !== 0n) {
     const assigned = a.AssignProcessToJobObject(jobHandle, procHandle);
     if (assigned) {
-      log.info("assigned to Job Object", { pid, memoryLimitMB: memLimitMB || undefined, cpuLimitPercent: cpuLimitPct || undefined });
+      log.debug("assigned to Job Object (pressure-ready)", { pid });
     } else {
       log.error("AssignProcessToJobObject failed", { pid });
     }
@@ -230,137 +168,131 @@ function applyWin32(child: ChildProcess, memLimitMB: number, cpuLimitPct: number
 
 const CG_ROOT = "/sys/fs/cgroup";
 
-function cgroupV2Available(): boolean {
-  try {
-    fs.accessSync(path.join(CG_ROOT, "cgroup.controllers"), fs.constants.R_OK);
-    return true;
-  } catch { return false; }
-}
-
-function cgroupV1Available(): boolean {
-  try {
-    fs.accessSync("/sys/fs/cgroup/memory", fs.constants.F_OK);
-    fs.accessSync("/sys/fs/cgroup/cpu", fs.constants.F_OK);
-    return true;
-  } catch { return false; }
-}
-
-const cgV1Cleanup = new Map<number, string[]>();
-
-function applyLinux(child: ChildProcess, memLimitMB: number, cpuLimitPct: number): void {
-  if (cgroupV2Available()) return applyCgroupV2(child, memLimitMB, cpuLimitPct);
-  if (cgroupV1Available()) return applyCgroupV1(child, memLimitMB, cpuLimitPct);
-  log.debug("no cgroup available, skipping");
-}
-
-// ── cgroup v2 ────────────────────────────────────────────────────────────────
-
-function applyCgroupV2(child: ChildProcess, memLimitMB: number, cpuLimitPct: number): void {
+function setupLinuxCgroup(child: ChildProcess): void {
   const pid = child.pid!;
   const cgName = `open-tag-agent-${pid}`;
   const cgDir = path.join(CG_ROOT, cgName);
 
   try {
     try {
-      const cur = fs.readFileSync(path.join(CG_ROOT, "cgroup.subtree_control"), "utf8");
-      const need: string[] = [];
-      if (!cur.includes("cpu")) need.push("+cpu");
-      if (!cur.includes("memory")) need.push("+memory");
-      if (need.length) fs.writeFileSync(path.join(CG_ROOT, "cgroup.subtree_control"), need.join(" "));
-    } catch { /* may not have permission */ }
-
-    fs.mkdirSync(cgDir, { recursive: true });
-
-    if (memLimitMB > 0) {
-      fs.writeFileSync(path.join(cgDir, "memory.max"), String(BigInt(memLimitMB) * 1024n * 1024n));
+      fs.mkdirSync(cgDir, { recursive: true });
+    } catch {
+      log.debug("cgroup setup skipped (no permission)", { pid });
+      return;
     }
-    if (cpuLimitPct > 0) {
-      const quota = Math.round(cpuLimitPct * 1000);
-      fs.writeFileSync(path.join(cgDir, "cpu.max"), `${quota} 100000`);
-    }
+
     fs.writeFileSync(path.join(cgDir, "cgroup.procs"), String(pid));
+    log.debug("assigned to cgroup (pressure-ready)", { pid });
 
-    log.info("assigned to cgroup v2", { pid, memoryLimitMB: memLimitMB || undefined, cpuLimitPercent: cpuLimitPct || undefined });
+    child.once("exit", () => {
+      try { fs.rmdirSync(cgDir); } catch { /* */ }
+    });
   } catch (err) {
-    try { fs.rmdirSync(cgDir); } catch { /* */ }
-    log.error("cgroup v2 setup failed", { pid, error: String(err) });
-    return;
+    log.debug("cgroup setup failed", { pid, error: String(err) });
   }
-
-  child.once("exit", () => {
-    try { fs.rmdirSync(cgDir); } catch { /* */ }
-  });
 }
 
-// ── cgroup v1 (fallback, e.g. WSL2) ─────────────────────────────────────────
+// ── Process memory reading ────────────────────────────────────────────────────
 
-function applyCgroupV1(child: ChildProcess, memLimitMB: number, cpuLimitPct: number): void {
-  const pid = child.pid!;
-  const cgName = `open-tag-agent-${pid}`;
-  const dirs: string[] = [];
-
+export function readProcessMemoryMB(pid: number): number {
+  if (pid <= 0) return 0;
   try {
-    if (memLimitMB > 0) {
-      const memDir = `/sys/fs/cgroup/memory/${cgName}`;
-      fs.mkdirSync(memDir, { recursive: true });
-      fs.writeFileSync(`${memDir}/memory.limit_in_bytes`, String(BigInt(memLimitMB) * 1024n * 1024n));
-      fs.writeFileSync(`${memDir}/cgroup.procs`, String(pid));
-      dirs.push(memDir);
-    }
-
-    if (cpuLimitPct > 0) {
-      const cpuDir = `/sys/fs/cgroup/cpu/${cgName}`;
-      fs.mkdirSync(cpuDir, { recursive: true });
-      const period = Number(fs.readFileSync(`${cpuDir}/cpu.cfs_period_us`, "utf8").trim()) || 100000;
-      const quota = Math.round(cpuLimitPct / 100 * period);
-      fs.writeFileSync(`${cpuDir}/cpu.cfs_quota_us`, String(quota));
-      fs.writeFileSync(`${cpuDir}/cgroup.procs`, String(pid));
-      dirs.push(cpuDir);
-    }
-
-    if (dirs.length) {
-      cgV1Cleanup.set(pid, dirs);
-      log.info("assigned to cgroup v1", { pid, memoryLimitMB: memLimitMB || undefined, cpuLimitPercent: cpuLimitPct || undefined });
-    }
-  } catch (err) {
-    for (const d of dirs) { try { fs.rmdirSync(d); } catch { /* */ } }
-    log.error("cgroup v1 setup failed", { pid, error: String(err) });
-  }
-
-  child.once("exit", () => {
-    const d = cgV1Cleanup.get(child.pid!);
-    if (d) {
-      for (const dir of d) {
-        // write 0 to migrate remaining tasks to root cgroup before rmdir
-        try { fs.writeFileSync(`${dir}/cgroup.procs`, "0"); } catch { /* */ }
-        try { fs.rmdirSync(dir); } catch { /* */ }
-      }
-      cgV1Cleanup.delete(child.pid!);
-    }
-  });
+    if (platform === "win32") return readWin32ProcessMemoryMB(pid);
+    if (platform === "linux") return readLinuxProcessMemoryMB(pid);
+  } catch { /* */ }
+  return 0;
 }
 
-// ── macOS (best-effort background priority) ──────────────────────────────────
-
-function applyDarwin(child: ChildProcess, cpuLimitPct: number): void {
-  if (cpuLimitPct <= 0) {
-    log.debug("macOS: no CPU limit configured, skipping");
-    return;
-  }
-
-  const pid = child.pid!;
+function readWin32ProcessMemoryMB(pid: number): number {
+  const a = (winApi ??= initWinApi());
+  const PROCESS_QUERY_INFORMATION = 0x0400;
+  const PROCESS_VM_READ = 0x0010;
+  const hProcess = a.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, pid);
+  if (typeof hProcess !== "bigint" || hProcess === 0n) return 0;
   try {
-    const lib = koffi.load("libc.dylib");
-    const setpriority = lib.func("setpriority", "int", ["int", "int", "int"]);
-    const PRIO_DARWIN_BG = 0x10000;
-
-    const ret = setpriority(PRIO_DARWIN_BG, pid, 0);
-    if (ret === 0) {
-      log.debug("set macOS background priority", { pid, cpuLimitPercent: cpuLimitPct });
-    } else {
-      log.error("setpriority failed", { pid });
-    }
-  } catch (err) {
-    log.error("macOS resource limit setup failed", { pid, error: String(err) });
+    const PSAPI = koffi.load("psapi.dll");
+    const PMC = koffi.struct("PMC", {
+      cb: "uint32",
+      PageFaultCount: "uint32",
+      PeakWorkingSetSize: "uint64",
+      WorkingSetSize: "uint64",
+      QuotaPeakPagedPoolUsage: "uint64",
+      QuotaPagedPoolUsage: "uint64",
+      QuotaPeakNonPagedPoolUsage: "uint64",
+      QuotaNonPagedPoolUsage: "uint64",
+      PagefileUsage: "uint64",
+      PeakPagefileUsage: "uint64",
+    });
+    const getMem = PSAPI.func("GetProcessMemoryInfo", "bool", ["void*", koffi.pointer(PMC), "uint32"]);
+    const pmc: Record<string, unknown> = {};
+    const ok = getMem(hProcess, pmc, koffi.sizeof(PMC));
+    if (!ok) return 0;
+    return Math.round(Number(pmc.WorkingSetSize) / (1024 * 1024));
+  } finally {
+    a.CloseHandle(hProcess);
   }
+}
+
+function readLinuxProcessMemoryMB(pid: number): number {
+  const st = fs.readFileSync(`/proc/${pid}/status`, "utf8");
+  const m = st.match(/^VmRSS:\s+(\d+)\s+kB/m);
+  return m ? Math.round(Number(m[1]) / 1024) : 0;
+}
+
+// ── Memory pressure: cap agents at current usage ───────────────────────────
+
+export function applyMemoryPressure(pid: number, currentMB: number, marginMB = 200): void {
+  if (pid <= 0) return;
+  try {
+    if (platform === "win32") applyWin32Pressure(pid, currentMB, marginMB);
+    if (platform === "linux") applyLinuxPressure(pid, currentMB, marginMB);
+  } catch { /* best-effort */ }
+}
+
+function applyWin32Pressure(pid: number, currentMB: number, marginMB: number): void {
+  const a = (winApi ??= initWinApi());
+  const handle = jobHandles.get(pid);
+  if (!handle) { log.debug("pressure: no job handle", { pid }); return; }
+
+  const newCapBytes = BigInt(Math.max(currentMB + marginMB, 1)) * 1024n * 1024n;
+  const z = 0n;
+  const extInfo = {
+    BasicLimitInformation: {
+      PerProcessUserTimeLimit: z,
+      PerJobUserTimeLimit: z,
+      LimitFlags: JOB_OBJECT_LIMIT_PROCESS_MEMORY,
+      MinimumWorkingSetSize: z,
+      MaximumWorkingSetSize: z,
+      ActiveProcessLimit: 0, Affinity: z, PriorityClass: 0, SchedulingClass: 0,
+    },
+    IoInfo: {
+      ReadOperationCount: z, WriteOperationCount: z, OtherOperationCount: z,
+      ReadTransferCount: z, WriteTransferCount: z, OtherTransferCount: z,
+    },
+    ProcessMemoryLimit: newCapBytes, JobMemoryLimit: z,
+    PeakProcessMemoryUsed: z, PeakJobMemoryUsed: z,
+  };
+  if (!a.SetExtendedLimitInfo(handle, JobObjectExtendedLimitInformation, extInfo, koffi.sizeof(a.ExtendedLimitInfo))) {
+    log.warn("pressure: SetExtendedLimitInfo failed", { pid, newCapMB: currentMB + marginMB });
+  }
+
+  const hProcess = a.OpenProcess(PROCESS_SET_QUOTA, 0, pid);
+  if (typeof hProcess === "bigint" && hProcess !== 0n) {
+    const wsBytes = BigInt(currentMB) * 1024n * 1024n;
+    a.SetProcessWorkingSetSizeEx(hProcess, wsBytes, wsBytes, 0);
+    a.CloseHandle(hProcess);
+  }
+}
+
+function applyLinuxPressure(pid: number, currentMB: number, marginMB: number): void {
+  const newCap = BigInt(currentMB + marginMB) * 1024n * 1024n;
+  try { fs.writeFileSync(`/proc/${pid}/cgroup`, ""); } catch { /* */ }
+  try {
+    const cgDir = `/sys/fs/cgroup/open-tag-agent-${pid}`;
+    if (fs.existsSync(path.join(cgDir, "memory.max"))) {
+      fs.writeFileSync(path.join(cgDir, "memory.max"), String(newCap));
+    } else if (fs.existsSync(`/sys/fs/cgroup/memory/${cgDir}/memory.limit_in_bytes`)) {
+      fs.writeFileSync(`/sys/fs/cgroup/memory/${cgDir}/memory.limit_in_bytes`, String(newCap));
+    }
+  } catch { /* */ }
 }

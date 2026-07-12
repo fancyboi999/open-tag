@@ -330,7 +330,6 @@ export async function agentConfig(agentId: string) {
   return {
     name: a.name, displayName: a.displayName, description: a.description,
     model: a.model, runtime: a.runtime, runtimeConfig: a.runtimeConfig, sessionId: a.sessionId ?? undefined,
-    memoryLimitMb: a.memoryLimitMb ?? undefined, cpuLimitPercent: a.cpuLimitPercent ?? undefined,
     serverUrl: SELF_URL, serverId: a.serverId, agentId: a.id, agentToken: token,
   };
 }

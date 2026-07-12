@@ -72,8 +72,7 @@ export const agents = pgTable("agents", {
   runtime: text("runtime").default("claude").notNull(),   // claude | codex | copilot | opencode | kimi | pi | cursor | hermes (registry: src/daemon/runtimes.ts REG)
   runtimeConfig: jsonb("runtime_config").$type<Record<string, unknown>>().default({}).notNull(),
   executionMode: text("execution_mode").default("auto").notNull(),
-  memoryLimitMb: integer("memory_limit_mb"),
-  cpuLimitPercent: integer("cpu_limit_percent"),
+
   envVars: jsonb("env_vars").$type<Record<string, string>>().default({}).notNull(),
   agentTokenHash: text("agent_token_hash"),       // hash of sk_agent_* token (used for CLI auth)
   scopes: jsonb("scopes").$type<{ granted: string[]; mode: "default" | "custom"; revision: number; updatedAt: string }>(), // null = default (all granted); see scopes.ts

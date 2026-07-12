@@ -18,7 +18,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     // creatorType lets the client distinguish system-seeded showcase agents (creatorType="system") from
     // real members — they stay in the store so #showcase history renders their avatar/name, but are filtered
     // out of member rosters and agent pickers (see web/src/store.tsx visibleAgents).
-    return (sendJson(res, 200, agents.map((a) => ({ id: a.id, name: a.name, displayName: a.displayName, description: a.description, status: a.status, activity: a.activity, model: a.model, runtime: a.runtime, machineId: a.machineId, avatarUrl: a.avatarUrl, creatorType: a.creatorType, memoryLimitMb: a.memoryLimitMb, cpuLimitPercent: a.cpuLimitPercent }))), true);
+    return (sendJson(res, 200, agents.map((a) => ({ id: a.id, name: a.name, displayName: a.displayName, description: a.description, status: a.status, activity: a.activity, model: a.model, runtime: a.runtime, machineId: a.machineId, avatarUrl: a.avatarUrl, creatorType: a.creatorType }))), true);
   }
   if (p === "/api/agents" && method === "POST") {
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
@@ -42,7 +42,6 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
       serverId, name: b.name, displayName: b.displayName || b.name, description: b.description ?? null,
       model: b.model || null, runtime: b.runtime || "claude", machineId: b.machineId,
       runtimeConfig: { provider: b.provider ?? "default", model: b.model ?? null, reasoningEffort: b.reasoning ?? null, mode: b.fastMode ? "fast" : "default" },
-      memoryLimitMb: b.memoryLimitMb ?? null, cpuLimitPercent: b.cpuLimitPercent ?? null,
       envVars: b.envVars ?? {}, executionMode: b.fastMode ? "fast" : "auto", creatorType: "user", creatorId: userId,
     }).onConflictDoNothing({ target: [schema.agents.serverId, schema.agents.name], where: isNull(schema.agents.deletedAt) }).returning();
     if (!agent) return (sendErr(res, 409, `an agent named "${b.name}" already exists`), true);
@@ -64,7 +63,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
     const b = await readJson(req); const patch: Record<string, unknown> = {};
     if (descTooLong(b.description)) return (sendErr(res, 400, DESC_TOO_LONG), true);
-    for (const k of ["displayName", "description", "model", "runtime", "avatarUrl", "memoryLimitMb", "cpuLimitPercent"]) if (b[k] !== undefined) patch[k] = b[k];
+    for (const k of ["displayName", "description", "model", "runtime", "avatarUrl"]) if (b[k] !== undefined) patch[k] = b[k];
     if (b.envVars !== undefined) patch.envVars = b.envVars;
     await db.update(schema.agents).set(patch).where(and(eq(schema.agents.id, am[1]!), eq(schema.agents.serverId, serverId)));
     // Title/role changed → push the current profile to the daemon so it syncs the workspace MEMORY.md.
@@ -89,10 +88,16 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     const [, agId, action] = alc;
     if (action === "start") { const r = await startAgent(serverId, agId!); return (r.ok ? sendJson(res, 200, { ok: true }) : sendErr(res, 503, r.reason ?? "cannot start")), true; }
     if (action === "stop") { await stopAgent(serverId, agId!); return (sendJson(res, 200, { ok: true }), true); }
-    if (action === "dequeue") { await dequeueAgent(serverId, agId!); return (sendJson(res, 200, { ok: true }), true); }
     if (action === "restart") { await stopAgent(serverId, agId!); const r = await startAgent(serverId, agId!); return (r.ok ? sendJson(res, 200, { ok: true }) : sendErr(res, 503, r.reason ?? "cannot start")), true; } // preserves session and workspace; restarts only the process
     const b = await readJson(req).catch(() => ({})); await resetAgent(serverId, agId!, !!b?.wipeWorkspace, !!b?.clearMemory);
     if (b?.restart) await startAgent(serverId, agId!); // reset & restart: restart after clearing; all three reset tiers support "& Restart"
+    return (sendJson(res, 200, { ok: true }), true);
+  }
+  // Dequeue: cancel a queued start (separate from lifecycle — not a running-agent action)
+  const adq = /^\/api\/agents\/([^/]+)\/dequeue$/.exec(p);
+  if (adq && method === "POST") {
+    if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
+    await dequeueAgent(serverId, adq[1]!);
     return (sendJson(res, 200, { ok: true }), true);
   }
   // Agent workspace file browser (reads local disk via daemon WS-RPC)

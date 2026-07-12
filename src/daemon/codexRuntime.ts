@@ -195,6 +195,6 @@ export const codexRuntime: Runtime = {
     });
     proc.on("exit", (code) => { client.closeAllPending(new Error("codex exited")); reportExit(code); });
 
-    return { deliver: (text) => { queue.push(text); pump(); }, stop: () => { killTree(proc); } };
+    return { pid: proc.pid, deliver: (text) => { queue.push(text); pump(); }, stop: () => { killTree(proc); } };
   },
 };
