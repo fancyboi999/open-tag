@@ -185,7 +185,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     const agId = askillOp[1]!; const skillName = askillOp[2]!;
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
-    const wsName = ({ claude: ".claude", codex: ".codex", copilot: ".copilot", opencode: ".opencode", cursor: ".cursor", pi: ".pi" } as Record<string, string>)[a.runtime] || ".claude";
+    const wsName = ({ claude: ".claude", codex: ".codex", copilot: ".copilot", hermes: ".hermes", kimi: ".kimi-code", opencode: ".opencode", cursor: ".cursor", pi: ".pi" } as Record<string, string>)[a.runtime] || ".claude";
     const relPath = `${wsName}/skills/${skillName}/SKILL.md`;
     if (method === "PUT") {
       const b = await readJson(req);

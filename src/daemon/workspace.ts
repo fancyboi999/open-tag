@@ -93,12 +93,14 @@ const PROVIDER_HOME_SKILLS: Record<string, SkillRoot> = {
   claude: { dir: path.join(HOME, ".claude", "skills"), label: "~/.claude/skills" },
   codex: { dir: path.join(process.env.CODEX_HOME || path.join(HOME, ".codex"), "skills"), label: "~/.codex/skills" },
   copilot: { dir: path.join(HOME, ".copilot", "skills"), label: "~/.copilot/skills" },
+  hermes: { dir: path.join(HOME, ".hermes", "skills"), label: "~/.hermes/skills" },
+  kimi: { dir: path.join(HOME, ".kimi-code", "skills"), label: "~/.kimi-code/skills" },
   opencode: { dir: path.join(HOME, ".config", "opencode", "skills"), label: "~/.config/opencode/skills" },
   cursor: { dir: path.join(HOME, ".cursor", "skills"), label: "~/.cursor/skills" },
   pi: { dir: path.join(HOME, ".pi", "agent", "skills"), label: "~/.pi/agent/skills" },
 };
 // Project-local (workspace) provider dir name per runtime, relative to the agent workspace/cwd.
-const PROVIDER_WS_DIR: Record<string, string> = { claude: ".claude", codex: ".codex", copilot: ".copilot", opencode: ".opencode", cursor: ".cursor", pi: ".pi" };
+const PROVIDER_WS_DIR: Record<string, string> = { claude: ".claude", codex: ".codex", copilot: ".copilot", hermes: ".hermes", kimi: ".kimi-code", opencode: ".opencode", cursor: ".cursor", pi: ".pi" };
 
 /** Resolve which skills dirs to scan for an agent, by its runtime. Pure (no I/O) — unit-tested. */
 export function skillRootsFor(runtime: string, agentId: string): { global: SkillRoot[]; workspace: SkillRoot | null } {
