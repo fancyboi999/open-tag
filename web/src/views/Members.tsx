@@ -156,11 +156,16 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const [edit, setEdit] = useState(false); const [dn, setDn] = useState(""); const [ds, setDs] = useState(""); // profile edit state (displayName/description)
   const [showRestart, setShowRestart] = useState(false);
   const [avBusy, setAvBusy] = useState(false); const [avErr, setAvErr] = useState(""); const [signedAvatar, setSignedAvatar] = useState<string | null>(null);
+  const [perContent, setPerContent] = useState<string | null>(null); const [perBusy, setPerBusy] = useState(false);
   const refetch = async () => { const data = await api("GET", "/api/agents/" + id); setA(data); setSignedAvatar(resolveAvatar(data?.avatarUrl, attachmentUrl)); };
   useEffect(() => { refetch(); }, [id]);
   useEffect(() => onEvent((e) => { if (e.type === "agent" && e.id === id) setA((p: any) => (p ? { ...p, status: e.status ?? p.status, activity: e.activity ?? p.activity } : p)); }), [id]);
   const onPickAvatar = async (f: File) => { setAvBusy(true); setAvErr(""); try { const url = await uploadAgentAvatar(id, f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { await api("PATCH", "/api/agents/" + id, { avatarUrl: scheme }); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
+  const fetchPersonality = async () => { try { const r = await api("GET", `/api/agents/${id}/personality`); setPerContent(r.content || null); } catch { setPerContent(null); } };
+  useEffect(() => { if (tab === "profile") fetchPersonality(); }, [id, tab]);
+  const uploadPersonality = async (f: File) => { setPerBusy(true); try { const text = await f.text(); await api("PUT", `/api/agents/${id}/personality`, { content: text }); toast.info("Personality saved"); await fetchPersonality(); } catch (e: any) { toast.error(String(e?.message || e)); } finally { setPerBusy(false); } };
+  const deletePersonality = async () => { if (!(await confirm({ title: "Delete personality", message: "Remove the personality.md file and restore the agent's default description?", confirmLabel: "Delete", danger: true }))) return; setPerBusy(true); try { await api("DELETE", `/api/agents/${id}/personality`); toast.info("Personality deleted"); setPerContent(null); } catch (e: any) { toast.error(String(e?.message || e)); } finally { setPerBusy(false); } };
   if (!a) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
   // Surface the server's concrete 503 reason ("no daemon online" / "runtime X unavailable on selected machine" …);
   // the generic machine-may-be-offline guess alone made users blind-retry (live 2026-07-05: 3× restart → 503).
@@ -252,6 +257,14 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
                 </div>}
               </>)}
             </div>
+            <div className="card">
+              <h3>Personality <small className="meta">{perContent ? "(personality.md)" : ""}</small></h3>
+              {perContent ? <div className="meta" style={{ whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto", marginBottom: 8 }}>{perContent}</div> : <div className="meta" style={{ opacity: .6 }}>No personality file — agent uses the description field.</div>}
+              {capabilities.manageAgents && <div className="task-acts">
+                <label className="joinbtn" style={{ cursor: perBusy ? "not-allowed" : "pointer", display: "inline-block" }}>{perBusy ? "Uploading…" : "Upload .md"}<input type="file" accept=".md,text/markdown,text/plain" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadPersonality(f); e.target.value = ""; }} /></label>
+                {perContent && <button className="joinbtn" style={{ color: "var(--error)" }} disabled={perBusy} onClick={deletePersonality}>Delete</button>}
+              </div>}
+            </div>
             <SkillsSection id={id} />
           </div>
         )}
@@ -263,18 +276,63 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
 // Profile tab SKILLS section (GET /api/agents/:id/skills — daemon reads skills from the host machine)
 function SkillsSection({ id }: { id: string }) {
   const { t } = useTranslation();
-  const { api } = useStore();
+  const { api, capabilities } = useStore();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [d, setD] = useState<{ global: any[]; workspace: any[] } | null>(null);
-  useEffect(() => { (async () => { try { setD(await api("GET", `/api/agents/${id}/skills`)); } catch { setD({ global: [], workspace: [] }); } })(); }, [id]);
+  const [busy, setBusy] = useState(false);
+  const refetch = async () => { try { setD(await api("GET", `/api/agents/${id}/skills`)); } catch { setD({ global: [], workspace: [] }); } };
+  useEffect(() => { refetch(); }, [id]);
+  const uploadSkill = async (f: File) => {
+    setBusy(true);
+    try {
+      const raw = await f.text();
+      const name = f.name.replace(/\.md$/i, "");
+      let content = raw;
+      if (!/^---\s*\n/.test(raw)) content = `---\nname: ${name}\nuserInvocable: true\n---\n\n${raw}`;
+      await api("PUT", `/api/agents/${id}/skills/${encodeURIComponent(name)}`, { content });
+      toast.info(`Skill "${name}" uploaded`);
+      await refetch();
+    } catch (e: any) { toast.error(String(e?.message ?? e)); }
+    finally { setBusy(false); }
+  };
+  const deleteSkill = async (name: string) => {
+    if (!(await confirm({ title: `Delete skill "${name}"`, message: "Remove this skill from the agent's workspace?", confirmLabel: "Delete", danger: true }))) return;
+    setBusy(true);
+    try {
+      await api("DELETE", `/api/agents/${id}/skills/${encodeURIComponent(name)}`);
+      toast.info(`Skill "${name}" deleted`);
+      await refetch();
+    } catch (e: any) { toast.error(String(e?.message ?? e)); }
+    finally { setBusy(false); }
+  };
   if (!d) return null;
   const all = [...(d.workspace || []).map((s) => ({ ...s, scope: t("members.scopeWorkspace") })), ...(d.global || []).map((s) => ({ ...s, scope: t("members.scopeGlobal") }))];
   return (
     <>
-      <div className="sec">{t("common.skills")} <span className="cnt">{all.length}</span></div>
+      <div className="sec">
+        {t("common.skills")} <span className="cnt">{all.length}</span>
+        {capabilities.manageAgents && <span style={{ marginLeft: 8 }}>
+          <label className="joinbtn" style={{ cursor: busy ? "not-allowed" : "pointer", display: "inline-block", fontSize: "inherit", lineHeight: "inherit", padding: "2px 8px" }}>
+            {busy ? "Uploading…" : "+ Skill"}
+            <input type="file" accept=".md,text/markdown" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadSkill(f); e.target.value = ""; }} />
+          </label>
+        </span>}
+      </div>
       {all.length === 0 ? <div className="empty">{t("members.skillsEmpty")}</div>
         : all.map((s, i) => (
           <div className="card skill-row" key={i} title={`${s.displayName || s.name}${s.description ? "\n\n" + s.description : ""}`}>
-            <div className="who">{s.displayName || s.name} <span className="meta">· {s.scope}{s.userInvocable ? ` · ${t("members.skillInvocable")}` : ""}</span></div>
+            <div className="who">
+              {s.displayName || s.name}
+              <span className="meta"> · {s.scope}{s.userInvocable ? ` · ${t("members.skillInvocable")}` : ""}</span>
+              {capabilities.manageAgents && s.sourcePath?.includes("<workspace>") && (
+                <button className="joinbtn" style={{
+                  color: "var(--error)", float: "right", fontSize: "inherit", lineHeight: "inherit",
+                  padding: "0 4px", background: "none", border: "none", cursor: busy ? "not-allowed" : "pointer",
+                  opacity: busy ? .5 : 1,
+                }} disabled={busy} onClick={() => deleteSkill(s.name!)} title="Delete from workspace">✕</button>
+              )}
+            </div>
             {s.description ? <div className="meta skill-desc">{s.description}</div> : <div className="meta" style={{ opacity: .6 }}>{t("members.noDescription")}</div>}
           </div>
         ))}

@@ -9,6 +9,13 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+### Added
+
+- **Personality upload/delete (server + web UI)**: `GET/PUT/DELETE /api/agents/:id/personality` endpoints gate on `manageAgents`; the Profile tab now shows current `personality.md` content with Upload .md and Delete buttons. Uploaded files are auto-renamed to `personality.md` in the agent workspace; after write/delete the daemon re-syncs MEMORY.md `## Role` via `syncProfile()`.
+- **Skills upload/delete (server + web UI)**: `PUT/DELETE /api/agents/:id/skills/:name` endpoints gate on `manageAgents`; the Skills section shows a "+ Skill" button. Uploaded `.md` files without frontmatter get auto-generated YAML (`name` + `userInvocable: true`). Workspace-scoped skills have a ✕ delete button; global skills are read-only.
+- **Daemon workspace file write/delete**: `writeWorkspaceFile()` / `deleteWorkspaceFile()` exports in `workspace.ts`, wired as `agent:workspace:write` / `agent:workspace:delete` WS-RPC cases in the daemon message dispatcher. Used by the personality and skills endpoints.
+- **Auto-frontmatter for skill uploads**: when a `.md` file without frontmatter is uploaded, the frontend prepends `---\nname: <skillName>\nuserInvocable: true\n---` so the skill is immediately recognized by the daemon's `readSkillsDir()`.
+
 ## [0.10.0] — 2026-07-11
 
 ### Added

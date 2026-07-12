@@ -115,6 +115,38 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     const r = await requestDaemon(serverId, { type: "agent:workspace:read", agentId: agId, path: url.searchParams.get("path") ?? "" });
     return (sendJson(res, 200, r.error ? { error: r.error } : { path: r.path, content: r.content }), true);
   }
+  // Agent personality: read/write/delete personality.md via daemon workspace
+  const aper = /^\/api\/agents\/([^/]+)\/personality$/.exec(p);
+  if (aper && method === "GET") {
+    if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
+    const agId = aper[1]!;
+    const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
+    if (!a) return (sendErr(res, 404, "agent not found"), true);
+    const r = await requestDaemon(serverId, { type: "agent:workspace:read", agentId: agId, path: "personality.md" });
+    return (sendJson(res, 200, { content: r.content ?? "", error: r.error }), true);
+  }
+  if (aper && method === "PUT") {
+    if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
+    const agId = aper[1]!;
+    const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
+    if (!a) return (sendErr(res, 404, "agent not found"), true);
+    const b = await readJson(req);
+    if (typeof b.content !== "string") return (sendErr(res, 400, "content required"), true);
+    const r = await requestDaemon(serverId, { type: "agent:workspace:write", agentId: agId, path: "personality.md", content: b.content });
+    if (r.error) return (sendErr(res, 500, r.error), true);
+    await syncAgentProfile(serverId, agId, a.displayName, a.description);
+    return (sendJson(res, 200, { ok: true }), true);
+  }
+  if (aper && method === "DELETE") {
+    if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
+    const agId = aper[1]!;
+    const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
+    if (!a) return (sendErr(res, 404, "agent not found"), true);
+    const r = await requestDaemon(serverId, { type: "agent:workspace:delete", agentId: agId, path: "personality.md" });
+    if (r.error) return (sendErr(res, 500, r.error), true);
+    await syncAgentProfile(serverId, agId, a.displayName, a.description);
+    return (sendJson(res, 200, { ok: true }), true);
+  }
   // Agent activity log: chronological [{timestamp, entry}]
   const alog = /^\/api\/agents\/([^/]+)\/activity-log$/.exec(p);
   if (alog && method === "GET") {
@@ -145,6 +177,26 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     if (!a) return (sendErr(res, 404, "agent not found"), true);
     try { const r = await requestDaemon(serverId, { type: "agent:skills:list", agentId: askill[1]!, runtime: a.runtime }); return (sendJson(res, 200, { global: r.global ?? [], workspace: r.workspace ?? [] }), true); }
     catch { return (sendJson(res, 200, { global: [], workspace: [] }), true); }
+  }
+  // Agent Skills write/delete (upload/remove SKILL.md in the workspace <runtime>/skills/ dir)
+  const askillOp = /^\/api\/agents\/([^/]+)\/skills\/([^/]+)$/.exec(p);
+  if (askillOp && (method === "PUT" || method === "DELETE")) {
+    if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
+    const agId = askillOp[1]!; const skillName = askillOp[2]!;
+    const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
+    if (!a) return (sendErr(res, 404, "agent not found"), true);
+    const wsName = ({ claude: ".claude", codex: ".codex", copilot: ".copilot", opencode: ".opencode", cursor: ".cursor", pi: ".pi" } as Record<string, string>)[a.runtime] || ".claude";
+    const relPath = `${wsName}/skills/${skillName}/SKILL.md`;
+    if (method === "PUT") {
+      const b = await readJson(req);
+      if (typeof b.content !== "string") return (sendErr(res, 400, "content required"), true);
+      const r = await requestDaemon(serverId, { type: "agent:workspace:write", agentId: agId, path: relPath, content: b.content });
+      if (r.error) return (sendErr(res, 500, r.error), true);
+    } else {
+      const r = await requestDaemon(serverId, { type: "agent:workspace:delete", agentId: agId, path: relPath });
+      if (r.error) return (sendErr(res, 500, r.error), true);
+    }
+    return (sendJson(res, 200, { ok: true }), true);
   }
   // Apps tab (connected third-party integrations): no integrations implemented yet, returns empty array
   const aint = /^\/api\/integrations\/agents\/([^/]+)$/.exec(p);
