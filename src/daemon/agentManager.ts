@@ -69,7 +69,7 @@ export class AgentManager {
   private checkMemoryPressure(): void {
     const freeMB = Math.floor(os.freemem() / (1024 * 1024));
     const threshold = Number(process.env.OPEN_TAG_PRESSURE_MEM_MB ?? "500");
-    if (freeMB >= threshold) return;
+    if (freeMB >= threshold) { this.tryDequeue(); return; }
     const agentCount = Math.max(this.agents.size, 1);
     const margin = Math.ceil(400 / agentCount);
     this.log.warn("memory pressure detected", { freeMB, threshold, margin, agentCount });

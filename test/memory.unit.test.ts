@@ -7,14 +7,14 @@ import { seedMemory, applyProfileToMemory } from "../src/daemon/memory.ts";
 test("seedMemory lays out title / Role / Key Knowledge / Active Context", () => {
   assert.equal(
     seedMemory("Ada", "local helper"),
-    "# Ada\n\n## Role\nlocal helper\n\n## Key Knowledge\n- None yet\n\n## Active Context\n- First startup\n",
+    "# Ada\n\n## Role\n<!-- role:start -->\nlocal helper\n<!-- role:end -->\n\n## Key Knowledge\n- None yet\n\n## Active Context\n- First startup\n",
   );
 });
 
 test("seedMemory falls back to Undefined for empty/whitespace description", () => {
-  assert.match(seedMemory("Ada", ""), /## Role\nUndefined\n/);
-  assert.match(seedMemory("Ada", "   "), /## Role\nUndefined\n/);
-  assert.match(seedMemory("Ada", null), /## Role\nUndefined\n/);
+  assert.match(seedMemory("Ada", ""), /## Role\n<!-- role:start -->\nUndefined\n<!-- role:end -->\n/);
+  assert.match(seedMemory("Ada", "   "), /## Role\n<!-- role:start -->\nUndefined\n<!-- role:end -->\n/);
+  assert.match(seedMemory("Ada", null), /## Role\n<!-- role:start -->\nUndefined\n<!-- role:end -->\n/);
 });
 
 test("applyProfileToMemory rewrites title + Role, preserves the agent's other sections", () => {
@@ -23,7 +23,7 @@ test("applyProfileToMemory rewrites title + Role, preserves the agent's other se
     .replace("- First startup", "- mid-refactor of the API layer");
   const after = applyProfileToMemory(before, "claudecode", "全栈资深工程师，精益求精");
   assert.match(after, /^# claudecode\n/);
-  assert.match(after, /## Role\n全栈资深工程师，精益求精\n/);
+  assert.match(after, /## Role\n<!-- role:start -->\n全栈资深工程师，精益求精\n<!-- role:end -->\n/);
   // agent-owned content survives untouched
   assert.match(after, /## Key Knowledge\n- notes\/users\.md — preferences/);
   assert.match(after, /## Active Context\n- mid-refactor of the API layer/);
@@ -38,30 +38,30 @@ test("applyProfileToMemory is a no-op when title + role already match", () => {
 test("applyProfileToMemory handles a multi-line description", () => {
   const before = seedMemory("Ada", "one-liner");
   const after = applyProfileToMemory(before, "Ada", "line 1\nline 2\nline 3");
-  assert.match(after, /## Role\nline 1\nline 2\nline 3\n\n## Key Knowledge/);
+  assert.match(after, /## Role\n<!-- role:start -->\nline 1\nline 2\nline 3\n<!-- role:end -->\n\n## Key Knowledge/);
 });
 
 test("applyProfileToMemory empty description becomes Undefined", () => {
   const after = applyProfileToMemory(seedMemory("Ada", "x"), "Ada", "   ");
-  assert.match(after, /## Role\nUndefined\n\n## Key Knowledge/);
+  assert.match(after, /## Role\n<!-- role:start -->\nUndefined\n<!-- role:end -->\n\n## Key Knowledge/);
 });
 
 test("applyProfileToMemory handles Role as the last section (no trailing heading)", () => {
   const before = "# Ada\n\n## Role\nold\n";
   const after = applyProfileToMemory(before, "Bob", "new role");
-  assert.equal(after, "# Bob\n\n## Role\nnew role");
+  assert.equal(after, "# Bob\n\n## Role\n<!-- role:start -->\nnew role\n<!-- role:end -->");
 });
 
 test("applyProfileToMemory reinstates a Role heading the agent removed", () => {
   const before = "# Ada\n\n## Key Knowledge\n- notes/x.md\n";
   const after = applyProfileToMemory(before, "Ada", "reassigned");
-  assert.match(after, /^# Ada\n\n## Role\nreassigned\n/);
+  assert.match(after, /^# Ada\n\n## Role\n<!-- role:start -->\nreassigned\n<!-- role:end -->\n/);
   assert.match(after, /## Key Knowledge\n- notes\/x\.md/);
 });
 
 test("applyProfileToMemory prepends a header when there is no H1 at all", () => {
   const before = "## Key Knowledge\n- notes/x.md\n";
   const after = applyProfileToMemory(before, "Ada", "role");
-  assert.match(after, /^# Ada\n\n## Role\nrole\n/);
+  assert.match(after, /^# Ada\n\n## Role\n<!-- role:start -->\nrole\n<!-- role:end -->\n/);
   assert.match(after, /## Key Knowledge\n- notes\/x\.md/);
 });
