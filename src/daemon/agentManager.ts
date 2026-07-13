@@ -9,7 +9,7 @@ import { getRuntime } from "./runtimes.js";
 import type { Runtime, RuntimeSession, RuntimeCallbacks } from "./runtime.js";
 import { createLogger } from "../log.js";
 import { agentsDir } from "../paths.js";
-import { ResourceBudget } from "./resourceBudget.js";
+import { ResourceBudget, PRESSURE_MEM_MB } from "./resourceBudget.js";
 import { readProcessMemoryMB, applyMemoryPressure } from "./resourceLimit.js";
 
 const DATA_DIR = agentsDir();
@@ -68,11 +68,10 @@ export class AgentManager {
 
   private checkMemoryPressure(): void {
     const freeMB = Math.floor(os.freemem() / (1024 * 1024));
-    const threshold = Number(process.env.OPEN_TAG_PRESSURE_MEM_MB ?? "500");
-    if (freeMB >= threshold) { this.tryDequeue(); return; }
+    if (freeMB >= PRESSURE_MEM_MB) { this.tryDequeue(); return; }
     const agentCount = Math.max(this.agents.size, 1);
     const margin = Math.ceil(400 / agentCount);
-    this.log.warn("memory pressure detected", { freeMB, threshold, margin, agentCount });
+    this.log.warn("memory pressure detected", { freeMB, threshold: PRESSURE_MEM_MB, margin, agentCount });
     for (const [id, r] of this.agents) {
       const pid = r.session.pid ?? r.pid;
       if (pid <= 0) continue;
@@ -137,18 +136,15 @@ export class AgentManager {
   sleep(agentId: string): void { if (!this.teardown(agentId)) return; this.log.info("sleep", { agentId }); this.send({ type: "agent:status", agentId, status: "sleeping" }); this.send({ type: "agent:activity", agentId, activity: "sleeping", detail: "" }); }
   /** Try to start the next queued agent if budget allows. */
   private tryDequeue(): void {
-    for (let i = 0; i < this.startQueue.length; i++) {
-      const q = this.startQueue[i]!;
-      if (this.budget.tryAllocate()) {
-        this.startQueue.splice(i, 1);
-        const agentId = q.agentId;
-        this.budget.queueLength = this.startQueue.length;
-        this.log.info("dequeue -> start", { agentId });
-        this.send({ type: "agent:status", agentId, status: "inactive" });
-        void this.startNow(agentId, q.config).finally(() => { this.starting.delete(agentId); this.budget.release(); });
-        return;
-      }
-    }
+    if (this.startQueue.length === 0) return;
+    const q = this.startQueue[0]!;
+    if (!this.budget.tryAllocate()) return;
+    this.startQueue.shift();
+    const agentId = q.agentId;
+    this.budget.queueLength = this.startQueue.length;
+    this.log.info("dequeue -> start", { agentId });
+    this.send({ type: "agent:status", agentId, status: "inactive" });
+    void this.startNow(agentId, q.config).finally(() => { this.starting.delete(agentId); this.budget.release(); });
   }
 
   /** Reset: stop the process + clear the server-side session (next start will not --resume); wipeWorkspace deletes the entire workspace; clearMemory clears MEMORY.md only. */

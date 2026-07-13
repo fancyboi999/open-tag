@@ -1,6 +1,6 @@
 import os from "node:os";
 
-const PRESSURE_MEM_MB = Number(process.env.OPEN_TAG_PRESSURE_MEM_MB ?? "500");
+export const PRESSURE_MEM_MB = Number(process.env.OPEN_TAG_PRESSURE_MEM_MB ?? "500");
 
 export interface ResourceBudgetStatus {
   totalMemMB: number;
