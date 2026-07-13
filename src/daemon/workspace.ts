@@ -1,7 +1,7 @@
 // Reads agent workspace (~/.open-tag/agents/<id>/) and exposes file tree / file content via WS-RPC to the server.
 // File tree: returns {root, files:[{name,path,isDirectory,size,modifiedAt}]} — root is the absolute on-disk workspace dir (so the UI shows the real path instead of a hardcoded template that's wrong under a non-default OPEN_TAG_HOME);
 //            read file: returns {path, content}. Security: path must remain inside the workspace root (prevents ../ escape).
-import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rmdir, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { agentsDir } from "../paths.js";
@@ -157,6 +157,7 @@ export async function deleteWorkspaceFile(agentId: string, rel: string): Promise
   if (!file) return { error: "invalid path" };
   try {
     await unlink(file);
+    await rmdir(path.dirname(file)).catch(() => {});
     return {};
   } catch (e: any) { return { error: String(e?.message ?? e) }; }
 }
