@@ -48,9 +48,27 @@ export class ResourceBudget {
     return Math.round((1 - dIdle / dTotal) * 100);
   }
 
-	canAllocate(): boolean {
-		return this.freememMB() >= PRESSURE_MEM_MB;
-	}
+  /** Number of agents that have passed tryAllocate() but haven't finished startNow(). */
+  pendingStarts = 0;
+
+  /** Reserve a slot for an in-flight start. Returns false if under pressure. */
+  tryAllocate(): boolean {
+    if (this.freememMB() >= PRESSURE_MEM_MB) {
+      this.pendingStarts++;
+      return true;
+    }
+    return false;
+  }
+
+  /** Release a previously reserved slot. */
+  release(): void {
+    this.pendingStarts = Math.max(0, this.pendingStarts - 1);
+  }
+
+  /** Stateless snapshot — prefer tryAllocate() for burst-safe checks. */
+  canAllocate(): boolean {
+    return this.freememMB() >= PRESSURE_MEM_MB;
+  }
 
 	freememMB(): number {
 		return Math.floor(os.freemem() / (1024 * 1024));

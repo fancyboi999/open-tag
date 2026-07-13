@@ -82,6 +82,27 @@ export class AgentManager {
         applyMemoryPressure(pid, actual, margin);
       }
     }
+    // macOS has no cgroup/job-object support — capping above is a no-op.
+    // Sleep the heaviest agent and auto-enqueue it so tryDequeue() resumes it
+    // once memory recovers.
+    if (process.platform === "darwin" && this.agents.size > 0) {
+      let maxRss = -1, maxId = "";
+      for (const [id, r] of this.agents) {
+        const pid = r.session.pid ?? r.pid;
+        if (pid <= 0) continue;
+        const rss = readProcessMemoryMB(pid);
+        if (rss > maxRss) { maxRss = rss; maxId = id; }
+      }
+      if (maxId) {
+        const config = this.agents.get(maxId)?.config;
+        if (config && !this.startQueue.some((q) => q.agentId === maxId)) {
+          this.startQueue.push({ agentId: maxId, config, enqueuedAt: Date.now() });
+        }
+        this.budget.queueLength = this.startQueue.length;
+        this.log.warn("darwin: sleeping heaviest agent to relieve memory pressure", { agentId: maxId, rssMB: maxRss });
+        this.sleep(maxId);
+      }
+    }
   }
 
   running(): string[] { return [...this.agents.keys()]; }
@@ -118,13 +139,13 @@ export class AgentManager {
   private tryDequeue(): void {
     for (let i = 0; i < this.startQueue.length; i++) {
       const q = this.startQueue[i]!;
-      if (this.budget.canAllocate()) {
+      if (this.budget.tryAllocate()) {
         this.startQueue.splice(i, 1);
         const agentId = q.agentId;
         this.budget.queueLength = this.startQueue.length;
         this.log.info("dequeue -> start", { agentId });
         this.send({ type: "agent:status", agentId, status: "inactive" });
-        void this.startNow(agentId, q.config).finally(() => this.starting.delete(agentId));
+        void this.startNow(agentId, q.config).finally(() => { this.starting.delete(agentId); this.budget.release(); });
         return;
       }
     }
@@ -222,8 +243,8 @@ export class AgentManager {
       return;
     }
 
-    if (this.budget.canAllocate()) {
-      const pending = this.startNow(agentId, config).finally(() => this.starting.delete(agentId));
+    if (this.budget.tryAllocate()) {
+      const pending = this.startNow(agentId, config).finally(() => { this.starting.delete(agentId); this.budget.release(); });
       this.starting.set(agentId, pending);
       return pending;
     }

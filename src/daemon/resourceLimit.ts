@@ -1,6 +1,6 @@
 import fs from "node:fs";
+import { execSync, type ChildProcess } from "node:child_process";
 import path from "node:path";
-import type { ChildProcess } from "node:child_process";
 import { createRequire } from "node:module";
 import { createLogger } from "../log.js";
 
@@ -199,8 +199,14 @@ export function readProcessMemoryMB(pid: number): number {
   try {
     if (platform === "win32") return readWin32ProcessMemoryMB(pid);
     if (platform === "linux") return readLinuxProcessMemoryMB(pid);
+    if (platform === "darwin") return readDarwinProcessMemoryMB(pid);
   } catch { /* */ }
   return 0;
+}
+
+function readDarwinProcessMemoryMB(pid: number): number {
+  const out = execSync(`ps -o rss= -p ${pid}`, { encoding: "utf8", timeout: 2000 }).trim();
+  return out ? Math.round(Number(out) / 1024) : 0;
 }
 
 function readWin32ProcessMemoryMB(pid: number): number {
