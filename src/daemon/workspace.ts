@@ -157,7 +157,12 @@ export async function deleteWorkspaceFile(agentId: string, rel: string): Promise
   if (!file) return { error: "invalid path" };
   try {
     await unlink(file);
-    await rmdir(path.dirname(file)).catch(() => {});
+    const dir = path.dirname(file);
+    if (dir !== path.join(DATA_DIR, agentId)) {
+      await rmdir(dir).catch((err: any) => {
+        if (err.code !== 'ENOENT' && err.code !== 'ENOTEMPTY') throw err;
+      });
+    }
     return {};
   } catch (e: any) { return { error: String(e?.message ?? e) }; }
 }
