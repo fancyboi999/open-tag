@@ -164,7 +164,7 @@ function setupWin32Job(child: ChildProcess): void {
   });
 }
 
-// ── Linux (cgroups v2 + v1 fallback) ─────────────────────────────────────────
+// ── Linux (cgroups v2) ───────────────────────────────────────────────────────
 
 const CG_ROOT = "/sys/fs/cgroup";
 
@@ -286,13 +286,11 @@ function applyWin32Pressure(pid: number, currentMB: number, marginMB: number): v
 
 function applyLinuxPressure(pid: number, currentMB: number, marginMB: number): void {
   const newCap = BigInt(currentMB + marginMB) * 1024n * 1024n;
-  try { fs.writeFileSync(`/proc/${pid}/cgroup`, ""); } catch { /* */ }
   try {
     const cgDir = `/sys/fs/cgroup/open-tag-agent-${pid}`;
-    if (fs.existsSync(path.join(cgDir, "memory.max"))) {
-      fs.writeFileSync(path.join(cgDir, "memory.max"), String(newCap));
-    } else if (fs.existsSync(`/sys/fs/cgroup/memory/${cgDir}/memory.limit_in_bytes`)) {
-      fs.writeFileSync(`/sys/fs/cgroup/memory/${cgDir}/memory.limit_in_bytes`, String(newCap));
+    if (fs.existsSync(path.join(cgDir, "memory.high"))) {
+      // Use memory.high (throttle/reclaim) instead of memory.max (hard limit → OOM kill)
+      fs.writeFileSync(path.join(cgDir, "memory.high"), String(newCap));
     }
   } catch { /* */ }
 }

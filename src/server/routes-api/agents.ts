@@ -132,6 +132,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     if (!a) return (sendErr(res, 404, "agent not found"), true);
     const b = await readJson(req);
     if (typeof b.content !== "string") return (sendErr(res, 400, "content required"), true);
+    if (b.content.length > 50_000) return (sendErr(res, 413, "personality.md too large (max 50 KB)"), true);
     const r = await requestDaemon(serverId, { type: "agent:workspace:write", agentId: agId, path: "personality.md", content: b.content });
     if (r.error) return (sendErr(res, 500, r.error), true);
     await syncAgentProfile(serverId, agId, a.displayName, a.description);
@@ -185,8 +186,8 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     const agId = askillOp[1]!; const skillName = askillOp[2]!;
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
-    const wsName = ({ claude: ".claude", codex: ".codex", copilot: ".copilot", hermes: ".hermes", kimi: ".kimi-code", opencode: ".opencode", cursor: ".cursor", pi: ".pi" } as Record<string, string>)[a.runtime] || ".claude";
-    const relPath = `${wsName}/skills/${skillName}/SKILL.md`;
+    const wsName = ({ claude: ".claude", codex: ".codex", copilot: ".copilot", hermes: ".hermes", kimi: ".skills", opencode: ".opencode", cursor: ".cursor", pi: ".pi" } as Record<string, string>)[a.runtime] || ".claude";
+    const relPath = `${wsName}${a.runtime === "kimi" ? "" : "/skills"}/${skillName}/SKILL.md`;
     if (method === "PUT") {
       const b = await readJson(req);
       if (typeof b.content !== "string") return (sendErr(res, 400, "content required"), true);

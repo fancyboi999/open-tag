@@ -59,22 +59,29 @@ function fmField(fm: string, key: string): string {
   return "";
 }
 // List available skills on the agent machine. global = ~/.claude/skills; workspace = <workspace>/.claude/skills.
-async function readSkillsDir(dir: string, sourcePath: string) {
-  const out: { name: string; displayName: string; description: string; userInvocable: boolean; sourcePath: string }[] = [];
+// Recursively walks up to 3 levels deep to handle category nesting (e.g. hermes puts skills under
+// <category>/<skillname>/SKILL.md). Each SKILL.md counts as one skill, keyed by its immediate parent dir name.
+async function readSkillsDir(dir: string, sourcePath: string, depth = 0): Promise<{ name: string; displayName: string; description: string; userInvocable: boolean; sourcePath: string; dirName: string }[]> {
+  if (depth > 3) return [];
+  const out: { name: string; displayName: string; description: string; userInvocable: boolean; sourcePath: string; dirName: string }[] = [];
   let entries; try { entries = await readdir(dir, { withFileTypes: true }); } catch { return out; }
   for (const e of entries) {
     if (!e.isDirectory()) continue;
     let name = e.name, description = "", userInvocable = false;
     try {
-      const txt = await readFile(path.join(dir, e.name, "SKILL.md"), "utf8");
+      const raw = await readFile(path.join(dir, e.name, "SKILL.md"), "utf8");
+      const txt = raw.replace(/\r\n/g, "\n");
       const fm = /^---\n([\s\S]*?)\n---/.exec(txt);
       if (fm) {
         name = fmField(fm[1]!, "name") || e.name;
         description = fmField(fm[1]!, "description");
         userInvocable = /^(true|yes)$/i.test(fmField(fm[1]!, "user-invocable") || fmField(fm[1]!, "userInvocable"));
       }
-    } catch { continue; } // no SKILL.md → not counted as a skill
-    out.push({ name, displayName: name, description, userInvocable, sourcePath });
+      out.push({ name, displayName: name, description, userInvocable, sourcePath, dirName: e.name });
+    } catch {
+      // no SKILL.md here — recurse in case this is a category dir containing nested skill dirs
+      out.push(...await readSkillsDir(path.join(dir, e.name), sourcePath, depth + 1));
+    }
   }
   return out;
 }
@@ -88,26 +95,30 @@ async function readSkillsDir(dir: string, sourcePath: string) {
 type SkillRoot = { dir: string; label: string };
 const HOME = os.homedir();
 const UNIVERSAL_SKILLS: SkillRoot = { dir: path.join(HOME, ".agents", "skills"), label: "~/.agents/skills" };
-// Home (global) provider skills dir per runtime.
+// Home (global) provider skills dir per runtime. Hermes is special on Windows:
+// its canonical skills dir is %LOCALAPPDATA%/hermes/skills, not ~/.hermes/skills.
 const PROVIDER_HOME_SKILLS: Record<string, SkillRoot> = {
   claude: { dir: path.join(HOME, ".claude", "skills"), label: "~/.claude/skills" },
   codex: { dir: path.join(process.env.CODEX_HOME || path.join(HOME, ".codex"), "skills"), label: "~/.codex/skills" },
   copilot: { dir: path.join(HOME, ".copilot", "skills"), label: "~/.copilot/skills" },
-  hermes: { dir: path.join(HOME, ".hermes", "skills"), label: "~/.hermes/skills" },
+  hermes: process.platform === "win32"
+    ? { dir: path.join(process.env.LOCALAPPDATA || path.join(HOME, "AppData", "Local"), "hermes", "skills"), label: "%LOCALAPPDATA%/hermes/skills" }
+    : { dir: path.join(HOME, ".hermes", "skills"), label: "~/.hermes/skills" },
   kimi: { dir: path.join(HOME, ".kimi-code", "skills"), label: "~/.kimi-code/skills" },
   opencode: { dir: path.join(HOME, ".config", "opencode", "skills"), label: "~/.config/opencode/skills" },
   cursor: { dir: path.join(HOME, ".cursor", "skills"), label: "~/.cursor/skills" },
   pi: { dir: path.join(HOME, ".pi", "agent", "skills"), label: "~/.pi/agent/skills" },
 };
 // Project-local (workspace) provider dir name per runtime, relative to the agent workspace/cwd.
-const PROVIDER_WS_DIR: Record<string, string> = { claude: ".claude", codex: ".codex", copilot: ".copilot", hermes: ".hermes", kimi: ".kimi-code", opencode: ".opencode", cursor: ".cursor", pi: ".pi" };
+const PROVIDER_WS_DIR: Record<string, string> = { claude: ".claude", codex: ".codex", copilot: ".copilot", hermes: ".hermes", kimi: ".skills", opencode: ".opencode", cursor: ".cursor", pi: ".pi" };
 
 /** Resolve which skills dirs to scan for an agent, by its runtime. Pure (no I/O) — unit-tested. */
 export function skillRootsFor(runtime: string, agentId: string): { global: SkillRoot[]; workspace: SkillRoot | null } {
   const home = PROVIDER_HOME_SKILLS[runtime];
   const global = home ? [home, UNIVERSAL_SKILLS] : [UNIVERSAL_SKILLS];
   const wsName = PROVIDER_WS_DIR[runtime];
-  const workspace = wsName ? { dir: path.join(DATA_DIR, agentId, wsName, "skills"), label: `<workspace>/${wsName}/skills` } : null;
+  const wsSkills = wsName ? (runtime === "kimi" ? "" : "skills") : null;
+  const workspace = wsName ? { dir: path.join(DATA_DIR, agentId, wsName, wsSkills!), label: wsSkills ? `<workspace>/${wsName}/skills` : `<workspace>/${wsName}` } : null;
   return { global, workspace };
 }
 

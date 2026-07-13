@@ -296,12 +296,12 @@ function SkillsSection({ id }: { id: string }) {
     } catch (e: any) { toast.error(String(e?.message ?? e)); }
     finally { setBusy(false); }
   };
-  const deleteSkill = async (name: string) => {
-    if (!(await confirm({ title: `Delete skill "${name}"`, message: "Remove this skill from the agent's workspace?", confirmLabel: "Delete", danger: true }))) return;
+  const deleteSkill = async (dirName: string) => {
+    if (!(await confirm({ title: `Delete skill "${dirName}"`, message: "Remove this skill from the agent's workspace?", confirmLabel: "Delete", danger: true }))) return;
     setBusy(true);
     try {
-      await api("DELETE", `/api/agents/${id}/skills/${encodeURIComponent(name)}`);
-      toast.info(`Skill "${name}" deleted`);
+      await api("DELETE", `/api/agents/${id}/skills/${encodeURIComponent(dirName)}`);
+      toast.info(`Skill "${dirName}" deleted`);
       await refetch();
     } catch (e: any) { toast.error(String(e?.message ?? e)); }
     finally { setBusy(false); }
@@ -330,7 +330,7 @@ function SkillsSection({ id }: { id: string }) {
                   color: "var(--error)", float: "right", fontSize: "inherit", lineHeight: "inherit",
                   padding: "0 4px", background: "none", border: "none", cursor: busy ? "not-allowed" : "pointer",
                   opacity: busy ? .5 : 1,
-                }} disabled={busy} onClick={() => deleteSkill(s.name!)} title="Delete from workspace">✕</button>
+                }} disabled={busy} onClick={() => deleteSkill(s.dirName)} title="Delete from workspace">✕</button>
               )}
             </div>
             {s.description ? <div className="meta skill-desc">{s.description}</div> : <div className="meta" style={{ opacity: .6 }}>{t("members.noDescription")}</div>}
