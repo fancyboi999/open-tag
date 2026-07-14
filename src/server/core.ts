@@ -9,6 +9,7 @@ import { newKey, hashToken } from "./auth.js";
 import { createLogger } from "../log.js";
 import { canUserReadChannel } from "./channelAccess.js";
 import { canAutoJoinMentionedMembers, isWakeable } from "./agentWakePolicy.js";
+import { UUID_RE } from "./util.js";
 
 const log = createLogger("server:core");
 const PORT = Number(process.env.PORT ?? 7777);
@@ -621,7 +622,6 @@ export async function convertMessageToTask(serverId: string, messageId: string, 
  * Agents see short ids and will use them directly for claim/update/reply → previously the endpoint queried the uuid column with a short id and threw 500.
  * Full uuid → verify existence; short id (6+ hex) → prefix match; neither → null (caller returns 404, never 500).
  */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Single definition of the agent-facing id convention: full uuid → exact match; 6+ hex chars → serverId-scoped
  *  prefix match; anything else (dashes in a partial, LIKE metachars, too short) → null — never a 500 from casting
  *  a non-uuid into the uuid column. Shared by messages (resolveMessageId) and attachments (attachment/view) so

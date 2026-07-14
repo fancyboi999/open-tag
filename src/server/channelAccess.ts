@@ -4,6 +4,7 @@
 // All three follow the same logic: channel member OR public channel OR thread of a readable parent.
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
+import { isUuid } from "./util.js";
 
 /**
  * May this human user read (and write to) this channel?
@@ -23,6 +24,7 @@ export async function canUserReadChannel(
   channelId: string,
   userId: string,
 ): Promise<boolean> {
+  if (!isUuid(channelId)) return false; // a non-uuid can't name a channel; casting it into the uuid column would throw (→ 500) instead of refusing
   const member = (
     await db
       .select()

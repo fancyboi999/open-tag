@@ -14,6 +14,12 @@ export async function readJson<T = any>(req: IncomingMessage): Promise<T> {
     req.on("end", () => { try { resolve((d ? JSON.parse(d) : {}) as T); } catch { resolve({} as T); } });
   });
 }
+/** Canonical UUID shape check. A client-supplied id destined for a uuid column must pass this before
+ *  reaching a query — Postgres throws on casting a non-uuid string (22P02), which surfaces as a 500.
+ *  Malformed ids (e.g. the web client's synthetic `agent-reply:*` streaming-preview id) must be
+ *  rejected as not-found at the route boundary instead. */
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isUuid = (s: string): boolean => UUID_RE.test(s);
 function header(req: IncomingMessage, name: string): string | null {
   const h = req.headers[name];
   return Array.isArray(h) ? (h[0] ?? null) : (h ?? null);
