@@ -1,4 +1,5 @@
 import os from "node:os";
+import { readFileSync } from "node:fs";
 
 export const PRESSURE_MEM_MB = Number(process.env.OPEN_TAG_PRESSURE_MEM_MB ?? "500");
 
@@ -6,7 +7,7 @@ export interface ResourceBudgetStatus {
   totalMemMB: number;
   totalCpuCores: number;
   queueLength: number;
-  freememMB: number;
+  availableMemMB: number;
   cpuUsagePct: number;
   agentCount: number;
   actualUsedMemMB: number;
@@ -23,9 +24,12 @@ export class ResourceBudget {
   agentCount = 0;
   actualUsedMemMB = 0;
 
-  constructor(opts?: { totalMemMB?: number; totalCpuCores?: number }) {
+  private _availableMemMB?: () => number;
+
+  constructor(opts?: { totalMemMB?: number; totalCpuCores?: number; availableMemMB?: () => number }) {
     this.totalMemMB = opts?.totalMemMB ?? Math.floor(os.totalmem() / (1024 * 1024));
     this.totalCpuCores = opts?.totalCpuCores ?? os.cpus().length;
+    this._availableMemMB = opts?.availableMemMB;
     this.cpuPrev = this.sampleCpu();
   }
 
@@ -53,7 +57,7 @@ export class ResourceBudget {
 
   /** Reserve a slot for an in-flight start. Returns false if under pressure. */
   tryAllocate(): boolean {
-    if (this.freememMB() >= PRESSURE_MEM_MB) {
+    if (this.availableMemMB() >= PRESSURE_MEM_MB) {
       this.pendingStarts++;
       return true;
     }
@@ -67,19 +71,26 @@ export class ResourceBudget {
 
   /** Stateless snapshot — prefer tryAllocate() for burst-safe checks. */
   canAllocate(): boolean {
-    return this.freememMB() >= PRESSURE_MEM_MB;
+    return this.availableMemMB() >= PRESSURE_MEM_MB;
   }
 
-	freememMB(): number {
-		return Math.floor(os.freemem() / (1024 * 1024));
-	}
+  availableMemMB(): number {
+    if (this._availableMemMB) return this._availableMemMB();
+    if (process.platform === "linux") {
+      try {
+        const m = readFileSync("/proc/meminfo", "utf8").match(/MemAvailable:\s+(\d+)\s+kB/);
+        if (m) return Math.floor(Number(m[1]) / 1024);
+      } catch {}
+    }
+    return Math.floor(os.totalmem() / (1024 * 1024) * 0.15);
+  }
 
   status(): ResourceBudgetStatus {
     return {
       totalMemMB: this.totalMemMB,
       totalCpuCores: this.totalCpuCores,
       queueLength: this.queueLength,
-      freememMB: this.freememMB(),
+      availableMemMB: this.availableMemMB(),
       cpuUsagePct: this.calcCpuUsage(),
       agentCount: this.agentCount,
       actualUsedMemMB: this.actualUsedMemMB,

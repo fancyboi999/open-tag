@@ -37,6 +37,7 @@ interface AgentManagerOptions {
   oneShotDeliverDebounceMs?: number;
   pendingDeliverTtlMs?: number;
   runtimeResolver?: (name: string) => Runtime | null;
+  budget?: ResourceBudget;
 }
 
 export class AgentManager {
@@ -55,7 +56,7 @@ export class AgentManager {
   private startQueue: QueuedStart[] = [];
   private log = createLogger("daemon:agents");
   constructor(private send: (msg: unknown) => void, opts: AgentManagerOptions = {}) {
-    this.budget = new ResourceBudget();
+    this.budget = opts.budget ?? new ResourceBudget();
     this.binDir = opts.binDir ?? ensureOpenTagBin();
     this.dataDir = opts.dataDir ?? DATA_DIR;
     this.deliverDebounceMs = opts.deliverDebounceMs ?? DELIVER_DEBOUNCE_MS;
@@ -67,7 +68,7 @@ export class AgentManager {
   }
 
   private checkMemoryPressure(): void {
-    const freeMB = Math.floor(os.freemem() / (1024 * 1024));
+    const freeMB = this.budget.availableMemMB();
     if (freeMB >= PRESSURE_MEM_MB) { this.tryDequeue(); return; }
     const agentCount = Math.max(this.agents.size, 1);
     const margin = Math.ceil(400 / agentCount);

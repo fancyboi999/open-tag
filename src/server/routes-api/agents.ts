@@ -97,7 +97,10 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
   const adq = /^\/api\/agents\/([^/]+)\/dequeue$/.exec(p);
   if (adq && method === "POST") {
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
-    await dequeueAgent(serverId, adq[1]!);
+    const agId = adq[1]!;
+    const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
+    if (!a) return (sendErr(res, 404, "agent not found"), true);
+    await dequeueAgent(serverId, agId);
     return (sendJson(res, 200, { ok: true }), true);
   }
   // Agent workspace file browser (reads local disk via daemon WS-RPC)
@@ -144,7 +147,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
     const r = await requestDaemon(serverId, { type: "agent:workspace:delete", agentId: agId, path: "personality.md" });
-    if (r.error) return (sendErr(res, 500, r.error), true);
+    if (r.error && !r.error.includes("ENOENT")) return (sendErr(res, 500, r.error), true);
     await syncAgentProfile(serverId, agId, a.displayName, a.description);
     return (sendJson(res, 200, { ok: true }), true);
   }

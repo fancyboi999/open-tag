@@ -252,7 +252,7 @@ export function Computers() {
               {budget && (
                 <div className="card">
                   <div className="meta" style={{ marginBottom: 8 }}>{t("members.resourceBudget")}</div>
-                  <div className="kv"><b>Agent budget</b> {fmtMem(budget.freememMB)} free · CPU {budget.totalCpuCores * 100 - budget.cpuUsagePct}% free</div>
+                  <div className="kv"><b>Agent budget</b> {fmtMem(budget.availableMemMB)} free · CPU {100 - budget.cpuUsagePct}% free</div>
                   <div className="kv"><b>Running</b> {budget.agentCount} agents</div>
                   <div className="kv"><b>Queue</b> {budget.queueLength}</div>
                 </div>

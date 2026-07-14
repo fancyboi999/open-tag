@@ -1,6 +1,5 @@
-import { test, mock } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
-import os from "node:os";
 import { ResourceBudget } from "./resourceBudget.js";
 
 test("ResourceBudget constructor uses provided values", () => {
@@ -10,25 +9,22 @@ test("ResourceBudget constructor uses provided values", () => {
 });
 
 test("canAllocate returns true when above pressure threshold", () => {
-  mock.method(os, "freemem", () => 600 * 1024 * 1024); // 600 MB free
-  const b = new ResourceBudget({ totalMemMB: 8000, totalCpuCores: 4 });
+  const b = new ResourceBudget({ totalMemMB: 8000, totalCpuCores: 4, availableMemMB: () => 600 });
   assert.equal(b.canAllocate(), true);
 });
 
 test("canAllocate returns false when below pressure threshold", () => {
-  mock.method(os, "freemem", () => 400 * 1024 * 1024); // 400 MB free
-  const b = new ResourceBudget({ totalMemMB: 8000, totalCpuCores: 4 });
+  const b = new ResourceBudget({ totalMemMB: 8000, totalCpuCores: 4, availableMemMB: () => 400 });
   assert.equal(b.canAllocate(), false);
 });
 
 test("status returns correct shape", () => {
-  mock.method(os, "freemem", () => 1000 * 1024 * 1024); // 1000 MB free
-  const b = new ResourceBudget({ totalMemMB: 8000, totalCpuCores: 4 });
+  const b = new ResourceBudget({ totalMemMB: 8000, totalCpuCores: 4, availableMemMB: () => 1000 });
   b.queueLength = 3;
   b.agentCount = 5;
   const s = b.status();
   assert.equal(s.totalMemMB, 8000);
-  assert.equal(s.freememMB, 1000);
+  assert.equal(s.availableMemMB, 1000);
   assert.equal(s.queueLength, 3);
   assert.equal(s.agentCount, 5);
 });

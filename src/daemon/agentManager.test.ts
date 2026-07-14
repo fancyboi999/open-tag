@@ -4,7 +4,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { AgentManager, type AgentConfig } from "./agentManager.js";
+import { ResourceBudget } from "./resourceBudget.js";
 import type { Runtime, RuntimeCallbacks, StartOpts } from "./runtime.js";
+
+const noPressureBudget = new ResourceBudget({ availableMemMB: () => 999999 });
 
 const baseConfig = (agentId: string): AgentConfig => ({
   agentId,
@@ -34,6 +37,7 @@ test("deliver received during async start is flushed to runtime session", async 
       dataDir: root,
       binDir: root,
       deliverDebounceMs: 0,
+      budget: noPressureBudget,
       runtimeResolver: () => fakeRuntime,
     });
     const start = mgr.start("agent-1", baseConfig("agent-1"));
@@ -70,6 +74,7 @@ test("one-shot runtime start with pending delivery uses wake nudge without a sec
       binDir: root,
       deliverDebounceMs: 3000,
       oneShotDeliverDebounceMs: 0,
+      budget: noPressureBudget,
       runtimeResolver: () => fakeRuntime,
     });
     const config = { ...baseConfig("agent-2"), runtime: "one-shot-test", sessionId: "existing-session" };
@@ -103,6 +108,7 @@ test("concurrent starts for the same agent are idempotent", async () => {
     const mgr = new AgentManager(() => {}, {
       dataDir: root,
       binDir: root,
+      budget: noPressureBudget,
       runtimeResolver: () => fakeRuntime,
     });
     await Promise.all([
