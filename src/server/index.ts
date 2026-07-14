@@ -126,6 +126,16 @@ const server = http.createServer(async (req, res) => {
     if (method === "GET" && await serveStatic(res, url.pathname)) return;
     sendErr(res, 404, "not found");
   } catch (e: any) {
+    // Postgres 22P02 (invalid text representation — e.g. a non-uuid client id cast into a uuid column,
+    // drizzle wraps the original error as .cause) is a malformed-input class, not a server fault: respond
+    // 400 without the raw query text. Route boundaries validate ids explicitly (isUuid); this is the
+    // backstop for any entry point that slips through — the 500 fallback below echoes e.message, which
+    // for query errors contains the SQL + bind values and must never reach a client for this class.
+    if ((e?.cause?.code ?? e?.code) === "22P02") {
+      log.warn("request error (malformed id)", { path: url.pathname, method });
+      try { sendErr(res, 400, "invalid id"); } catch { /* */ }
+      return;
+    }
     log.error("request error", { path: url.pathname, method, detail: String(e?.message ?? e), stack: e?.stack });
     try { sendErr(res, 500, "internal", { detail: String(e?.message ?? e) }); } catch { /* */ }
   }
