@@ -1,5 +1,7 @@
 # runtime-default-model — claudecode / codex 支持"使用本地默认"
 
+> ✅ **Shipped** — PR #151（commit `c290ba0`）+ daemon 0.7.1（2026-07-02 发布）。`buildClaudeArgs` 纯函数 + `--effort` 透传 + UI「使用本地默认（推荐）」均已落地；FEATURES.md P6 已勾选。2026-07-06 移入 completed/。
+
 ## 背景
 
 创建 claude / codex agent 时无法选"使用本地默认（不指定模型/思考强度）"。链路有三层阻挡：

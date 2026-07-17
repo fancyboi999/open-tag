@@ -69,7 +69,7 @@ export const agents = pgTable("agents", {
   activity: text("activity").default("offline").notNull(),// offline|online|thinking|working
   sessionId: text("session_id"),                  // current runtime session (used with --resume)
   model: text("model"),                            // model alias or NULL → CLI uses its local default (~/.claude / ~/.codex)
-  runtime: text("runtime").default("claude").notNull(),   // claude | codex | kimi
+  runtime: text("runtime").default("claude").notNull(),   // claude | codex | copilot | opencode | kimi | pi | cursor | hermes (registry: src/daemon/runtimes.ts REG)
   runtimeConfig: jsonb("runtime_config").$type<Record<string, unknown>>().default({}).notNull(),
   executionMode: text("execution_mode").default("auto").notNull(),
   envVars: jsonb("env_vars").$type<Record<string, string>>().default({}).notNull(),
@@ -142,6 +142,9 @@ export const messages = pgTable("messages", {
 }, (t) => ({
   bySeq: index("messages_server_seq_idx").on(t.serverId, t.seq),     // primary index for incremental sync
   byChannel: index("messages_channel_idx").on(t.channelId, t.seq),
+  // Agents cite 6-8 char short-id prefixes (core.ts resolveIdOrPrefix does `id::text LIKE 'prefix%'`);
+  // the uuid pkey btree can't serve a text-cast prefix match, so without this the lookup is a seq scan.
+  idTextPrefix: index("messages_id_text_prefix_idx").using("btree", sql`(${t.id}::text) text_pattern_ops`),
 }));
 
 // @mentions: separate table for efficient "messages that mention me = inbox" queries + frontend highlighting
@@ -176,7 +179,11 @@ export const attachments = pgTable("attachments", {
   sizeBytes: integer("size_bytes"),
   storageKey: text("storage_key").notNull(),      // absolute local server path (MVP; object storage to follow)
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => ({ byChannel: index("attachments_channel_idx").on(t.channelId) }));
+}, (t) => ({
+  byChannel: index("attachments_channel_idx").on(t.channelId),
+  // Same short-id prefix lookup as messages (core.ts resolveIdOrPrefix) — see messages_id_text_prefix_idx.
+  idTextPrefix: index("attachments_id_text_prefix_idx").using("btree", sql`(${t.id}::text) text_pattern_ops`),
+}));
 
 // ── Reminders / Knowledge base (tables created first, logic to follow) ────────────────────────
 export const reminders = pgTable("reminders", {

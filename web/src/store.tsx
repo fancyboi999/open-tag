@@ -37,7 +37,7 @@ interface Store {
   reload: () => Promise<void>;
   onEvent: (cb: (e: Ev) => void) => () => void;
   subscribeChannel: (id: string) => void;                         // join the channel/thread's realtime room while it is being viewed (idempotent; re-emitted on reconnect)
-  createChannel: (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => Promise<{ id: string } | null>;
+  createChannel: (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => Promise<{ id?: string; error?: string } | null>;
   markActionExecuted: (messageId: string, result?: { kind: string; id: string; name: string }) => Promise<void>; // mark action card as executed after submission
   createTasks: (channelId: string, titles: string[]) => Promise<any[]>;
   openDM: (memberType: string, memberId: string) => Promise<string | null>;
@@ -118,7 +118,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // channel became relevant (public non-member, thread, or appeared after connect). Tracked so a reconnect re-joins. Idempotent.
   const subscribeChannel = (id: string) => { if (!id) return; subscribedRef.current.add(id); sockRef.current?.emit("join:channel", id); };
 
-  const createChannel = async (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => { const r = await api("POST", "/api/channels", { name: opts.name, description: opts.description, visibility: opts.visibility, agentIds: opts.agentIds ?? [], userIds: opts.userIds ?? [] }); if (r?.id) { await reload(); sockRef.current?.emit("join:channel", r.id); } return r?.id ? r : null; };
+  // Returns the raw response (incl. `error` on failure, e.g. 409 "channel name exists") instead of collapsing
+  // it to null — callers need `error` to surface a toast instead of silently closing the create-channel modal.
+  const createChannel = async (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => { const r = await api("POST", "/api/channels", { name: opts.name, description: opts.description, visibility: opts.visibility, agentIds: opts.agentIds ?? [], userIds: opts.userIds ?? [] }); if (r?.id) { await reload(); sockRef.current?.emit("join:channel", r.id); } return r; };
   // Create workspace → optimistically add it to the server list (POST returns role+capabilities so no re-fetch needed) and
   // return the new slug. The caller navigates client-side to /s/<slug>/channel; the URL drives activation (see main.tsx),
   // so there is no full-page reload — the workspace skeleton shows while the new workspace's data loads.
@@ -314,9 +316,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         else {
           setAgents((as) => as.map((a) => (a.id === p.agentId ? { ...a, status: p.status ?? a.status, activity: p.activity ?? a.activity, activityDetail: p.detail ?? a.activityDetail } : a))); // real-time status dot + activity text used by header and sidebar
+          // Leaving working/thinking ends this agent's turn — mark the live-trace buffer so the next
+          // fragment for the same agent starts a fresh group instead of running on from a finished turn.
+          if (p.activity && p.activity !== "working" && p.activity !== "thinking") {
+            setTraj((prev) => (prev.some((x) => x.name === p.name && !x.boundary) ? appendCapped(prev, [{ name: p.name, text: "", boundary: true }]) : prev));
+          }
           dispatch({ type: "agent", id: p.agentId, name: p.name, activity: p.activity, status: p.status, detail: p.detail });
         }
       });
+      sock.on("agent:reply", (p: any) => dispatch({ type: "agent:reply", ...p }));
       sock.on("agent:created", () => reload());
       sock.on("agent:deleted", () => reload());
       // Real-time: new DM / channel membership change → reload lists + join the new channel room
@@ -348,4 +356,3 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, switchServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, visibleAgents, machines, latestDaemonVersion, humans, traj, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
 }
 
-export const fmtTime = (iso?: string) => { try { return iso ? new Date(iso).toLocaleTimeString("zh-CN", { hour12: false }) : ""; } catch { return ""; } };

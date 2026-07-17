@@ -1,6 +1,6 @@
 # MISSION — Build open-tag into a Shippable Open-Source Product
 
-> open-tag's north star and working directive. Any session that adds or changes a capability **must read this first**, alongside `CLAUDE.md`, `docs/core-beliefs.md`, and `docs/tech-debt-tracker.md`.
+> open-tag's north star and working directive. Any session that adds or changes a capability **must read this first**, alongside `AGENTS.md`, `docs/core-beliefs.md`, and `docs/tech-debt-tracker.md`.
 
 ## Goal
 
@@ -12,9 +12,9 @@ The construction method is **harness engineering**: give agents a codemap (ARCHI
 
 1. **Evidence-driven, no speculation.** Before implementing any feature: read the existing code to understand what is already built (a great deal is), read `ARCHITECTURE.md` to find the right place to change, and read `docs/tech-debt-tracker.md` for known issues in that area. Do not invent payload shapes or behavior from memory. If a behavior is ambiguous, write a small curl probe against the real running server and observe.
 
-2. **Advance in user-visible capability slices, not REST endpoints.** The unit of work is a capability a user can perceive — "sent messages appear in real time", "task card moves across the board", "agent ↔ agent DM produces a reply". Each slice must cut **vertically** through REST + socket + DB + daemon + agent in one go. Ship one working slice before starting the next. `ARCHITECTURE.md` and `docs/FEATURES.md` are the spec lists; they are not the work queue itself.
+2. **Advance in user-visible capability slices, not REST endpoints.** The unit of work is a capability a user can perceive — "sent messages appear in real time", "task card moves across the board", "agent ↔ agent DM produces a reply". Each slice must cut **vertically** through REST + socket + DB + daemon + agent in one go. Ship one working slice before starting the next. `ARCHITECTURE.md` and `FEATURES.md` are the spec lists; they are not the work queue itself.
 
-3. **Understand before changing; do not rebuild what exists.** Read `ARCHITECTURE.md` to locate the right module, read the actual source to confirm what is already implemented (channels / DM / tasks / threads / members / agent profile / three runtimes / idle-sleep are largely done), then make a surgical change. Scan `docs/tech-debt-tracker.md` for related debt before touching anything.
+3. **Understand before changing; do not rebuild what exists.** Read `ARCHITECTURE.md` to locate the right module, read the actual source to confirm what is already implemented (channels / DM / tasks / threads / members / agent profile / the runtime adapters / idle-sleep are largely done), then make a surgical change. Scan `docs/tech-debt-tracker.md` for related debt before touching anything.
 
 4. **Close the loop with real verification on every slice.** A slice is not done until: ① the server is running and accepts real HTTP/WS traffic → ② `curl` hits the real endpoint and returns the expected shape → ③ `chrome-devtools` opens our own web UI and the interaction works end-to-end in a real browser → ④ `/doc-sync` is run to reconcile docs. **Claiming "done" requires attaching real evidence** (command output, screenshot). Follow the global "real verification criteria + Fail loud" rules without exception.
 
@@ -31,18 +31,14 @@ A slice is complete when **all four** hold:
 
 ## When Something Is Unclear (in order)
 
-1. **Unclear product requirement** → Re-read `docs/FEATURES.md` and `ARCHITECTURE.md`. If still ambiguous, write a minimal probe (curl / browser) against the running server and observe actual behavior.
+1. **Unclear product requirement** → Re-read `FEATURES.md` and `ARCHITECTURE.md`. If still ambiguous, write a minimal probe (curl / browser) against the running server and observe actual behavior.
 2. **Unclear implementation approach** → Read the existing source in `src/`. Most patterns are already established; follow them. Consult open-source references only when the codebase gives no signal.
 3. **Unclear Claude Code / Codex behavior** → Read the official documentation.
 4. **Runtime choice**: prefer **claude / codex** runtimes (subscription quota, low cost). Only use other runtimes when there is a specific architectural reason.
 
 ## Obey Existing Repository Conventions
 
-`CLAUDE.md` (directory map) · `docs/core-beliefs.md` (load-bearing beliefs) · **doc-sync discipline** (changing code = changing docs; run `/doc-sync` at the end) · committed files must contain **zero personal / machine-specific references** (core belief #10). For complex changes, write a short spec in `docs/exec-plans/active/` before writing code.
-
-## Recommended Starting Point
-
-**Agent communication loop + agent ↔ agent collaboration** — the soul of the product, the clearest differentiator from a toy. Start by reading the existing `src/daemon/` and `src/server/` implementations to understand the current state, identify gaps with the spec in `ARCHITECTURE.md`, then fill them slice by slice with real verification at each step.
+`AGENTS.md` (the repo map) · `docs/core-beliefs.md` (load-bearing beliefs) · **doc-sync discipline** (changing code = changing docs; run `/doc-sync` at the end) · committed files must contain **zero personal / machine-specific references** (core belief #9). For complex changes, write a short spec in `docs/exec-plans/active/` before writing code.
 
 ## Success Criteria
 

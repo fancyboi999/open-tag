@@ -26,6 +26,22 @@ export async function reconcileMachinesOnBoot(): Promise<number> {
   return flipped.length;
 }
 
+/** A known-current daemon connection closed, so the machine cannot currently run any agent.
+ *  Unlike the stale sweeper, this path is immediate because a close from the current ws is authoritative.
+ *  Keep sessionId intact; the next wake/reconnect can still resume. */
+export async function markMachineAgentsOffline(machineId: string): Promise<number> {
+  const rows = await db
+    .select({ id: schema.agents.id, name: schema.agents.name, serverId: schema.agents.serverId })
+    .from(schema.agents)
+    .where(and(eq(schema.agents.machineId, machineId), ne(schema.agents.status, "inactive")));
+  for (const a of rows) {
+    await db.update(schema.agents).set({ status: "inactive", activity: "offline" }).where(eq(schema.agents.id, a.id));
+    await publish(a.serverId, { type: "agent", id: a.id, name: a.name, status: "inactive", activity: "offline" });
+  }
+  if (rows.length) log.info("machine disconnect: agents → inactive", { machineId, count: rows.length });
+  return rows.length;
+}
+
 /** When a machine is confirmed down — offline AND its lastHeartbeat is older than `cutoff` — none of its
  *  agents can be live, so force every still-live agent (status active OR sleeping) on it to inactive/offline
  *  and publish the change. The heartbeat gate is what keeps a brief WS blip (offline for a few seconds, then

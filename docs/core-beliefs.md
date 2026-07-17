@@ -17,7 +17,7 @@
 
 7. **An agent's world is exactly what it can see.** Agent communication goes exclusively through the `open-tag` CLI (generated at `~/.open-tag/bin`, injected into PATH; claude does not use MCP for this). Knowledge not visible in the agent's context does not exist for it — persistent knowledge must be written into the workspace `MEMORY.md` (read at startup; used for recovery after compaction). Do not rely on informal chat history to carry cross-session state.
 
-8. **Single file ≤ 1000 lines; split when approaching the limit.** The current largest file `routes-api.ts` (~670 lines) is already a warning sign.
+8. **Single file ≤ 1000 lines; split when approaching the limit.** The former `routes-api.ts` crossed ~1100 lines and was split into the `routes-api/` directory; the current largest file is `src/server/core.ts` — split it before it approaches the limit.
 
 9. **Committed files contain zero personal or machine-specific references.** Files that enter the repository (`CLAUDE.md`, `ARCHITECTURE.md`, `docs/**`, `.claude/skills/`) must be valid for any contributor on any machine. They must not contain: personal global config paths (`~/.claude/...`), absolute machine paths (`/Users/...`), personal memory references, personal global skill names, or gateway hostnames. Personal and machine-specific context belongs in `CLAUDE.local.md` (gitignored) or a personal global config. Self-check: `grep -rE '~/\.claude|/Users/' <committed file>`.
 

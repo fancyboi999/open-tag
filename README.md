@@ -114,8 +114,9 @@ All runtimes speak back through the same agent API, so the web app sees one cons
 | Kimi Code | `kimi -p --output-format stream-json` (one-shot per turn, resumed by `-r`; provider in `~/.kimi-code/config.toml`) | Supported |
 | Pi | `pi -p --mode json` (one-shot per turn, resumed by `--session`; provider/model from Pi's own config) | Supported |
 | Cursor | `cursor-agent -p --output-format stream-json` (one-shot per turn, resumed by `--resume`; runs on your Cursor account) | Supported |
+| Hermes | `hermes chat -q` (one-shot per turn; profiles from `~/.hermes/profiles`, Hermes keeps provider credentials; final-response bridge) | Experimental |
 
-> **Roadmap:** runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). The seven above are live; new ones get added on request. (Standalone Gemini CLI is intentionally **not** on the list — Google retired it on 2026-06-18, folding it into Antigravity.)
+> **Roadmap:** runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). The first seven are live and Hermes is experimental; new ones get added on request. (Standalone Gemini CLI is intentionally **not** on the list — Google retired it on 2026-06-18, folding it into Antigravity.)
 
 ## Quick start
 
@@ -126,6 +127,11 @@ Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on yo
 
 ```bash
 cp .env.example .env
+# The server refuses to start without these two secrets (they are commented out
+# in .env.example on purpose — never ship a default secret):
+echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
+echo "DAEMON_BOOTSTRAP_KEY=$(openssl rand -hex 32)" >> .env
+
 npm install
 npm --prefix web install
 npm --prefix docs-site install

@@ -9,9 +9,11 @@
 //  2. --dangerously-skip-permissions is required for headless runs (otherwise it waits on approval),
 //     and NODE_OPTIONS is stripped from the child env (a proxy flag like `--use-env-proxy` makes some
 //     bundled CLIs refuse to start). The system prompt is injected via {cwd}/AGENTS.md (native).
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
+import { spawnSafe } from "./spawnSafe.js";
+import { killTree } from "./killTree.js";
 import type { Runtime, StartOpts, RuntimeCallbacks, RuntimeSession, TrajectoryEntry } from "./runtime.js";
 
 const MAX = 2000;
@@ -114,7 +116,7 @@ class OpencodeRun {
     this.cb.onActivity("working", "turn");
     const args = buildArgs(message, this.opts, this.sessionId);
     // stdin "ignore" is mandatory: a piped stdin makes `opencode run` block forever (see file header).
-    const proc = spawn("opencode", args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: this.env });
+    const proc = spawnSafe("opencode", args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: this.env });
     this.proc = proc;
     let buf = "";
     const errTail: string[] = [];
@@ -162,7 +164,7 @@ class OpencodeRun {
   stop(): void {
     this.stopped = true;
     const p = this.proc; this.proc = null;
-    if (p) { try { p.kill("SIGTERM"); } catch { /* */ } }
+    if (p) { killTree(p); }
   }
 }
 

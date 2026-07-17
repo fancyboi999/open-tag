@@ -7,7 +7,7 @@ import { verifyUser } from "../auth.js";
 import { can, requireCap } from "../capabilities.js";
 import { canUserReadChannel } from "../channelAccess.js";
 import { readObject } from "../storage.js";
-import { bearer, sendErr, sendJson } from "../util.js";
+import { bearer, isUuid, sendErr, sendJson } from "../util.js";
 
 /**
  * MIME types safe for inline display with no additional restrictions.
@@ -96,6 +96,7 @@ export async function handlePublicAttachmentGet(ctx: BaseCtx): Promise<boolean> 
   if (adl && adl[1] !== "upload" && method === "GET") {
     const uid = verifyUser(url.searchParams.get("token") ?? bearer(req));
     if (!uid) return (sendErr(res, 401, "unauthorized"), true);
+    if (!isUuid(adl[1]!)) return (sendErr(res, 404, "attachment not found"), true); // non-uuid would throw casting into the uuid column → 500
     const a = (await db.select().from(schema.attachments).where(eq(schema.attachments.id, adl[1]!)))[0];
     if (!a) return (sendErr(res, 404, "attachment not found"), true);
     // Channel/server access gate — invariant 3: non-members of private/DM channels must not
@@ -138,6 +139,7 @@ export async function handleAttachments(ctx: ServerCtx): Promise<boolean> {
   if (agavatar && method === "POST") {
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
     const agentId = agavatar[1]!;
+    if (!isUuid(agentId)) return (sendErr(res, 404, "agent not found"), true);
     const { files } = await parseUpload(req);
     const f = files[0];
     if (!f) return (sendErr(res, 400, "no file"), true);

@@ -5,7 +5,7 @@ import { db, schema } from "../../db/index.js";
 import { requireCap } from "../capabilities.js";
 import { addChannelMembers, getOrCreateDM, getOrCreateThread } from "../core.js";
 import { publish } from "../realtime.js";
-import { readJson, sendErr, sendJson } from "../util.js";
+import { isUuid, readJson, sendErr, sendJson } from "../util.js";
 import { canUserReadChannel } from "../channelAccess.js";
 import { userChannels } from "./shared.js";
 
@@ -86,6 +86,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   if (cthreads && method === "POST") {
     const b = await readJson(req);
     if (!b.parentMessageId) return (sendErr(res, 400, "parentMessageId required"), true);
+    if (!isUuid(String(b.parentMessageId))) return (sendErr(res, 404, "parent message not found"), true); // non-uuid (e.g. an agent-reply:* preview id) would throw casting into the uuid column → 500
     const parent = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, b.parentMessageId), eq(schema.messages.serverId, serverId))))[0];
     if (!parent) return (sendErr(res, 404, "parent message not found"), true);
     // Channel visibility gate — non-members must not create threads on private/DM channels (IDOR-B3)
@@ -209,6 +210,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   // and yields lastReadSeq for the read flag.
   if (p === "/api/announcements/active" && method === "GET") return (sendJson(res, 200, { announcements: [] }), true);
   const cmem = /^\/api\/channels\/([^/]+)\/members$/.exec(p);
+  if (cmem && !isUuid(cmem[1]!)) return (sendErr(res, 404, "channel not found"), true); // covers GET/POST/DELETE below — non-uuid would throw in the ownership pre-query
   if (cmem && method === "GET") {
     // serverId scope: channel_members has no serverId column, so confirm the channel belongs to this tenant
     // before enumerating its members — otherwise a foreign channel UUID leaks its roster.
@@ -233,6 +235,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     const b = await readJson(req);
     const mt = b.userId ? "user" : "agent"; const mid = b.userId || b.agentId;
     if (!mid) return (sendErr(res, 400, "agentId or userId required"), true);
+    if (!isUuid(String(mid))) return (sendErr(res, 400, "invalid agentId or userId"), true); // channel_members.member_id is a uuid column
     // An agent invited into an existing channel joins at its watermark (no pre-join backlog flood on first
     // `message check`); a user keeps lastReadSeq=0 so the UI still shows channel history as unread. See addChannelMembers.
     await addChannelMembers(cmem[1]!, [{ type: mt, id: mid }]);
@@ -245,6 +248,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     if (!own) return (sendErr(res, 404, "channel not found"), true);
     const b = await readJson(req).catch(() => ({}));
     const mt = b.userId ? "user" : "agent"; const mid = b.userId || b.agentId;
+    if (mid && !isUuid(String(mid))) return (sendErr(res, 400, "invalid agentId or userId"), true); // channel_members.member_id is a uuid column
     if (mid) await db.delete(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, cmem[1]!), eq(schema.channelMembers.memberType, mt), eq(schema.channelMembers.memberId, mid)));
     await publish(serverId, { type: "channel:members-updated", channelId: cmem[1]! });
     return (sendJson(res, 200, { ok: true }), true);
@@ -301,6 +305,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     const peerType = b.userId ? "user" : "agent";
     const peerId = b.userId || b.agentId;
     if (!peerId) return (sendErr(res, 400, "Either agentId or userId is required"), true);
+    if (!isUuid(String(peerId))) return (sendErr(res, 404, "peer not found in server"), true); // non-uuid would throw casting into the uuid column → 500
     const ok = peerType === "agent"
       ? (await db.select().from(schema.agents).where(and(eq(schema.agents.id, peerId), eq(schema.agents.serverId, serverId))))[0]
       : (await db.select().from(schema.serverMembers).where(and(eq(schema.serverMembers.userId, peerId), eq(schema.serverMembers.serverId, serverId))))[0];
@@ -313,6 +318,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   const cops = /^\/api\/channels\/([^/]+)\/(archive|unarchive)$/.exec(p);
   if (cops && method === "POST") {
     if (!await requireCap(serverId, userId, "manageChannels")) return (sendErr(res, 403, "need manageChannels capability"), true);
+    if (!isUuid(cops[1]!)) return (sendErr(res, 404, "channel not found"), true);
     // Thread channels follow their parent message's lifecycle; direct archive/unarchive is not allowed.
     const archTarget = (await db.select({ type: schema.channels.type }).from(schema.channels)
       .where(and(eq(schema.channels.id, cops[1]!), eq(schema.channels.serverId, serverId))))[0];
@@ -324,6 +330,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   const cone = /^\/api\/channels\/([^/]+)$/.exec(p);
   if (cone && (method === "PATCH" || method === "DELETE")) {
     if (!await requireCap(serverId, userId, "manageChannels")) return (sendErr(res, 403, "need manageChannels capability"), true);
+    if (!isUuid(cone[1]!)) return (sendErr(res, 404, "channel not found"), true);
     // Fetch the channel first: thread channels must not be modified via this endpoint — their
     // lifecycle is managed by their parent message (getOrCreateThread / thread follow API).
     const targetCh = (await db.select({ type: schema.channels.type }).from(schema.channels)
@@ -345,6 +352,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   const cjoin = /^\/api\/channels\/([^/]+)\/(join|leave|read)$/.exec(p);
   if (cjoin && method === "POST") {
     const [, chId, action] = cjoin;
+    if (!isUuid(chId!)) return (sendErr(res, 404, "channel not found"), true);
     const ch = (await db.select().from(schema.channels).where(and(eq(schema.channels.id, chId!), eq(schema.channels.serverId, serverId))))[0];
     if (!ch) return (sendErr(res, 404, "channel not found"), true);
     if (action === "join") {

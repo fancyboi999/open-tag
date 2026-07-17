@@ -6,40 +6,42 @@
 > - **Small changes**: a lightweight plan is enough — one-sentence goal + verification criterion, written in the PR description or as a short entry below.
 > - **Complex work**: write a full execution plan in `docs/exec-plans/active/<slug>.md` (containing goal, steps, progress log, decision log). Move to `docs/exec-plans/completed/` when done.
 > - Every step carries a **verifiable criterion** — translate vague tasks into testable goals and loop until the criterion passes.
+> - **Historical archive**: `docs/superpowers/{plans,specs}` holds plan/spec documents produced by an earlier planning workflow (2026-06-24 → 2026-07-01, e.g. dev-e2e harness, S3 storage, connect-computer wizard, task handoff). They are read-only records of shipped work — new plans go in `docs/exec-plans/`, not there.
+>
+> **Status single-source rule**: this file *indexes* work; it does not mirror per-item states owned elsewhere. Security/authorization item states live **only** in `docs/authorization.md` §6; feature completion lives in `FEATURES.md`; drift/debt lives in `docs/tech-debt-tracker.md`. (A mirrored list here once kept C10 marked "remaining" for ten days after it was fixed.)
 
 ## Active
 
 - **Authorization hardening** — a two-plane security audit (human `routes-api` + agent `routes-agent`)
-  surfaced ~20 access-control gaps. The canonical model + the full prioritized findings register live in
-  **[`docs/authorization.md`](./authorization.md)** (§6 roadmap). Shipped: (1) cross-tenant IDOR batch
-  (F4/F6/F7/F9/F10 + C9) + machine `manageMachines` (F1/F2) + C11; (2) the **agent-plane channel-access
-  layer** (C1/C2/C3/C6/C7/C8 + server/info) via `canAgentReadChannel` — agents freely use public channels +
-  their threads, but private/DM are invite-only (real agent-api E2E verified). This is the security boundary
-  the "agents join channels/threads" feature sits on; (3) **human capability gates** (F3/F5/F8 →
-  `manageAgents`/`manageChannels`) + **C4** deleted-agent-token hole (`resolveAgent` `isNull(deletedAt)` +
-  clear hash on delete) — real E2E member→403/owner→200, token rejected after delete. Remaining (each its own
-  PR with a test): task-ownership (C5 — product decision); auth primitives (C10 timing-safe compare, C12 token
-  TTL). **越权很危险 — verify each fix.**
+  surfaced ~20 access-control gaps; nearly all are closed (cross-tenant IDOR batch, agent-plane
+  channel-access layer, human capability gates, human-plane IDOR-B1…B6, timing-safe compares).
+  The canonical model + the **live status register** are in **[`docs/authorization.md`](./authorization.md)** §6
+  — check there, not here. Open at last audit (2026-07-06): **C5** task-ownership (product decision)
+  and **C12** agent-token TTL. **越权很危险 — verify each fix.**
 
-- **Harness engineering rollout** — ordered checklist: git init → slim CLAUDE.md → mechanically enforce invariants → independent evaluator loop → one-command instance start → plans in repo / doc-gardening → planner/generator/evaluator personas. Current state: `ARCHITECTURE.md` ✅, `docs/` skeleton ✅, `CLAUDE.md` slimmed ✅, git ✅; remaining items ⬜.
+- **Harness engineering rollout** — remaining: mechanically enforce invariants (lint/CI — tech-debt I5),
+  independent evaluator loop, scheduled doc-gardening. Done: `ARCHITECTURE.md` codemap, `docs/` skeleton,
+  `CLAUDE.md` slimmed to an `AGENTS.md` import, git, `/doc-sync` skill (`.agents/skills/doc-sync/`).
 
-### Capability Slice Progress (evidence-driven; specs in `docs/exec-plans/active/`)
+*(`docs/exec-plans/active/` is currently empty; completed plans live in `docs/exec-plans/completed/`.)*
 
-- **01 Agent communication loop + agent ↔ agent collaboration** ✅ closed-loop verified (`01-agent-comm-loop.md`)
-- **02 Saved Messages** ✅ full-stack implemented (`02-saved-messages.md`)
-- **03 Tasks end-to-end** ✅ core loop closed (card navigation / socket bug / enum validation / thread-on-create / DELETE; `03-tasks.md`)
-- **03b Task interaction rework** ⬜ in progress — several interaction details were wrong on first pass (`03-tasks.md` §9): thread-on-create ✅ fixed and verified; remaining: D2 card click → open thread panel / D4 DONE·CLOSED column collapse / D5 status dropdown permissions / D6 drag-and-drop / D7 legacy / card styling
-- **04 Rich text / syntax-highlighted message rendering** ⬜ researching — no unified rich-text renderer yet (`04-message-rendering.md`)
-- **Fixed bugs**: double message delivery (StrictMode double-socket) / Chinese IME Enter mis-send → tech-debt I9/I10
+## Completed slice history (index only)
 
-## Roadmap (index only — most items already implemented)
+The early capability slices shipped and their working notes were not retained as plan files;
+their verified end state is recorded in `FEATURES.md`:
+
+- **01 Agent communication loop + agent ↔ agent collaboration** ✅ (FEATURES P5)
+- **02 Saved Messages** ✅ (FEATURES P3)
+- **03 / 03b Tasks end-to-end + interaction rework** ✅ (FEATURES P4 — board move UX, layout toggle, DM tasks, handoff)
+- **04 Message rendering** ✅ (markdown + structured-mention links + no-raw-HTML invariant, `web/src/messageRender.tsx`; ARCHITECTURE §III)
+- Early fixed bugs: double message delivery (StrictMode double-socket) / Chinese IME Enter mis-send → tech-debt I9/I10
+
+## Roadmap (index only — ground truth is the code + `FEATURES.md`)
 
 1. Foundation (PG + Redis + Drizzle + TS) ✅
 2. Agent lifecycle (idle-sleep + resume) ✅
 3. Channel core (multi-channel / DM / private + seq + real-time) ✅
-4. Tasks / threads ✅ (code done; `FEATURES.md` markers pending cleanup, see tech-debt D4)
-5. Agent ↔ agent messaging 🟡
+4. Tasks / threads ✅
+5. Agent ↔ agent messaging + task handoff ✅
 6. Agent profile (seven facets) ✅
-7. Advanced capabilities: knowledge base / search 🟡, integrations ⬜, credential proxy ⬜, wake hints ⬜
-
-> Ground truth is the code; `FEATURES.md` checkbox state may lag (see `tech-debt-tracker.md` D4).
+7. Advanced capabilities: human message search ✅ · knowledge base ⬜ · integrations ⬜ · credential proxy ⬜ · web push ⬜

@@ -1,14 +1,10 @@
 # Product
 
-## Register
-
-product
-
 ## Users
 
 **Human engineers/members** and **resident AI agents** inside a self-hosted team workspace, collaborating as colleagues.
 - **Humans**: send messages in channels/threads/tasks, @ -mention agents to wake them, assign work, review output, manage members and permissions. Context: "keeping this workspace open as the collaboration hub" — like using Slack, except your teammates include AI.
-- **Agents**: claude / codex runtimes, resident "employees" attached to a daemon host — they have memory (MEMORY.md), wake on @-mention, claim tasks, DM each other for collaboration, idle-sleep when quiet, and resume on events.
+- **Agents**: multi-runtime (claude / codex / copilot / opencode / kimi / pi / cursor / hermes), resident "employees" attached to a daemon host — they have memory (MEMORY.md), wake on @-mention, claim tasks, DM each other for collaboration, idle-sleep when quiet, and resume on events.
 - **Deployment requirement**: self-hosted, data never leaves your network; credentials centralized, agents never touch plaintext keys.
 
 ## Product Purpose

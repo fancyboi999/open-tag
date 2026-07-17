@@ -49,7 +49,7 @@ conn = new Connection(serverUrl, apiKey, (msg) => {
     // server-reported config.serverUrl (SELF_URL = localhost:PORT on the server box — wrong whenever the
     // daemon runs on a different host than the server, e.g. local daemon ↔ getopentag.com).
     case "agent:start": void mgr.start(msg.agentId, { ...msg.config, serverUrl }); break;
-    case "agent:deliver": mgr.deliver(msg.agentId, msg.from ?? "someone", msg.target ?? "", !!msg.mentioned, { targetName: msg.targetName, msgShort: msg.msgShort, isTask: msg.isTask }); conn.send({ type: "agent:deliver:ack", agentId: msg.agentId, seq: msg.seq }); break;
+    case "agent:deliver": mgr.deliver(msg.agentId, msg.from ?? "someone", msg.target ?? "", !!msg.mentioned, { targetName: msg.targetName, msgShort: msg.msgShort, isTask: msg.isTask, streamId: msg.streamId }); conn.send({ type: "agent:deliver:ack", agentId: msg.agentId, seq: msg.seq }); break;
     case "agent:stop": mgr.stop(msg.agentId); break;
     case "agent:sleep": mgr.sleep(msg.agentId); break;
     case "agent:reset": void mgr.reset(msg.agentId, !!msg.wipeWorkspace, !!msg.clearMemory); break;
@@ -75,3 +75,4 @@ conn.connect();
 const shutdown = () => { log.info("shutting down"); mgr.stopAll(); conn.close(); process.exit(0); };
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
+process.on("SIGBREAK", shutdown); // Windows Ctrl+Break (SIGTERM is not available on Windows)

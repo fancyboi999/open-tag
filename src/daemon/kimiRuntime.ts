@@ -7,7 +7,9 @@
 // default_model configured there (e.g. an OpenAI-compatible gateway with a kimi-k2 model) — the same
 // "the CLI must be set up on the machine" contract as claude (logged in) / codex (~/.codex).
 // Verified against kimi-code 0.19.2. stdin is closed (stdio "ignore"): the prompt is an argv value.
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess } from "node:child_process";
+import { spawnSafe } from "./spawnSafe.js";
+import { killTree } from "./killTree.js";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Runtime, StartOpts, RuntimeCallbacks, RuntimeSession, TrajectoryEntry } from "./runtime.js";
@@ -94,7 +96,7 @@ class KimiRun {
     this.cb.onActivity("working", "turn");
     const args = buildArgs(prompt, this.opts.model, this.sessionId);
     // stdin "ignore": kimi -p takes the prompt as argv; a live stdin is unnecessary (and risks blocking).
-    const proc = spawn("kimi", args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: this.env });
+    const proc = spawnSafe("kimi", args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: this.env });
     this.proc = proc;
     let buf = "";
     const errTail: string[] = [];
@@ -141,7 +143,7 @@ class KimiRun {
   stop(): void {
     this.stopped = true;
     const p = this.proc; this.proc = null;
-    if (p) { try { p.kill("SIGTERM"); } catch { /* */ } }
+    if (p) { killTree(p); }
   }
 }
 

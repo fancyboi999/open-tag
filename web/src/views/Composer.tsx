@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, type ChangeEvent, type ClipboardEvent as RClipboardEvent, type DragEvent as RDragEvent, type CSSProperties } from "react";
-import { ImagePlus, Paperclip, Send, CheckCircle2, Power, Moon } from "lucide-react";
+import { ImagePlus, Paperclip, Send, CheckCircle2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useStore, type Agent } from "../store.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
@@ -34,20 +34,38 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
   const inputRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { const el = inputRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }, [text]); // textarea auto-grows up to 160px
 
-  // Reachability / wake hint above the input. Targets a message will reach = the DM peer (if any) + agents
+  // Reachability hint as the input placeholder. Targets a message will reach = the DM peer (if any) + agents
   // @-mentioned in the current draft. Surfaces when a target's machine is offline (the message is saved but the
   // agent can't see it until its machine reconnects — at which point reconnect catch-up wakes it to process the
   // backlog), or, for a DM (single peer), when the peer is merely sleeping (sending wakes it). Channels have no
   // single peer, so they only get the offline hint, keyed off whoever is @-mentioned in the draft.
-  const reach = useMemo<{ kind: "off" | "sleep"; names: string } | null>(() => {
+  const reach = useMemo<{ kind: "off" | "sleep" | "work" | "on"; names: string } | null>(() => {
     const targets = new Map<string, Agent>();
     if (dmAgent) targets.set(dmAgent.id, dmAgent);
     for (const m of text.matchAll(/@([\p{L}\p{N}_-]+)/gu)) { const a = agents.find((x) => x.name === m[1]); if (a) targets.set(a.id, a); }
-    const offline = [...targets.values()].filter((a) => !a.machineId || machines.find((mc) => mc.id === a.machineId)?.status !== "online");
+    const allTargets = [...targets.values()];
+    const offline = allTargets.filter((a) => {
+      if (!a.machineId) return true;
+      const machine = machines.find((mc) => mc.id === a.machineId);
+      if (machine?.status !== "online") return true;
+      return !(machine.runtimes ?? []).includes(a.runtime);
+    });
     if (offline.length) return { kind: "off", names: offline.map((a) => a.displayName || a.name).join(", ") };
-    if (dmAgent) { const st = dmAgent.activity || dmAgent.status; if (st === "sleeping" || st === "inactive" || st === "offline") return { kind: "sleep", names: dmAgent.displayName || dmAgent.name }; }
+    const working = allTargets.filter((a) => { const st = a.activity || a.status; return st === "working" || st === "thinking"; });
+    if (working.length) return { kind: "work", names: working.map((a) => a.displayName || a.name).join(", ") };
+    const sleeping = allTargets.filter((a) => { const st = a.activity || a.status; return st === "sleeping" || st === "inactive" || st === "offline"; });
+    if (sleeping.length) return { kind: "sleep", names: sleeping.map((a) => a.displayName || a.name).join(", ") };
+    if (allTargets.length) return { kind: "on", names: allTargets.map((a) => a.displayName || a.name).join(", ") };
     return null;
   }, [text, dmAgent, agents, machines]);
+  const reachPlaceholder = reach ? (
+    reach.kind === "off" ? t("chat.machineOfflineComposerPlaceholder", { names: reach.names }) :
+    reach.kind === "work" ? t("chat.agentWorkingComposerPlaceholder", { name: reach.names }) :
+    reach.kind === "on" ? t("chat.agentOnlineComposerPlaceholder", { name: reach.names }) :
+    t("chat.agentSleepingComposerPlaceholder", { name: reach.names })
+  ) : null;
+  const reachStatusChip = reach?.kind === "off" ? t("chat.machineOfflineComposerPlaceholder", { names: reach.names }) : "";
+  const effectivePlaceholder = reachPlaceholder ?? (allowAsTask && asTask ? t("chat.taskPlaceholder") : placeholder);
 
   const send = async (forceTask?: boolean) => {
     const v = text.trim(); if ((!v && !pendingAtts.length) || !channelId) return;
@@ -98,9 +116,6 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
 
   return (
     <div className={"composer" + (className ? " " + className : "")}>
-      {reach && (reach.kind === "off"
-        ? <div className="wake-hint wh-off"><Power size={13} /> {t("chat.machineOffline", { names: reach.names })}</div>
-        : <div className="wake-hint"><Moon size={13} /> {t("chat.agentSleeping", { name: reach.names })}</div>)}
       {atQuery !== null && cands.length > 0 && (
         <div className="mention-menu">
           {cands.map((c, i) => (
@@ -127,8 +142,9 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
       <input type="file" ref={imgRef} accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
       <input type="file" ref={fileRef} multiple style={{ display: "none" }} onChange={onPickFiles} />
       <div className="composer-box" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
+        {reachStatusChip && <div className="composer-status-chip" role="status">{reachStatusChip}</div>}
         <textarea className="composer-input" ref={inputRef} rows={1} value={text} onChange={onInput} onPaste={onPaste}
-          placeholder={allowAsTask && asTask ? t("chat.taskPlaceholder") : placeholder}
+          placeholder={effectivePlaceholder}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return; // IME composition (CJK input): Enter selects a candidate, not send
             if (atQuery !== null && cands.length) { // @ menu open: ↑/↓ move highlight, Enter/Tab pick, Esc closes

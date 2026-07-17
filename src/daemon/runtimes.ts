@@ -12,7 +12,16 @@ import type { Runtime } from "./runtime.js";
 
 export type { Runtime, RuntimeSession, RuntimeCallbacks, StartOpts, TrajectoryEntry } from "./runtime.js";
 
-function has(tool: string): boolean { try { execSync(`command -v ${tool}`, { stdio: "pipe" }); return true; } catch { return false; } }
+function has(tool: string): boolean {
+  try {
+    if (process.platform === "win32") {
+      execSync(`where ${tool} 2>nul`, { stdio: "pipe" });
+    } else {
+      execSync(`command -v ${tool}`, { stdio: "pipe" });
+    }
+    return true;
+  } catch { return false; }
+}
 export function detectRuntimes(): string[] {
   return ["claude", "codex", "copilot", "kimi", "opencode", "pi", "cursor-agent", "hermes"].filter(has).map((t) => (t === "cursor-agent" ? "cursor" : t));
 }

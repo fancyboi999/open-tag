@@ -1,7 +1,9 @@
 // Codex runtime: `codex app-server --listen stdio://` + JSON-RPC 2.0 (NDJSON).
 // System prompt is passed via developerInstructions; each delivery = one turn/start (serial, waits for turn/completed).
 // Automatically approves exec/patch/elicitation requests in daemon mode.
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess } from "node:child_process";
+import { spawnSafe } from "./spawnSafe.js";
+import { killTree } from "./killTree.js";
 import type { Runtime, StartOpts, RuntimeCallbacks, RuntimeSession } from "./runtime.js";
 
 const MAX = 2000;
@@ -131,11 +133,19 @@ export const codexRuntime: Runtime = {
   start(opts: StartOpts, cb: RuntimeCallbacks): RuntimeSession {
     // Do not override CODEX_HOME: use the user's default ~/.codex (which contains subscription auth state).
     // Per-agent CODEX_HOME isolation + auth/MCP injection is a future improvement.
-    const proc = spawn("codex", ["app-server", "--listen", "stdio://"], { cwd: opts.cwd, stdio: ["pipe", "pipe", "pipe"], env: opts.env });
+    const proc = spawnSafe("codex", ["app-server", "--listen", "stdio://"], { cwd: opts.cwd, stdio: ["pipe", "pipe", "pipe"], env: opts.env });
     const client = new CodexClient(proc, cb);
     let ready = false;
+    let spawnFailed = false;
+    let reportedExit = false;
     const queue: string[] = [];
     let turnBusy = false;
+
+    function reportExit(code: number | null): void {
+      if (reportedExit) return;
+      reportedExit = true;
+      cb.onExit(code);
+    }
 
     client.onTurnDone = () => { turnBusy = false; pump(); };
     function pump(): void {
@@ -144,7 +154,7 @@ export const codexRuntime: Runtime = {
       turnBusy = true;
       cb.onActivity("working", "turn");
       client.request("turn/start", turnParams(opts, client.threadId, text))
-        .catch((e) => { cb.log.warn("codex turn/start failed", { detail: String(e?.message ?? e) }); turnBusy = false; pump(); });
+        .catch((e) => { if (spawnFailed) return; cb.log.warn("codex turn/start failed", { detail: String(e?.message ?? e) }); turnBusy = false; pump(); });
     }
 
     (async () => {
@@ -168,14 +178,23 @@ export const codexRuntime: Runtime = {
         ready = true;
         queue.push(opts.initialPrompt); pump();
       } catch (e) {
+        if (spawnFailed) return;
         cb.log.error("codex init failed", { detail: String((e as any)?.message ?? e) });
         cb.onActivity("offline", "codex init failed");
       }
     })();
 
     proc.stderr?.on("data", (c: Buffer) => { const t = c.toString().trim(); if (t) cb.log.debug("codex stderr", { t: t.slice(0, 300) }); });
-    proc.on("exit", (code) => { client.closeAllPending(new Error("codex exited")); cb.onExit(code); });
+    proc.on("error", (e: NodeJS.ErrnoException) => {
+      spawnFailed = true;
+      const detail = e.code === "ENOENT" ? "codex not found" : "codex spawn failed";
+      client.closeAllPending(new Error(detail));
+      cb.log.error("codex spawn failed", { detail: String(e?.message ?? e), code: e.code ?? "" });
+      cb.onActivity("offline", detail);
+      reportExit(1);
+    });
+    proc.on("exit", (code) => { client.closeAllPending(new Error("codex exited")); reportExit(code); });
 
-    return { deliver: (text) => { queue.push(text); pump(); }, stop: () => { try { proc.kill("SIGTERM"); } catch { /* */ } } };
+    return { deliver: (text) => { queue.push(text); pump(); }, stop: () => { killTree(proc); } };
   },
 };

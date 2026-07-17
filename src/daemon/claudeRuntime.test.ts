@@ -5,6 +5,7 @@
 // Run: npx tsx --test src/daemon/claudeRuntime.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { buildClaudeArgs } from "./claudeRuntime.js";
 
 const BASE = (promptFlag: string[] = ["--append-system-prompt", "SP"]) =>
@@ -55,4 +56,12 @@ test("effort allow-list rejects bogus values (injection guard)", () => {
 test("effort='max' boundary value passes through", () => {
   const args = buildClaudeArgs({ promptFileFlag: ["--append-system-prompt", "SP"], reasoningEffort: "max" });
   assert.equal(valAfter(args, "--effort"), "max");
+});
+
+test("spawn errors are handled so a missing claude CLI does not crash the daemon", () => {
+  const src = fs.readFileSync(new URL("./claudeRuntime.ts", import.meta.url), "utf8");
+  assert.match(src, /proc\.on\("error",/, "claude runtime must listen for child_process spawn errors");
+  assert.match(src, /cb\.log\.error\("claude spawn failed"/, "spawn failures should be logged for operators");
+  assert.match(src, /cb\.onActivity\("offline", "claude not found"\)/, "missing claude CLI should surface as offline activity");
+  assert.match(src, /finish\(1\)/, "spawn failure should terminate only this runtime session");
 });

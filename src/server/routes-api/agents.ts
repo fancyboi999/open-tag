@@ -7,7 +7,7 @@ import { DESC_TOO_LONG, INVALID_AGENT_NAME, addChannelMembers, descTooLong, inva
 import { requestDaemon } from "../daemonHub.js";
 import { publish } from "../realtime.js";
 import { ALL_SCOPE_KEYS, SCOPES, effectiveScopes, isScopeLiteral } from "../scopes.js";
-import { readJson, sendErr, sendJson } from "../util.js";
+import { isUuid, readJson, sendErr, sendJson } from "../util.js";
 
 export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
   const { req, res, url, method, p, userId, serverId } = ctx;
@@ -26,13 +26,22 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     if (!b.name) return (sendErr(res, 400, "name required"), true);
     if (invalidAgentName(b.name)) return (sendErr(res, 400, INVALID_AGENT_NAME), true);
     if (descTooLong(b.description)) return (sendErr(res, 400, DESC_TOO_LONG), true);
+    // A new agent must be created bound to a machine — an unbound (machineId=null) agent can only run via the
+    // legacy broadcastToDaemons fallback (any daemon connected to the server may pick it up), which is a
+    // one-way door (no rebind API yet, see tech-debt I77) and non-deterministic once >1 machine is connected.
+    // The web client's create modal now requires picking one; enforce it here too so no caller can slip past it.
+    if (!b.machineId) return (sendErr(res, 400, "machineId required"), true);
+    if (!isUuid(String(b.machineId))) return (sendErr(res, 404, "machine not found"), true); // non-uuid would throw casting into the uuid column → 500
+    const machine = (await db.select({ id: schema.machines.id }).from(schema.machines)
+      .where(and(eq(schema.machines.id, b.machineId), eq(schema.machines.serverId, serverId))))[0];
+    if (!machine) return (sendErr(res, 404, "machine not found"), true); // 404, not 400: existence-hiding for a cross-tenant/bogus id, consistent with this repo's other ownership pre-checks
     // A live agent name must be unique per server — it is the @mention / dm:@<name> routing key, so a duplicate
     // becomes an unreachable routing blind spot. ON CONFLICT against the agents_name_uniq partial index is
     // race-proof (no SELECT-then-INSERT gap): a duplicate live name inserts no row → friendly 409. Soft-deleted
     // names are excluded by the index predicate, so a deleted agent's name can be reused.
     const [agent] = await db.insert(schema.agents).values({
       serverId, name: b.name, displayName: b.displayName || b.name, description: b.description ?? null,
-      model: b.model || null, runtime: b.runtime || "claude", machineId: b.machineId ?? null,
+      model: b.model || null, runtime: b.runtime || "claude", machineId: b.machineId,
       runtimeConfig: { provider: b.provider ?? "default", model: b.model ?? null, reasoningEffort: b.reasoning ?? null, mode: b.fastMode ? "fast" : "default" },
       envVars: b.envVars ?? {}, executionMode: b.fastMode ? "fast" : "auto", creatorType: "user", creatorId: userId,
     }).onConflictDoNothing({ target: [schema.agents.serverId, schema.agents.name], where: isNull(schema.agents.deletedAt) }).returning();
@@ -47,6 +56,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     return (sendJson(res, 200, { id: agent!.id, name: agent!.name, started: started.ok }), true);
   }
   const am = /^\/api\/agents\/([^/]+)$/.exec(p);
+  if (am && !isUuid(am[1]!)) return (sendErr(res, 404, "agent not found"), true); // covers GET/PATCH/DELETE — non-uuid would throw casting into the uuid column
   if (am && method === "GET") {
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, am[1]!), eq(schema.agents.serverId, serverId))))[0];
     return (a ? sendJson(res, 200, a) : sendErr(res, 404, "agent not found"), true);
@@ -61,7 +71,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     // Title/role changed → push the current profile to the daemon so it syncs the workspace MEMORY.md.
     if (patch.displayName !== undefined || patch.description !== undefined) {
       const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, am[1]!), eq(schema.agents.serverId, serverId))))[0];
-      if (a) syncAgentProfile(serverId, am[1]!, a.displayName, a.description);
+      if (a) await syncAgentProfile(serverId, am[1]!, a.displayName, a.description);
     }
     return (sendJson(res, 200, { ok: true }), true);
   }
@@ -75,6 +85,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
   }
   // Agent lifecycle: start / stop / reset
   const alc = /^\/api\/agents\/([^/]+)\/(start|stop|reset|restart)$/.exec(p);
+  if (alc && !isUuid(alc[1]!)) return (sendErr(res, 404, "agent not found"), true);
   if (alc && method === "POST") {
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true);
     const [, agId, action] = alc;
@@ -88,6 +99,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
   // Agent workspace file browser (reads local disk via daemon WS-RPC)
   const awsList = /^\/api\/agents\/([^/]+)\/workspace-files$/.exec(p);
   const awsFile = /^\/api\/agents\/([^/]+)\/workspace-files\/read$/.exec(p);
+  if ((awsList || awsFile) && !isUuid((awsList || awsFile)![1]!)) return (sendErr(res, 404, "agent not found"), true);
   if ((awsList || awsFile) && method === "GET") {
     if (!await requireCap(serverId, userId, "manageAgents")) return (sendErr(res, 403, "need manageAgents capability"), true); // reading an agent's workspace (source / secrets / MEMORY.md) is owner/admin-only
     const agId = (awsList || awsFile)![1]!;
@@ -102,6 +114,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
   }
   // Agent activity log: chronological [{timestamp, entry}]
   const alog = /^\/api\/agents\/([^/]+)\/activity-log$/.exec(p);
+  if (alog && !isUuid(alog[1]!)) return (sendErr(res, 404, "agent not found"), true);
   if (alog && method === "GET") {
     const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
     const rows = await db.select().from(schema.agentActivityLog).where(and(eq(schema.agentActivityLog.agentId, alog[1]!), eq(schema.agentActivityLog.serverId, serverId))).orderBy(desc(schema.agentActivityLog.ts)).limit(limit); // serverId scope: never leak another tenant's agent activity by raw agentId
@@ -109,6 +122,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
   }
   // ── Agent Permissions (scopes) ── GET to read / PUT to replace entirely. Default mode = grant all.
   const ascope = /^\/api\/agents\/([^/]+)\/scopes$/.exec(p);
+  if (ascope && !isUuid(ascope[1]!)) return (sendErr(res, 404, "agent not found"), true);
   if (ascope && (method === "GET" || method === "PUT")) {
     const agId = ascope[1]!;
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
@@ -125,6 +139,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
   // Agent Skills (used by Profile tab): daemon reads the runtime's own skills dir on the machine
   // (claude → ~/.claude/skills, codex → ~/.codex/skills, …) + the matching dir in the workspace.
   const askill = /^\/api\/agents\/([^/]+)\/skills$/.exec(p);
+  if (askill && !isUuid(askill[1]!)) return (sendErr(res, 404, "agent not found"), true);
   if (askill && method === "GET") {
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, askill[1]!), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
@@ -136,6 +151,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
   if (aint && method === "GET") return (sendJson(res, 200, []), true);
   // Agent DMs tab: derived from channels (DMs where this agent participates and the peer is also an agent)
   const adms = /^\/api\/agents\/([^/]+)\/agent-dms$/.exec(p);
+  if (adms && !isUuid(adms[1]!)) return (sendErr(res, 404, "agent not found"), true);
   if (adms && method === "GET") {
     const agId = adms[1]!;
     // serverId scope: confirm the agent belongs to this tenant before fanning out over its memberships

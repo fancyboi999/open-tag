@@ -59,8 +59,9 @@ Run both root and web before committing:
 npm run typecheck    # tsc --noEmit for root + web
 ```
 
-CI (`.github/workflows/ci.yml`) runs `typecheck` + `web build` + daemon bundle
-build on every push/PR. A PR with a failing typecheck will not be merged.
+CI (`.github/workflows/ci.yml`) runs `typecheck`, tests, `npm audit`, `web build`,
+and daemon bundle on both **Ubuntu** and **Windows** for every push/PR. A PR
+with a failing typecheck will not be merged.
 
 ## Tests
 
@@ -71,9 +72,10 @@ npx tsx --test --test-force-exit test/*.unit.test.ts
 npx tsx --test --test-force-exit test/*.integration.ts
 ```
 
-CI does not run tests automatically (the runner has no DB), so run them
-locally before opening a PR. Always write a test that **fails first** before
-fixing a bug, then make it pass.
+CI runs unit tests automatically on both Ubuntu and Windows. Integration
+tests (`.integration.ts`) that need a DB are not in CI — run those locally
+before opening a PR. Always write a test that **fails first** before fixing a
+bug, then make it pass.
 
 ## Doc-sync discipline
 

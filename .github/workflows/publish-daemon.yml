@@ -23,7 +23,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          # 22+: npm@12 (pulled in by the upgrade step below) refuses to install
+          # on Node 20 (EBADENGINE) — this broke the v0.9.0 publish. The daemon
+          # still supports node >=20 at runtime; 22 here is only the publish
+          # toolchain.
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
       - name: Upgrade npm (Trusted Publishing needs npm >= 11.5.1)

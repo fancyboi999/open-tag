@@ -5,7 +5,7 @@ import { db, schema } from "../../db/index.js";
 import { addReaction, checkSaved, createMessage, listSaved, removeReaction, saveMessage, unsaveMessage } from "../core.js";
 import { parseMsgPageParams } from "../messagePage.js";
 import { publish } from "../realtime.js";
-import { readJson, sendErr, sendJson } from "../util.js";
+import { isUuid, readJson, sendErr, sendJson } from "../util.js";
 import { attachMentions, userChannels } from "./shared.js";
 import { canUserReadChannel } from "../channelAccess.js";
 
@@ -64,6 +64,7 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
     const b = await readJson(req).catch(() => ({}));
     const messageId = String(b.messageId ?? "").trim();
     if (!messageId) return (sendErr(res, 400, "messageId required"), true);
+    if (!isUuid(messageId)) return (sendErr(res, 404, "message not found"), true); // non-uuid (e.g. the web client's agent-reply:* streaming-preview id) would throw casting into the uuid column → 500
     const m = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, messageId), eq(schema.messages.serverId, serverId))))[0];
     if (!m) return (sendErr(res, 404, "message not found"), true);
     if (!(await canUserReadChannel(serverId, m.channelId, userId))) return (sendErr(res, 404, "message not found"), true); // invariant 3 (IDOR-B5): non-members can't bookmark (and thereby read via GET /saved) a private/DM channel's message (404 hides existence, matches reactions B2 / tasks B4)
@@ -73,13 +74,14 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
   // Bulk saved check: body {messageIds[]} → {savedIds[]}
   if (p === "/api/channels/saved/check" && method === "POST") {
     const b = await readJson(req).catch(() => ({}));
-    const ids = Array.isArray(b.messageIds) ? b.messageIds.map((x: unknown) => String(x)) : [];
+    const ids = Array.isArray(b.messageIds) ? b.messageIds.map((x: unknown) => String(x)).filter(isUuid) : []; // drop non-uuid ids (can't be saved; would throw in the uuid inArray → 500)
     const savedIds = await checkSaved(serverId, "user", userId, ids);
     return (sendJson(res, 200, { savedIds }), true);
   }
   // Unsave: DELETE /channels/saved/:messageId
   const cunsave = /^\/api\/channels\/saved\/([^/]+)$/.exec(p);
   if (cunsave && method === "DELETE") {
+    if (!isUuid(cunsave[1]!)) return (sendErr(res, 404, "message not found"), true);
     await unsaveMessage(serverId, cunsave[1]!, "user", userId);
     return (sendJson(res, 200, { ok: true }), true);
   }
@@ -128,6 +130,7 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
     const b = await readJson(req).catch(() => ({}));
     const emoji = String(b.emoji ?? "").trim();
     if (!emoji) return (sendErr(res, 400, "emoji required"), true);
+    if (!isUuid(react[1]!)) return (sendErr(res, 404, "message not found"), true); // the prod-observed 500: reacting to a not-yet-persisted agent-reply:* preview cast a non-uuid into the uuid column
     const m = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, react[1]!), eq(schema.messages.serverId, serverId))))[0];
     if (!m) return (sendErr(res, 404, "message not found"), true);
     // invariant 3: non-members must not react to messages in private/DM channels (IDOR-B2)
@@ -140,6 +143,7 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
   const amark = /^\/api\/actions\/([^/]+)\/mark-executed$/.exec(p);
   if (amark && method === "POST") {
     const b = await readJson(req).catch(() => ({}));
+    if (!isUuid(amark[1]!)) return (sendErr(res, 404, "action not found"), true);
     const m = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, amark[1]!), eq(schema.messages.serverId, serverId))))[0];
     if (!m) return (sendErr(res, 404, "action not found"), true);
     if (!(await canUserReadChannel(serverId, m.channelId, userId))) return (sendErr(res, 404, "action not found"), true); // invariant 3 (IDOR-B4): non-members of a private/DM channel can't mark its action cards (404 hides existence, matches reactions B2)
@@ -167,6 +171,7 @@ export async function handleMessages(ctx: ServerCtx): Promise<boolean> {
   // the bare-id regex never shadows them. Tenant-scoped + channel-read gated (invariant 3).
   const cone = /^\/api\/messages\/([^/]+)$/.exec(p);
   if (cone && method === "GET") {
+    if (!isUuid(cone[1]!)) return (sendErr(res, 404, "message not found"), true);
     const m = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, cone[1]!), eq(schema.messages.serverId, serverId))))[0];
     if (!m) return (sendErr(res, 404, "message not found"), true);
     if (!(await canUserReadChannel(serverId, m.channelId, userId))) return (sendErr(res, 404, "message not found"), true); // non-members of private/DM channels are refused (don't leak existence)

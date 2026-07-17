@@ -4,7 +4,7 @@ import { and, eq, ne, gt, lt, inArray, asc, desc, ilike, like, sql, isNull, isNo
 import { db, schema } from "../db/index.js";
 import { sendJson, sendErr, readJson, bearer, agentIdHeader } from "./util.js";
 import { resolveAgent } from "./auth.js";
-import { createMessage, resolveTarget, channelMembers, addChannelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG, assignTask } from "./core.js";
+import { createMessage, resolveTarget, channelMembers, addChannelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG, assignTask, resolveIdOrPrefix } from "./core.js";
 import { agentHasScope } from "./scopes.js";
 import { parseUpload } from "./attachments.js";
 import { readObject } from "./storage.js";
@@ -470,7 +470,11 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
   if (p === "/agent-api/attachment/view" && method === "GET") {
     const id = (url.searchParams.get("id") || "").trim();
     if (!id) return (sendErr(res, 400, "id required"), true);
-    const a = (await db.select().from(schema.attachments).where(and(eq(schema.attachments.id, id), eq(schema.attachments.serverId, serverId))))[0];
+    // Tolerates short id via the shared resolver (same convention as resolveMessageId): agents cite the 8-char
+    // prefixes they see in message text. Without this a short id hits the uuid column raw → 500 (live
+    // 2026-07-05: an agent's short-id views failed and it retried in a loop).
+    const attId = await resolveIdOrPrefix(schema.attachments, serverId, id);
+    const a = attId ? (await db.select().from(schema.attachments).where(eq(schema.attachments.id, attId)))[0] : undefined;
     if (!a) return (sendErr(res, 404, "attachment not found"), true);
     // Agent ACL: the agent may view an attachment only if it uploaded it, or it can access the channel the
     // attachment was posted in — otherwise an attachment id leaks a private channel's file. 404 (don't reveal).

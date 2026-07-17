@@ -52,4 +52,4 @@ The same server also serves the documentation page at `http://localhost:7788/doc
 - Schema migration (`drizzle-kit push` without `--force`) and seed run on every container start; both are idempotent.
   Additive-only schema changes apply automatically; destructive changes cause the container to fail rather than
   silently drop data — see `docs/self-host.md` for the manual migration procedure.
-- Three auth planes and the `ALLOW_DEV_LOGIN` / `ADMIN_SETUP_TOKEN` flags are described in `AGENTS.md`.
+- The authoritative access-control model (three auth planes, capabilities, scopes) is `docs/authorization.md`; the deploy-facing `ALLOW_DEV_LOGIN` / `ADMIN_SETUP_TOKEN` flag summary is in `AGENTS.md`.

@@ -92,8 +92,9 @@ export function emitMapped(serverId: string, event: any): void {
       break;
     }
     // agent:activity merges status + trajectory (carries entries[]). Internally we still keep status/trajectory as two sources; map both to this single event here.
-    case "agent": room.emit("agent:activity", { agentId: event.id, name: event.name, status: event.status, activity: event.activity }); break;
+    case "agent": room.emit("agent:activity", { agentId: event.id, name: event.name, status: event.status, activity: event.activity, detail: event.detail ?? "" }); break;
     case "trajectory": room.emit("agent:activity", { agentId: event.agentId, name: event.name, entries: event.entries }); break;
+    case "agent:reply": chan(event.channelId).emit("agent:reply", event); break; // ephemeral streaming preview → channel members only, never server-wide
     case "message:updated": chan(event.message.channelId).emit("message:updated", event.message); break; // reactions/edits (content) → channel members only
     case "thread:updated": room.emit("thread:updated", { threadChannelId: event.threadChannelId, parentMessageId: event.parentMessageId, parentChannelId: event.parentChannelId, replyCount: event.replyCount, participantIds: event.participantIds, senderId: event.senderId, senderType: event.senderType }); break;
     case "agent:created": room.emit("agent:created", event.agent); break;

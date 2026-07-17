@@ -6,13 +6,15 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeSanitize from "rehype-sanitize";
 import { useTranslation } from "react-i18next";
-import { useStore, fmtTime } from "../store.tsx";
+import { useStore } from "../store.tsx";
 import { fmtDateTime } from "../format";
 import { IconMonitor } from "../icons.tsx";
 import { Avatar, AvatarPicker, resolveAvatar } from "../Avatar.tsx";
 import { Select } from "../Select.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 import { useToast } from "../toast.tsx";
+import { startFailReasonKey } from "../startFailReason.ts";
+import { CodeBlock, ColorSwatch, GithubAlertBlockquote, colorValueFromTag, markdownSchema, markdownUrlTransform, remarkColorSwatches, remarkGithubAlerts, remarkHtmlAsText } from "../messageRender.tsx";
 import i18n from "../i18n";
 
 // Unified agent status label: fine-grained activity (working/thinking/online) takes priority;
@@ -160,7 +162,15 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const onPickAvatar = async (f: File) => { setAvBusy(true); setAvErr(""); try { const url = await uploadAgentAvatar(id, f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { await api("PATCH", "/api/agents/" + id, { avatarUrl: scheme }); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   if (!a) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
-  const ctl = async (action: string) => { const r = await api("POST", `/api/agents/${id}/${action}`); if (r?.error) toast.error(t("members.startFailed")); setTimeout(refetch, 400); }; // start/stop: surface daemon-offline failure (503 → {error}) instead of swallowing it
+  // Surface the server's concrete 503 reason ("no daemon online" / "runtime X unavailable on selected machine" …);
+  // the generic machine-may-be-offline guess alone made users blind-retry (live 2026-07-05: 3× restart → 503).
+  // Known reasons render localized (startFailReasonKey); unknown ones fall back to the raw server string.
+  const startFail = (r: any) => {
+    if (!r?.error || r.error === "internal") return toast.error(t("members.startFailed"));
+    const known = startFailReasonKey(String(r.error));
+    toast.error(`${t("members.startFailedWithReason")}: ${known ? t(known.key, known.params) : r.error}`);
+  };
+  const ctl = async (action: string) => { const r = await api("POST", `/api/agents/${id}/${action}`); if (r?.error) startFail(r); setTimeout(refetch, 400); }; // start/stop: surface daemon-offline failure (503 → {error}) instead of swallowing it
   // Three restart modes: restart=keep session+workspace; reset=clear session, keep workspace; full=clear session+delete workspace. All modes end with a restart.
   const doRestart = async (mode: "restart" | "reset" | "full") => {
     setShowRestart(false);
@@ -168,7 +178,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
     if (mode === "restart") r = await api("POST", `/api/agents/${id}/restart`);
     else if (mode === "reset") r = await api("POST", `/api/agents/${id}/reset`, { restart: true });
     else r = await api("POST", `/api/agents/${id}/reset`, { wipeWorkspace: true, restart: true });
-    if (r?.error) toast.error(t("members.startFailed")); // pure restart returns 503 when daemon offline; reset/full return ok (restart leg stays best-effort)
+    if (r?.error) startFail(r); // pure restart returns 503 when daemon offline; reset/full return ok (restart leg stays best-effort)
     setTimeout(refetch, 500);
   };
   const del = async () => { if (!(await confirm({ title: t("members.deleteAgentTitle", { name: a.name }), message: t("members.deleteAgentMessage"), confirmLabel: t("members.delete"), danger: true }))) return; await api("DELETE", "/api/agents/" + id); await reload(); onDeleted(); };
@@ -343,7 +353,7 @@ function RemindersTab({ id, name }: { id: string; name: string }) {
       : rem.map((r) => (
         <div className="card" key={r.id}>
           <div className="who">{r.content}{r.recurrence ? <span className="meta"> · {t("members.recurrenceEvery", { seconds: r.recurrence })}</span> : null}</div>
-          <div className="meta"><span className={"rem-badge " + (r.status || "scheduled")}>{REM_STATUS[r.status] || r.status}</span> · {fmtTime(r.remindAt)}</div>
+          <div className="meta"><span className={"rem-badge " + (r.status || "scheduled")}>{REM_STATUS[r.status] || r.status}</span> · {fmtDateTime(r.remindAt)}</div>
         </div>
       ))}</div>;
 }
@@ -423,7 +433,7 @@ function WorkspaceTab({ id }: { id: string }) {
                   </span>}
                 </div>
                 {isMd && mode === "preview"
-                  ? <div className="ws-md"><ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeSanitize]}>{sel.content || ""}</ReactMarkdown></div>
+                  ? <div className="ws-md"><ReactMarkdown urlTransform={markdownUrlTransform} remarkPlugins={[remarkGfm, remarkBreaks, remarkHtmlAsText, remarkGithubAlerts, remarkColorSwatches]} rehypePlugins={[[rehypeSanitize, markdownSchema]]} components={{ a: ({ href, children }) => { const color = colorValueFromTag(href); return color ? <ColorSwatch value={color} /> : <a href={href} target="_blank" rel="noreferrer">{children}</a>; }, blockquote: ({ node: _node, children, ...props }) => <GithubAlertBlockquote {...props}>{children}</GithubAlertBlockquote>, pre: ({ children }) => <CodeBlock>{children}</CodeBlock> }}>{sel.content || ""}</ReactMarkdown></div>
                   : <pre className="ws-content">{sel.content}</pre>}
               </>}
       </div>
@@ -469,12 +479,18 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
     return () => { cancelled = true; };
   }, [runtime, machineId]);
   const create = async () => {
+    if (!machineId) { setErr(t("members.machineRequired")); return; } // Computer is required: an unbound agent only runs via the legacy broadcast-to-all-daemons fallback (tech-debt I77) — force an explicit pick.
     const nm = name.trim();
     if (!nm) { setErr(t("members.nameRequired")); return; }
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(nm) || nm.length > 64) { setErr(t("members.nameInvalid")); return; } // @mention handle must be machine-safe; keep regex + length 64 in sync with core.ts AGENT_NAME_RE / MAX_AGENT_NAME
     setBusy(true); setErr("");
-    try { const r = await api("POST", "/api/agents", { machineId: machineId || null, name: nm, description: desc.trim() || null, runtime, model: model && model !== LOCAL_DEFAULT ? model : null, reasoning: thinkingLevels.length ? (reasoning || null) : null, fastMode: fast }); await reload(); if (r?.id) { if (r.started === false) toast.info(t("members.agentCreatedOffline")); onCreated?.({ id: r.id, name: r.name ?? nm }); } onClose(); }
-    catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
+    try {
+      const r = await api("POST", "/api/agents", { machineId, name: nm, description: desc.trim() || null, runtime, model: model && model !== LOCAL_DEFAULT ? model : null, reasoning: thinkingLevels.length ? (reasoning || null) : null, fastMode: fast });
+      if (r?.error) { setErr(r.error); return; } // api() resolves the JSON body even on 4xx (fetch only throws on network failure) — an unchecked error here previously closed the modal silently with no feedback, e.g. once the backend started rejecting a stale/deleted machineId.
+      await reload();
+      if (r?.id) { if (r.started === false) toast.info(t("members.agentCreatedOffline")); onCreated?.({ id: r.id, name: r.name ?? nm }); }
+      onClose();
+    } catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
   const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "opencode", label: "OpenCode" }, { value: "kimi", label: "Kimi Code" }, { value: "pi", label: "Pi" }, { value: "cursor", label: "Cursor" }, { value: "hermes", label: "Hermes" }];
   const machineOpts = machines.length ? machines.map((m) => ({ value: m.id, label: m.name || m.hostname || m.id, hint: m.status === "online" ? t("members.machineOnline") : t("members.machineOffline") })) : [];
@@ -491,8 +507,9 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>{t("members.createAgentTitle")}</h3>
-        <label>{t("members.computerLabel")}</label>
+        <label>{t("members.computerLabel")}<span className="req-mark">*</span></label>
         <Select ariaLabel={t("members.computerAriaLabel")} value={machineId} options={machineOpts} onChange={setMachineId} placeholder={t("members.noMachineOnline")} />
+        {machineOpts.length === 0 && <div className="hint">{t("members.noMachineHint")}</div>}
         <label>{t("members.nameLabel")}</label><input value={name} maxLength={64} onChange={(e) => setName(e.target.value)} placeholder={t("members.namePlaceholder")} />
         <label>{t("members.descriptionLabel")}</label><textarea value={desc} maxLength={3000} onChange={(e) => setDesc(e.target.value)} placeholder={t("members.descriptionPlaceholder")} />
         <label>Runtime</label>
@@ -510,7 +527,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
         </>}
         <label className="ck-row"><input type="checkbox" checked={fast} onChange={(e) => setFast(e.target.checked)} /><span>{t("members.fastMode")}</span></label>
         {err && <div className="form-err">{err}</div>}
-        <div className="acts"><button className="cancel" onClick={onClose}>{t("members.cancel")}</button><button className="ok" onClick={create} disabled={busy}>{busy ? t("members.creating") : t("members.create")}</button></div>
+        <div className="acts"><button className="cancel" onClick={onClose}>{t("members.cancel")}</button><button className="ok" onClick={create} disabled={busy || !machineId} title={!machineId ? t("members.machineRequired") : undefined}>{busy ? t("members.creating") : t("members.create")}</button></div>
       </div>
     </div>
   );

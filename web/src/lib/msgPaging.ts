@@ -17,3 +17,12 @@ export function appendWithCap<T>(
   if (atBottom && grown.length > cap) return { next: grown.slice(grown.length - cap), trimmed: true };
   return { next: grown, trimmed: false };
 }
+
+export function nextScrollState(
+  metrics: { scrollHeight: number; scrollTop: number; clientHeight: number },
+  currentShowJump: boolean,
+): { atBottom: boolean; showJump: boolean; changed: boolean } {
+  const atBottom = metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight < 120;
+  const showJump = !atBottom;
+  return { atBottom, showJump, changed: showJump !== currentShowJump };
+}

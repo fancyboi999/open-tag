@@ -5,11 +5,11 @@
 // Run: npx tsx --test test/daemonHub.unit.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { registerDaemon, unregisterDaemon, registerMachineConn, unregisterMachineConn, broadcastToDaemons } from "../src/server/daemonHub.js";
+import { registerDaemon, unregisterDaemon, registerMachineConn, unregisterMachineConn, broadcastToDaemons, isMachineConnected, sendToMachine } from "../src/server/daemonHub.js";
 
 // Minimal fake ws: readyState=OPEN(1), counts sends + close.
 function fakeWs(): any {
-  return { readyState: 1, sends: 0, closed: false, send() { this.sends++; }, close() { this.closed = true; } };
+  return { readyState: 1, sends: 0, sent: [] as string[], closed: false, send(data: string) { this.sends++; this.sent.push(data); }, close() { this.closed = true; } };
 }
 
 test("same machine: 2nd ws evicts 1st from broadcast + closes it (no double delivery)", () => {
@@ -45,5 +45,25 @@ test("multi-tenant: broadcast does not cross servers", () => {
   assert.equal(wsA.sends, 1);
   assert.equal(wsB.sends, 0, "server B's daemon must not receive server A's broadcast");
   unregisterDaemon(wsA); unregisterMachineConn(wsA);
+  unregisterDaemon(wsB); unregisterMachineConn(wsB);
+});
+
+test("machine-targeted send only reaches the selected connected machine", () => {
+  const sid = "s-target-" + Math.random().toString(36).slice(2);
+  const wsA = fakeWs(), wsB = fakeWs();
+  registerDaemon(wsA, sid); registerDaemon(wsB, sid);
+  registerMachineConn("m-target-a", wsA); registerMachineConn("m-target-b", wsB);
+
+  assert.equal(isMachineConnected("m-target-a"), true);
+  assert.equal(sendToMachine("m-target-a", { type: "agent:start", agentId: "a1" }), true);
+  assert.equal(wsA.sends, 1);
+  assert.equal(wsB.sends, 0, "non-target machine must not receive targeted start");
+  assert.match(wsA.sent[0]!, /"agentId":"a1"/);
+
+  unregisterMachineConn(wsA);
+  assert.equal(isMachineConnected("m-target-a"), false);
+  assert.equal(sendToMachine("m-target-a", { type: "agent:start", agentId: "a1" }), false);
+
+  unregisterDaemon(wsA);
   unregisterDaemon(wsB); unregisterMachineConn(wsB);
 });

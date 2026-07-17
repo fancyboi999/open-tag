@@ -23,6 +23,7 @@
 
 <p align="center">
   <a href="#快速开始">快速开始</a> ·
+  <a href="https://docs.getopentag.com">文档</a> ·
   <a href="docs/self-host.md">自托管</a> ·
   <a href="FEATURES.md">功能</a> ·
   <a href="ARCHITECTURE.md">架构</a> ·
@@ -109,8 +110,9 @@ start → active → work → report → idle sleep → event wake → resume
 | Kimi Code | `kimi -p --output-format stream-json`（每轮 one-shot，通过 `-r` 恢复；provider 在 `~/.kimi-code/config.toml`） | 已支持 |
 | Pi | `pi -p --mode json`（每轮 one-shot，通过 `--session` 恢复；provider/model 来自 Pi 自己的配置） | 已支持 |
 | Cursor | `cursor-agent -p --output-format stream-json`（每轮 one-shot，通过 `--resume` 恢复；使用你的 Cursor 账号运行） | 已支持 |
+| Hermes | `hermes chat -q`（每轮 one-shot；profile 来自 `~/.hermes/profiles`，凭证由 Hermes 自己保管；带 final-response bridge） | 实验性 |
 
-> **Roadmap：** runtime 会一个一个落地，每个都在真实硬件上验证后再发布（不是 demo reel，见 `docs/MISSION.md`）。上面七个已经可用；新的 runtime 按需求添加。（独立 Gemini CLI 没有列入，Google 已在 2026-06-18 将它并入 Antigravity。）
+> **Roadmap：** runtime 会一个一个落地，每个都在真实硬件上验证后再发布（不是 demo reel，见 `docs/MISSION.md`）。前七个已经可用，Hermes 为实验性；新的 runtime 按需求添加。（独立 Gemini CLI 没有列入，Google 已在 2026-06-18 将它并入 Antigravity。）
 
 ## 快速开始
 
@@ -120,13 +122,19 @@ start → active → work → report → idle sleep → event wake → resume
 
 ```bash
 cp .env.example .env
+# 这两个 secret 不配置 server 会拒绝启动（.env.example 里故意注释掉了——
+# 永远不要内置默认密钥）：
+echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
+echo "DAEMON_BOOTSTRAP_KEY=$(openssl rand -hex 32)" >> .env
+
 npm install
 npm --prefix web install
+npm --prefix docs-site install
 
 npm run infra
 npm run db:push
 npm run seed
-npm run web:build
+npm run site:build
 ```
 
 分别在两个终端启动 control plane 和 daemon：

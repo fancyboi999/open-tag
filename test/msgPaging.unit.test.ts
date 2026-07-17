@@ -5,7 +5,7 @@
 // Run: npx tsx --test --test-force-exit test/msgPaging.unit.test.ts
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appendWithCap } from "../web/src/lib/msgPaging.js";
+import { appendWithCap, nextScrollState } from "../web/src/lib/msgPaging.js";
 
 test("appends below the cap without trimming", () => {
   const { next, trimmed } = appendWithCap([1, 2, 3], 4, true, 10);
@@ -23,4 +23,22 @@ test("does NOT trim when the user is scrolled up (not at bottom)", () => {
   const { next, trimmed } = appendWithCap([1, 2, 3], 4, false, 3);
   assert.deepEqual(next, [1, 2, 3, 4]);
   assert.equal(trimmed, false);
+});
+
+test("scroll state reports a UI update only when the jump-button visibility changes", () => {
+  assert.deepEqual(nextScrollState({ scrollHeight: 1000, scrollTop: 700, clientHeight: 250 }, false), {
+    atBottom: true,
+    showJump: false,
+    changed: false,
+  });
+  assert.deepEqual(nextScrollState({ scrollHeight: 1000, scrollTop: 500, clientHeight: 250 }, false), {
+    atBottom: false,
+    showJump: true,
+    changed: true,
+  });
+  assert.deepEqual(nextScrollState({ scrollHeight: 1000, scrollTop: 450, clientHeight: 250 }, true), {
+    atBottom: false,
+    showJump: true,
+    changed: false,
+  });
 });

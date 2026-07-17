@@ -2,12 +2,9 @@
 // Run: npx tsx --test --test-force-exit test/showcaseOpenHoverHighlight.unit.test.ts
 //
 // Bug: a Showcase case whose thread is open (.showcase-case.open) gets a surface-strong fill + an
-// inset accent bar. It reuses Chat's .msg, whose :hover paints an opaque, LIGHTER (canvas-soft)
-// rounded block — on the open case's darker fill that reads as a reversed, half-height highlight AND,
-// being opaque, clips the inset accent bar to a stray segment above the avatar ("hover makes half the
-// message vanish" + "blue bar under the avatar"). Fix: inside an open case, suppress the per-message
-// hover fill so the fill stays uniform and the accent bar runs full-height. Must stay SCOPED — the
-// global .msg:hover (real Chat channels) must be untouched.
+// inset accent bar. Chat message hover now uses a transparent background plus a subtle hairline/shadow
+// instead of an opaque fill. Showcase open cases must keep the same transparent hover contract so the
+// open-case fill stays uniform and the accent bar runs full-height.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -26,9 +23,11 @@ test("open Showcase case clears the per-message hover fill (no reversed half-hei
   assert.match(body, /background\s*:\s*transparent\b/, `open-case hover must clear the .msg fill, got: ${body}`);
 });
 
-test("global .msg:hover (real Chat channels) is untouched — still the canvas-soft hover block", () => {
+test("global .msg:hover (real Chat channels) uses the readable border-only hover contract", () => {
   const body = ruleBody(".msg:hover");
-  assert.match(body, /background\s*:\s*var\(--canvas-soft\)/, `global .msg:hover must keep its hover block, got: ${body}`);
+  assert.match(body, /background\s*:\s*transparent\b/, `global .msg:hover must not dim message contents, got: ${body}`);
+  assert.match(body, /box-shadow\s*:\s*inset 0 0 0 \.5px rgba\(87,96,106,\.18\),0 6px 18px rgba\(15,23,42,\.035\)/, `global .msg:hover should expose only a quiet full-message border and shadow, got: ${body}`);
+  assert.equal(ruleBody(".msg-col"), "min-width:0;padding:0", "message body column should not carry a nested card skin");
 });
 
 test("the open case still carries the fill + accent bar the hover fix relies on", () => {
@@ -39,7 +38,7 @@ test("the open case still carries the fill + accent bar the hover fix relies on"
 
 test("open case is a contained card — content indents off the accent bar (avatar not flush on the bar)", () => {
   const body = ruleBody(".showcase-case.open .msg");
-  // drop the reused negative side-margins (Chat's .msg uses 0 -12px) so content sits inside the card…
+  // keep the reused message row contained so content sits inside the case card…
   assert.match(body, /margin\s*:\s*0\s+0\s+6px/, `open-case .msg must drop its negative side-margins: ${body}`);
   // …and indent past the 3px inset accent bar so the avatar clears it instead of sitting flush.
   assert.match(body, /padding-left\s*:\s*18px/, `open-case content must indent off the accent bar: ${body}`);

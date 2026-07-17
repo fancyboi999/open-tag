@@ -5,16 +5,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// tsx's real JS entrypoint: `npx`/`.bin/tsx` are shell shims spawnSync can't exec
+// on Windows, but `node tsx/dist/cli.mjs` works on every platform.
+const TSX_CLI = path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs");
 
 /** Run a small snippet in a fresh tsx subprocess with a given environment.
  *  Returns { status, stderr }. */
 function runSnippet(snippet: string, extraEnv: NodeJS.ProcessEnv): { status: number | null; stderr: string } {
   const r = spawnSync(
-    "npx",
-    ["tsx", "--input-type=module", "--eval", snippet],
+    process.execPath,
+    [TSX_CLI, "--input-type=module", "--eval", snippet],
     {
       cwd: ROOT,
       env: { ...process.env, ...extraEnv },
@@ -25,9 +28,11 @@ function runSnippet(snippet: string, extraEnv: NodeJS.ProcessEnv): { status: num
   return { status: r.status, stderr: r.stderr ?? "" };
 }
 
-// Use absolute path — when running via --eval there's no "file" base for relative imports.
+// Use an absolute file:// URL — when running via --eval there's no "file" base for
+// relative imports, and on Windows a bare drive-letter path (D:\...) is not a valid
+// ESM specifier (ERR_UNSUPPORTED_ESM_URL_SCHEME).
 const AUTH_PATH = path.join(ROOT, "src/server/auth.ts");
-const LOAD_AUTH = `import ${JSON.stringify(AUTH_PATH)};`;
+const LOAD_AUTH = `import ${JSON.stringify(pathToFileURL(AUTH_PATH).href)};`;
 
 test("auth.ts throws at load time when JWT_SECRET is missing", () => {
   const { status, stderr } = runSnippet(LOAD_AUTH, {

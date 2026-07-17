@@ -88,7 +88,8 @@ setup otherwise. Decide per task.
 > Docs naturally lag behind code. This project treats doc/code sync as a **hard rule**:
 > every change must update the corresponding docs in the **same commit**.
 > **Doc lag = an unfinished bug.** Self-check with the table below before marking done,
-> then run `/doc-sync` (built-in skill at `.claude/skills/doc-sync/`) for a full audit.
+> then run `/doc-sync` for a full audit (canonical skill at `.agents/skills/doc-sync/`,
+> exposed to Claude Code via the `.claude/skills/doc-sync` symlink — same file, any runtime).
 
 | You changed… | Must also update |
 |---|---|
@@ -98,7 +99,7 @@ setup otherwise. Decide per task.
 | A feature (completed or modified) | `FEATURES.md` checkbox + `README.md` "Verified" section if relevant |
 | Doc/code mismatch, or a TODO / tech debt left behind | `docs/tech-debt-tracker.md` — add an entry, don't let it rot silently |
 | A complex change with a plan | `docs/PLANS.md` (convention) |
-| `src/daemon/**` that ships in the bundle (runtime / CLI / daemon protocol) | **Publish a new daemon release** — bump `packages/daemon/package.json` + cut a GitHub Release. See **Release discipline** below. **Merged ≠ shipped.** |
+| `src/daemon/**` that ships in the bundle (runtime / CLI / daemon protocol) | **Publish a new daemon release** — bump `packages/daemon/package.json` + cut a GitHub Release **+ add the version's `CHANGELOG.md` entry**. See **Release discipline** below. **Merged ≠ shipped.** |
 
 > Keep this file in "map" form: details go into their respective files.
 > **Don't accumulate history or changelogs here** — that's what `git log` is for.
@@ -117,6 +118,8 @@ setup otherwise. Decide per task.
   Release** (`vX.Y.Z`). That — and only that — fires `.github/workflows/publish-daemon.yml`,
   which builds the bundle and publishes to npm via OIDC Trusted Publishing (token-less). A
   plain merge / tag / push publishes nothing. (New runtime → minor bump; bugfix → patch.)
+  **Add the version's `CHANGELOG.md` entry in the same PR** — the changelog tracks this
+  package, and it silently rotted from 0.4.0 to 0.8.1 while this step wasn't on the list.
 - A long-lived daemon keeps running the **old** bundle until **restarted** — bounce it
   (`npx @fancyboi999/open-tag-daemon@latest`) on each prod machine after publishing.
 

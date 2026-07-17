@@ -250,7 +250,7 @@ function runList(bin: string, args: string[], timeoutMs: number = LIST_TIMEOUT_M
     let stderr = "";
     proc.stdout?.on("data", (c: Buffer) => { if (stdout.length < OUT_CAP) stdout += c.toString(); });
     proc.stderr?.on("data", (c: Buffer) => { if (stderr.length < OUT_CAP) stderr += c.toString(); });
-    const timer = setTimeout(() => { try { proc.kill("SIGKILL"); } catch { /* */ } }, timeoutMs);
+    const timer = setTimeout(() => { try { proc.kill(process.platform === "win32" ? undefined : "SIGKILL"); } catch { /* */ } }, timeoutMs);
     proc.on("error", (e) => { clearTimeout(timer); resolve({ stdout, stderr: stderr || String((e as any)?.message ?? e), code: 1 }); });
     proc.on("exit", (code) => { clearTimeout(timer); resolve({ stdout, stderr, code }); });
   });

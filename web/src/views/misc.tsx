@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Star, Bookmark, AlertTriangle, Lock, MessageCircle, Eye } from "lucide-react";
-import { useStore, fmtTime } from "../store.tsx";
+import { Star, Bookmark, AlertTriangle, Lock, MessageCircle, Eye, Plus } from "lucide-react";
+import { useStore } from "../store.tsx";
+import { fmtDateTime } from "../format";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { ChatSidebar } from "./ChatSidebar.tsx";
 import { IconMonitor, IconInbox } from "../icons.tsx";
@@ -153,7 +154,7 @@ export function Inbox() {
                 <span className="ib-top">
                   <span className="ib-name">{it.channelName}</span>
                   {it.hasMention && <span className="ib-mention" title={t("misc.inboxMentionTitle")}>@</span>}
-                  <span className="ib-time">{fmtTime(it.lastMessageAt)}</span>
+                  <span className="ib-time">{fmtDateTime(it.lastMessageAt)}</span>
                 </span>
                 <span className="ib-preview"><b>{it.lastMessageSenderName}</b>: {it.lastMessagePreview}</span>
               </span>
@@ -167,7 +168,7 @@ export function Inbox() {
                 <span className="ib-top">
                   <span className="ib-name">{m.channelName}</span>
                   {!m.read && <span className="ib-mention" title={t("misc.inboxMentionTitle")}>@</span>}
-                  <span className="ib-time">{fmtTime(m.createdAt)}</span>
+                  <span className="ib-time">{fmtDateTime(m.createdAt)}</span>
                 </span>
                 <span className="ib-preview"><b>{m.senderName}</b>: {m.preview}</span>
               </span>
@@ -222,7 +223,7 @@ export function Computers() {
         </div>
       </aside>
       <main className="content-col">
-        {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll"><PaneEmpty icon={<IconMonitor size={30} />} title={t("misc.computersNoMachine")} sub={t("misc.computersNoMachineHint")} /></div></>
+        {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll"><PaneEmpty icon={<IconMonitor size={30} />} title={t("misc.computersNoMachine")} sub={t("misc.computersNoMachineHint")} action={capabilities.manageMachines && <button className="pe-cta" onClick={() => setConnect(true)}><Plus size={15} /> {t("misc.computersConnectBtn")}</button>} /></div></>
           : <>
             <div className="head"><h1>{cur.name || cur.hostname}</h1><small>{cur.status === "online" ? t("misc.computersOnline") : t("misc.computersOffline")} · {t("misc.computersDaemonLabel")} {cur.daemonVersion || "?"}</small>
               {capabilities.manageMachines && <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -312,7 +313,7 @@ export function Search() {
           {searched && results.length === 0 && <div className="empty">{t("misc.searchNoResults", { q })}</div>}
           {results.map((r) => (
             <div className="card" key={r.id} style={{ cursor: "pointer" }} onClick={() => nav(`/s/${slug}/channel/${r.channelId}?msg=${r.id}`)}>
-              <div className="kv"><b># {r.channelName}</b> · {r.senderName} · {fmtTime(r.createdAt)}</div>
+              <div className="kv"><b># {r.channelName}</b> · {r.senderName} · {fmtDateTime(r.createdAt)}</div>
               <div className="mbody" dangerouslySetInnerHTML={{ __html: hilite(r.snippet || r.content, q) }} />
             </div>
           ))}
@@ -506,7 +507,7 @@ export function Saved() {
 }
 
 // Invite members (join-links): owner/admin generates invite links (configurable role/max-uses) → share → recipient registers or logs in to join.
-async function copyText(text: string): Promise<boolean> {
+export async function copyText(text: string): Promise<boolean> {
   if (navigator.clipboard && window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text);

@@ -1,9 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, Fragment, type CSSProperties, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
-import { useStore, fmtTime, type Msg, type Att } from "../store.tsx";
-import { PAGE_SIZE, appendWithCap } from "../lib/msgPaging";
+import { useStore, type Msg, type Att } from "../store.tsx";
+import { fmtDateTime, isSameLocalDay, fmtDateDivider } from "../format";
+import { PAGE_SIZE, appendWithCap, nextScrollState } from "../lib/msgPaging";
+import { groupTraj } from "../trajBuffer";
+import { AGENT_REPLY_PREVIEW_TYPE, AGENT_REPLY_STREAM_TICK_MS, absorbPersistedAgentMessagePreview, applyAgentReplyPreview, dropAgentReplyPreviewsForMessage, hasStreamingAgentReplyPreview, renderKeyForMessage, tickAgentReplyPreviews, type AgentReplyEvent, type AgentReplyPreviewMsg } from "../lib/agentReplyPreview";
 import { MessageContent } from "../messageRender.tsx";
 import { nextThreadMeta } from "../threadUnread";
 import { Smile, X, ExternalLink, CheckCircle2, MessageCircle, MoreHorizontal, Link2, Clipboard, Bookmark, CheckSquare, Circle, Play, Eye, Ban, ArrowDown, BellOff, Lock, Globe, Archive, Trash2 } from "lucide-react";
@@ -16,14 +19,57 @@ import { TaskBoard, ynOptions, ST_LABEL } from "../TaskBoard.tsx";
 import { PaneEmpty } from "../PaneEmpty.tsx";
 import { ChatSkeleton } from "./Skeleton.tsx";
 import { AgentProfile, HumanProfile, CreateAgentModal } from "./Members.tsx";
-import { ChatSidebar, CreateChannelModal } from "./ChatSidebar.tsx";
+import { ChatSidebar, CreateChannelModal, channelCreateErrorMsg } from "./ChatSidebar.tsx";
 import { ConnectComputerWizard } from "./ConnectComputerWizard.tsx";
 import { Composer } from "./Composer.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
+import { useToast } from "../toast.tsx";
 
 const fmtSize = (n?: number) => (!n ? "" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB");
 const isImage = (m?: string) => !!m && m.startsWith("image/");
 const isVideo = (m?: string) => !!m && m.startsWith("video/");
+export const BACK_TO_BOTTOM_SCROLL_MS = 800;
+export const MESSAGE_ENTER_PIN_MS = 1000;
+export const backToBottomEase = (t: number) => 1 - Math.pow(1 - t, 3);
+
+export function animateBackToBottom(el: Pick<HTMLDivElement, "scrollTop" | "scrollHeight">, done?: () => void) {
+  const start = el.scrollTop;
+  const target = el.scrollHeight;
+  const delta = target - start;
+  if (!delta) { done?.(); return; }
+  const startTime = performance.now();
+  const step = (now: number) => {
+    const t = Math.min(1, (now - startTime) / BACK_TO_BOTTOM_SCROLL_MS);
+    el.scrollTop = start + delta * backToBottomEase(t);
+    if (t < 1) requestAnimationFrame(step);
+    else { el.scrollTop = target; done?.(); }
+  };
+  requestAnimationFrame(step);
+}
+
+function AgentReplyPreviewBody({ m }: { m: Msg }) {
+  const { t } = useTranslation();
+  const preview = m as AgentReplyPreviewMsg;
+  const done = !!preview.streamDone && !preview.streamError;
+  if (!preview.streamError && !done && !preview.streamThinkingVisible) return null;
+  return (
+    <div className={"mbody agent-reply-placeholder" + (preview.streamError ? " error" : done ? " done" : "")} aria-live="polite">
+      {preview.streamError ? t("chat.agentReplyError") : done ? t("chat.agentThinkingDone") : t("chat.agentThinking")}
+    </div>
+  );
+}
+
+export function keepPinnedToBottomDuringEnter(el: Pick<HTMLDivElement, "scrollTop" | "scrollHeight">, shouldContinue: () => boolean, durationMs = MESSAGE_ENTER_PIN_MS) {
+  const startTime = performance.now();
+  const pin = () => { el.scrollTop = el.scrollHeight; };
+  pin();
+  const step = (now: number) => {
+    if (!shouldContinue()) return;
+    pin();
+    if (now - startTime < durationMs) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 
 // Message attachments: images shown inline with lightbox, videos shown with inline player; other files shown as a file card. Videos that fail to play fall back to a download card.
 function AttCard({ a, url }: { a: Att; url: string }) {
@@ -50,7 +96,7 @@ function Reactions({ m, mine, onReact }: { m: Msg; mine: string; onReact: (emoji
         return <button key={r.emoji} className={"rx-chip" + (did ? " on" : "")} onClick={() => onReact(r.emoji, !!did)}>{r.emoji} {r.count}{names ? <span className="rx-tip" role="tooltip">{names}</span> : null}</button>;
       })}
       <span className="rx-add-wrap">
-        <button className="rx-add" title={i18n.t("chat.addReaction")} onMouseDown={(e) => { e.preventDefault(); setPick((v) => !v); }}><Smile size={15} /></button>
+        <button className="rx-add" title={i18n.t("chat.addReaction")} onMouseDown={(e) => { e.preventDefault(); setPick((v) => !v); }}><Smile size={17} /></button>
         {pick && <span className="rx-pop" onMouseLeave={() => setPick(false)}>{QUICK_EMOJIS.map((e) => <button key={e} onMouseDown={(ev) => { ev.preventDefault(); onReact(e, false); setPick(false); }}>{e}</button>)}</span>}
       </span>
     </div>
@@ -61,6 +107,7 @@ function Reactions({ m, mine, onReact }: { m: Msg; mine: string; onReact: (emoji
 function ActionCardMsg({ m }: { m: Msg }) {
   const { t } = useTranslation();
   const { createChannel, markActionExecuted, slug, agents, attachmentUrl } = useStore();
+  const toast = useToast();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const meta = m.actionMetadata!;
@@ -74,7 +121,7 @@ function ActionCardMsg({ m }: { m: Msg }) {
     <div className="msg action-card-msg" id={"m-" + m.id} key={m.id}>
       <Avatar seed={m.senderName} url={resolveAvatar(agents.find((a) => a.id === m.senderId)?.avatarUrl, attachmentUrl)} size={36} />
       <div className="msg-col">
-        <div className="msg-head"><span className="who">{m.senderName}</span><span className="member-badge">{t("chat.proposed")}</span><span className="ts">{fmtTime(m.createdAt)}</span></div>
+        <div className="msg-head"><span className="who">{m.senderName}</span><span className="member-badge">{t("chat.proposed")}</span><span className="ts">{fmtDateTime(m.createdAt)}</span></div>
         <div className="action-card">
           <div className="ac-title">{title}</div>
           {a.description ? <div className="ac-detail"><span className="ac-k">{t("chat.description")}</span> {a.description}</div> : null}
@@ -87,7 +134,11 @@ function ActionCardMsg({ m }: { m: Msg }) {
         <CreateChannelModal
           prefill={{ name: a.name, description: a.description ?? "", visibility: a.visibility, agentIds: a.initialAgents ?? [], userIds: a.initialHumans ?? [] }}
           submitLabel={t("chat.createChannel")} onClose={() => setOpen(false)}
-          onCreate={async (opts) => { const r = await createChannel(opts); setOpen(false); if (r?.id) { await markActionExecuted(m.id, { kind: "channel", id: r.id, name: opts.name }); nav(`/s/${slug}/channel/${r.id}`); } }}
+          onCreate={async (opts) => {
+            const r = await createChannel(opts);
+            if (r?.id) { setOpen(false); await markActionExecuted(m.id, { kind: "channel", id: r.id, name: opts.name }); nav(`/s/${slug}/channel/${r.id}`); }
+            else toast.error(channelCreateErrorMsg(t, r?.error)); // keep the modal open so the user can fix the name and retry
+          }}
         />
       )}
       {open && !isChan && (
@@ -106,6 +157,9 @@ export function Chat() {
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   // A message's sender avatar: look the sender up in the loaded agents/humans lists (carry avatarUrl) — no message-schema change needed.
   const senderAvatar = (m: Msg) => avFor(m.senderType === "agent" ? agents.find((a) => a.id === m.senderId)?.avatarUrl : humans.find((h) => h.userId === m.senderId)?.avatarUrl);
+  // Agent Live Trace panel: group raw streamed fragments into one message-bar-like block per agent/turn
+  // (avatar + running text), instead of one <div> per fragment — see trajBuffer.ts groupTraj.
+  const trajGroups = useMemo(() => groupTraj(traj), [traj]);
   const confirm = useConfirm();
   const [showEdit, setShowEdit] = useState(false);
   const manageServer = myRole === "owner" || myRole === "admin"; // server admins get the full task-status dropdown (matches TaskBoard permission model)
@@ -125,7 +179,10 @@ export function Chat() {
   const [unreadThreads, setUnreadThreads] = useState<{ threadChannelId: string; parentMessageId: string; parentChannelId: string; unreadCount: number }[]>([]); // unread that lives in this channel's threads (invisible in the main timeline) → "jump to unread thread" bar
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true); // tracks whether the scroll position is at the bottom; new messages auto-scroll only when already at the bottom, preserving history browsing
+  const forceBottomPinRef = useRef(false); // own sends + agent previews should return the viewport to the live tail even if overlay height made atBottom stale
   const [showJump, setShowJump] = useState(false); // when not at the bottom, show the "Back to bottom" jump button
+  const showJumpRef = useRef(false);
+  const scrollingToBottomRef = useRef(false); // suppress jump-button flicker while the 0.8s smooth scroll is in progress
   const [hasMore, setHasMore] = useState(false); // older messages remain before the loaded window → drives scroll-to-top "load more"
   const loadingOlderRef = useRef(false); // de-dupes concurrent "load older" fetches while one is in flight
   const prependRestoreRef = useRef<number | null>(null); // scrollHeight captured before a prepend; restored after so the viewport doesn't jump
@@ -221,20 +278,39 @@ export function Chat() {
     // eslint-disable-next-line
   }, [agentPanelReq]);
   useEffect(() => onEvent((e) => {
-    if (e.type === "message" && e.channelId === cur?.id) { const idx = Math.min(burstCountRef.current, 7); newMsgOrderRef.current.set(e.message.id, idx); burstCountRef.current += 1; if (burstTimerRef.current) clearTimeout(burstTimerRef.current); burstTimerRef.current = setTimeout(() => { burstCountRef.current = 0; burstTimerRef.current = null; }, 600); setMsgs((m) => { const { next, trimmed } = appendWithCap(m, e.message, atBottomRef.current && !loadingOlderRef.current); if (trimmed) trimmedRef.current = true; return next; }); markRead(cur.id); } // don't trim mid-pagination: a trim's setHasMore(true) would race the in-flight loadOlder's setHasMore — suppressing it closes the window (the next message trims instead)
+    if (e.type === "message" && e.channelId === cur?.id) { if (e.message.senderType === "user" && e.message.senderId === me?.id) forceBottomPinRef.current = true; setMsgs((m) => { const preview = absorbPersistedAgentMessagePreview(m, e.message); if (preview.consumed) { forceBottomPinRef.current = true; newMsgOrderRef.current.delete(e.message.id); return preview.messages; } const idx = Math.min(burstCountRef.current, 7); newMsgOrderRef.current.set(e.message.id, idx); burstCountRef.current += 1; if (burstTimerRef.current) clearTimeout(burstTimerRef.current); burstTimerRef.current = setTimeout(() => { burstCountRef.current = 0; burstTimerRef.current = null; }, 600); const { next, trimmed } = appendWithCap(dropAgentReplyPreviewsForMessage(m, e.message), e.message, atBottomRef.current && !loadingOlderRef.current); if (trimmed) trimmedRef.current = true; return next; }); markRead(cur.id); } // don't trim mid-pagination: a trim's setHasMore(true) would race the in-flight loadOlder's setHasMore — suppressing it closes the window (the next message trims instead)
     else if (e.type === "message:updated" && e.message) setMsgs((m) => m.map((x) => (x.id === e.message.id ? { ...x, ...e.message } : x))); // sync reactions and task fields
+    else if (e.type === "agent:reply" && e.channelId === cur?.id) { forceBottomPinRef.current = true; setMsgs((m) => applyAgentReplyPreview(m, e as AgentReplyEvent, agents.find((a) => a.id === e.agentId))); }
     else if (e.type === "thread:updated" && e.parentMessageId) setThreadMeta((tm) => ({ // live reply count update; unreadCount is approximated from the replyCount delta (the authoritative value is corrected on channel switch via GET)
       ...tm,
       [e.parentMessageId]: nextThreadMeta(tm[e.parentMessageId], { threadChannelId: e.threadChannelId, replyCount: e.replyCount, senderId: e.senderId }, me?.id),
     }));
-    else if (e.type === "agent") setSub(e.activity ? `${e.name} · ${e.activity}${e.detail ? " · " + e.detail : ""}` : ""); // live-trace entries are accumulated globally in the store (see store.tsx agent:activity handler), so they persist across channel/DM switches
-  }), [cur?.id]);
-  useEffect(() => { const el = scrollRef.current; if (!el || msgParam) return; if (atBottomRef.current) el.scrollTop = el.scrollHeight; }, [msgs, msgParam]); // auto-scroll only when already pinned to the bottom
+  }), [cur?.id, agents, me?.id]);
+  const streamingPreviewActive = hasStreamingAgentReplyPreview(msgs);
+  useEffect(() => {
+    if (!streamingPreviewActive) return;
+    const timer = window.setInterval(() => {
+      setMsgs((m) => {
+        const tick = tickAgentReplyPreviews(m);
+        if (tick.changed) forceBottomPinRef.current = true;
+        return tick.changed ? tick.messages : m;
+      });
+    }, AGENT_REPLY_STREAM_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [streamingPreviewActive]);
+  useEffect(() => { const el = scrollRef.current; if (!el || msgParam) return; const force = forceBottomPinRef.current; if (force) { forceBottomPinRef.current = false; atBottomRef.current = true; setJumpVisible(false); } if (force || atBottomRef.current) keepPinnedToBottomDuringEnter(el, () => !msgParam && (force || atBottomRef.current)); }, [msgs, msgParam]); // auto-scroll when already pinned; own sends and agent previews force the live tail so users do not drag the scrollbar manually
   // Keep the viewport anchored across an older-page prepend: restore scrollTop before paint. Runs before the auto-scroll effect above, which is a no-op here anyway (a prepend only happens while scrolled up, so atBottomRef is false).
   useLayoutEffect(() => { const el = scrollRef.current; if (el && prependRestoreRef.current != null) { el.scrollTop = el.scrollHeight - prependRestoreRef.current; prependRestoreRef.current = null; } }, [msgs]);
   useEffect(() => { if (trimmedRef.current) { trimmedRef.current = false; setHasMore(true); } }, [msgs]); // a live-tail trim opened a gap at the top → older messages stay re-fetchable
-  useEffect(() => { atBottomRef.current = true; setShowJump(false); newMsgOrderRef.current.clear(); burstCountRef.current = 0; }, [cur?.id]); // reset bottom-pin state + new-msg enter animation tracking on channel switch
-  const toBottom = () => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; atBottomRef.current = true; setShowJump(false); };
+  const setJumpVisible = (visible: boolean) => { showJumpRef.current = visible; setShowJump(visible); };
+  useEffect(() => { atBottomRef.current = true; setJumpVisible(false); newMsgOrderRef.current.clear(); burstCountRef.current = 0; }, [cur?.id]); // reset bottom-pin state + new-msg enter animation tracking on channel switch
+  const toBottom = () => {
+    const el = scrollRef.current;
+    if (!el) { atBottomRef.current = true; setJumpVisible(false); return; }
+    scrollingToBottomRef.current = true;
+    setJumpVisible(false);
+    animateBackToBottom(el, () => { scrollingToBottomRef.current = false; atBottomRef.current = true; setJumpVisible(false); });
+  };
   // Fetch the previous (older) page via the `before` keyset cursor and prepend it; guarded so concurrent scroll events can't fire duplicate loads.
   const loadOlder = async () => {
     if (!cur || loadingOlderRef.current || !hasMore || !msgs.length) return;
@@ -248,7 +324,7 @@ export function Chat() {
       setHasMore(!!d.hasMore);
     } catch { /* transient — the next scroll-to-top retries */ } finally { loadingOlderRef.current = false; }
   };
-  const onScroll = () => { const el = scrollRef.current; if (!el) return; if (el.scrollTop < 80 && hasMore && !loadingOlderRef.current) void loadOlder(); const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120; atBottomRef.current = near; setShowJump(!near); };
+  const onScroll = () => { const el = scrollRef.current; if (!el) return; if (el.scrollTop < 80 && hasMore && !loadingOlderRef.current) void loadOlder(); const st = nextScrollState(el, showJumpRef.current); atBottomRef.current = st.atBottom; if (!scrollingToBottomRef.current && st.changed) setJumpVisible(st.showJump); };
   // highlightedMsgRef guards the flash to once per target. The deps below include `msgs`, so without it every
   // incoming live message (msgs changes) would re-run this while ?msg= is still in the URL and re-flash the
   // inbox-clicked message on each new message. Re-armed on channel switch so re-opening the same target flashes again.
@@ -293,6 +369,18 @@ export function Chat() {
   const taskAssignee = (m: Msg) => { if (!m.taskAssigneeId) return ""; const a = agents.find((x) => x.id === m.taskAssigneeId); if (a) return " @" + (a.displayName || a.name); const h = humans.find((x) => x.userId === m.taskAssigneeId); return h ? " @" + (h.displayName || h.name) : ""; };
   // Handles task status change / claim from the task badge; socket message:updated event refreshes the message automatically
   const doTask = async (m: Msg, action: string, body?: unknown) => { try { await api("PATCH", `/api/tasks/${m.id}/${action}`, body); } catch { /* will self-correct on next reload */ } };
+  const copyMarkdown = (content: string) => { navigator.clipboard?.writeText(content).catch(() => {}); };
+  const agentLiveState = (a?: (typeof agents)[number]) => {
+    if (!a) return "offline";
+    const activity = a.activity && a.activity !== "offline" ? a.activity : "";
+    const status = a.status && a.status !== "offline" ? a.status : "";
+    return activity || status || "offline";
+  };
+  const agentActivityText = (a?: (typeof agents)[number]) => {
+    if (a?.activity && a.activity !== "offline") return a.activity;
+    if (a?.status && a.status !== "offline") return a.status;
+    return "";
+  };
   // Routes inline token clicks (@mention / #channel / thread / task #N) inside MessageContent
   const navToken = async (type: string, args: string[]) => {
     if (type === "agent") return setProfile({ type: "agent", id: args[0]! });
@@ -315,7 +403,7 @@ export function Chat() {
         <div className="head chat-head">
           <h1>{isDm ? "@ " + (cur?.name || "") : cur?.type === "showcase" ? <><Eye size={16} style={{ verticalAlign: "-3px", opacity: 0.7 }} /> {cur?.name || "…"}</> : "# " + (cur?.name || "…")}</h1>
           {dmAgent
-            ? <span className="head-status"><span className={"dot " + (dmAgent.activity || "offline")} />{dmAgent.activityDetail || dmAgent.activity || "offline"}</span>
+            ? <span className="head-status"><span className={"dot " + (agentLiveState(dmAgent) || "offline")} />{agentActivityText(dmAgent) || "offline"}</span>
             : <small>{sub || cur?.description || ""}</small>}
           {cur && <div className="chtabs">{(isDm ? ["chat", "tasks"] : ["chat", "tasks", "files"]).map((tt) => <button key={tt} className={chatTab === tt ? "on" : ""} onClick={() => setTab(tt)}>{tt === "chat" ? t("nav.channel") : tt === "tasks" ? t("nav.tasks") : t("common.files")}</button>)}</div>}
           {!isDm && cur && cur.type !== "showcase" && <button className="joinbtn" style={{ marginLeft: "auto" }} title={t("chat.channelMembers")} onClick={() => setShowMembers(true)}>{t("chat.members")}</button>}
@@ -333,40 +421,57 @@ export function Chat() {
                 <span className="utb-cta">{t("chat.viewUnreadThread")}</span>
               </button>
             )}
-            <div key={cur?.id} className="scroll ch-view-enter" ref={scrollRef} onScroll={onScroll}>
+            <div key={cur?.id} className={"scroll ch-view-enter" + (chatTab === "chat" && unreadThreads.length > 0 ? " scroll-fade-top" : "")} ref={scrollRef} onScroll={onScroll}>
               {!loaded && <ChatSkeleton />}
               {loaded && loadError && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.loadFailedTitle")} sub={<><span>{t("chat.loadFailedBody")}</span><button className="joinbtn" onClick={loadCurrentMessages}>{t("chat.retryLoad")}</button></>} />}
               {loaded && !loadError && !msgs.length && <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.channelEmpty")} />}
-              {!loadError && msgs.map((m) => {
+              {loaded && !loadError && msgs.map((m, mIdx) => {
                 const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // used for role description and avatar status dot
+                const agLive = agentLiveState(ag);
+                const agActivity = agentActivityText(ag);
                 const tm = threadMeta[m.id];
                 const isMember = m.senderType !== "agent" && m.senderType !== "system"; // human/user senders get a "member" badge
+                const isSaved = savedIds.has(m.id);
+                const isAgentReplyPreview = m.messageType === AGENT_REPLY_PREVIEW_TYPE;
+                const agentReplyPreview = isAgentReplyPreview ? m as AgentReplyPreviewMsg : undefined;
+                if (agentReplyPreview && !agentReplyPreview.streamVisible) return null;
+                const prevMsg = msgs[mIdx - 1];
+                const dateDivider: ReactNode = m.createdAt && !isSameLocalDay(m.createdAt, prevMsg?.createdAt)
+                  ? <div className="date-divider"><span className="date-divider-label">{fmtDateDivider(m.createdAt, i18n.language, t("chat.dateToday"), t("chat.dateYesterday"))}</span></div>
+                  : null;
                 // action card (agent proposal card) → rendered by dedicated ActionCardMsg component
-                if (m.messageType === "action" && m.actionMetadata?.kind === "action-card") return <ActionCardMsg m={m} key={m.id} />;
+                if (m.messageType === "action" && m.actionMetadata?.kind === "action-card") return <Fragment key={m.id}>{dateDivider}<ActionCardMsg m={m} /></Fragment>;
                 // system messages (task lifecycle events, etc.) → centered grey bar (no avatar, no full message block)
                 // If the system message has thread replies (e.g. showcase case anchors), render a thread-pill below the bar so it's clickable.
                 if (m.senderType === "system") return (
-                  <div className="msg-sys" id={"m-" + m.id} key={m.id}>
-                    <MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} />
-                    {tm?.replyCount ? <button className="thread-pill" onClick={() => startThread(m)}><MessageCircle size={12} /> {t("chat.replyCount", { count: tm.replyCount })}</button> : null}
-                  </div>
+                  <Fragment key={m.id}>
+                    {dateDivider}
+                    <div className="msg-sys" id={"m-" + m.id}>
+                      <MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} />
+                      {tm?.replyCount ? <button className="thread-pill" onClick={() => startThread(m)}><MessageCircle size={12} /> {t("chat.replyCount", { count: tm.replyCount })}</button> : null}
+                    </div>
+                  </Fragment>
                 );
                 const staggerIdx = newMsgOrderRef.current.get(m.id);
                 const isNewMsg = staggerIdx !== undefined;
+                const shouldEnter = isNewMsg || !!agentReplyPreview;
                 return (
-                <div className={"msg" + (isNewMsg ? " msg-enter" : "")} id={"m-" + m.id} key={m.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ m, x: e.clientX, y: e.clientY }); }} style={isNewMsg ? { "--msg-delay": `${staggerIdx * 60}ms` } as CSSProperties : undefined}>
-                  <div className="msg-toolbar">
-                    <button title={t("chat.emojiActions")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCtxMenu({ m, x: r.left - 180, y: r.bottom + 4 }); }}><Smile size={15} /></button>
-                    <button title={t("chat.openThread")} onClick={() => startThread(m)}><MessageCircle size={15} /></button>
+                <Fragment key={renderKeyForMessage(m)}>
+                  {dateDivider}
+                  <div className={"msg" + (shouldEnter ? " msg-enter" : "")} id={"m-" + m.id} onContextMenu={isAgentReplyPreview ? undefined : (e) => { e.preventDefault(); setCtxMenu({ m, x: e.clientX, y: e.clientY }); }} style={isNewMsg ? { "--msg-delay": `${staggerIdx * 60}ms` } as CSSProperties : undefined}>
+                  {/* a streaming preview isn't persisted yet — its synthetic agent-reply:* id must never reach the API (save/react/menu), so no toolbar/context menu until the real message replaces it */}
+                  {!isAgentReplyPreview && <div className="msg-toolbar">
+                    <button className={isSaved ? "on" : ""} title={isSaved ? t("chat.unsave") : t("chat.saveMessage")} onClick={() => { isSaved ? unsaveMsg(m.id) : saveMsg(m.id); }}><Bookmark size={15} fill={isSaved ? "currentColor" : "none"} /></button>
+                    <button title={t("chat.copyMarkdown")} onClick={() => copyMarkdown(m.content)}><Clipboard size={15} /></button>
                     <button title={t("chat.more")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCtxMenu({ m, x: r.right - 212, y: r.bottom + 4 }); }}><MoreHorizontal size={15} /></button>
-                  </div>
+                  </div>}
                   {ag
                     ? <span className="msg-av clickable" onClick={() => setProfile({ type: "agent", id: m.senderId! })}
                         onMouseEnter={(e) => setHoverAgent({ id: m.senderId!, x: e.currentTarget.getBoundingClientRect().right + 8, y: e.currentTarget.getBoundingClientRect().top })}
-                        onMouseLeave={() => setHoverAgent(null)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={36} />{ag.activity && ag.activity !== "offline" && <span className={"av-status " + ag.activity} />}</span>
+                        onMouseLeave={() => setHoverAgent(null)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={36} />{agLive !== "offline" && <span className={"av-status " + agLive} />}</span>
                     : m.senderId
                       ? <span className="msg-av clickable" onClick={() => setProfile({ type: "human", id: m.senderId! })}><Avatar seed={m.senderName} url={senderAvatar(m)} size={36} /></span>
-                      : <Avatar seed={m.senderName} url={senderAvatar(m)} size={36} />}
+                      : <span className="msg-av"><Avatar seed={m.senderName} url={senderAvatar(m)} size={36} /></span>}
                   <div className="msg-col">
                     <div className="msg-head">
                       {ag
@@ -376,9 +481,15 @@ export function Chat() {
                         : m.senderId
                           ? <span className="who clickable" onClick={() => setProfile({ type: "human", id: m.senderId! })}>{m.senderName}</span>
                           : <span className="who">{m.senderName}</span>}
-                      {ag?.description ? <span className="msg-role">{ag.description}</span> : isMember ? <span className="member-badge">member</span> : null}
-                      <span className="ts">{fmtTime(m.createdAt)}</span></div>
-                    {!!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
+                      <span className="ts">{fmtDateTime(m.createdAt)}</span>
+                      {agActivity ? <code className={"msg-activity " + agLive}>{agActivity}</code> : null}</div>
+                    {ag && ag.description ? <div className="msg-subhead">
+                      <span className="msg-role">{ag.description}</span>
+                    </div> : null}
+                    {isMember ? <div className="msg-subhead"><span className="member-badge">member</span></div> : null}
+                    {isAgentReplyPreview && !m.content
+                      ? <AgentReplyPreviewBody m={m} />
+                      : !!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
                     {!!m.attachments?.length && <div className="msg-atts">{m.attachments.map((a) => <AttCard key={a.id} a={a} url={attachmentUrl(a.id)} />)}</div>}
                     {/* persistent meta row: task badge + thread button + reactions all on the same line (reactions no longer occupy a separate row) */}
                     <div className="msg-meta">
@@ -401,10 +512,11 @@ export function Chat() {
                           );
                         })()}
                         {tm?.replyCount ? <button className="thread-pill" onClick={() => startThread(m)}><MessageCircle size={12} /> {t("chat.replyCount", { count: tm.replyCount })}{tm.unreadCount ? <span className="thread-new"> · {tm.unreadCount} new</span> : ""}</button> : null}
-                        <Reactions m={m} mine={me?.id ?? ""} onReact={(emoji, remove) => react(m.id, emoji, remove)} />
+                        {!isAgentReplyPreview && <Reactions m={m} mine={me?.id ?? ""} onReact={(emoji, remove) => react(m.id, emoji, remove)} />}
                       </div>
                   </div>
-                </div>
+                  </div>
+                </Fragment>
                 );
               })}
             </div>
@@ -430,9 +542,24 @@ export function Chat() {
         ? <ThreadPanel channelId={thread.channelId} parent={thread.parent} onClose={() => setThread(null)} onOpenProfile={(type, id) => setProfile({ type, id })} />
         : <aside className="traj-col">
               <h2>{t("chat.agentLiveTrace")}</h2>
-              {traj.length === 0
+              {trajGroups.length === 0
                 ? <div className="hint">{t("chat.agentTraceHint")}</div>
-                : traj.map((t, i) => <div className={"traj" + (t.tool ? " tool" : "")} key={i}>{t.tool && <IconWrench size={12} />}{t.name ? "@" + t.name + " · " : ""}{t.text}</div>)}
+                : trajGroups.map((g, i) => {
+                    const gAgent = agents.find((a) => (a.displayName || a.name) === g.name);
+                    const isTail = i === trajGroups.length - 1;
+                    const isLive = isTail && (gAgent?.activity === "working" || gAgent?.activity === "thinking");
+                    return (
+                      <div className="traj-grp" key={i}>
+                        <span className="traj-av"><Avatar seed={g.name || "agent"} url={avFor(gAgent?.avatarUrl)} size={26} /></span>
+                        <div className="traj-body">
+                          {g.name ? <div className="traj-head">@{g.name}</div> : null}
+                          {g.items.map((it, j) => it.kind === "tool"
+                            ? <div className="traj-tool" key={j}><IconWrench size={12} />{it.text}</div>
+                            : <div className="traj-text" key={j}>{it.text}{isLive && j === g.items.length - 1 ? <span className="traj-cursor" /> : null}</div>)}
+                        </div>
+                      </div>
+                    );
+                  })}
       </aside>}
       <ConnectComputerWizard mode="onboard" />
       {showMembers && cur && <ChannelMembersModal channelId={cur.id} channelName={cur.name} onClose={() => setShowMembers(false)} />}
@@ -446,8 +573,8 @@ export function Chat() {
           <div className="ctx-backdrop" onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }}>
             <div className="ctx-menu" style={{ left: Math.min(ctxMenu.x, window.innerWidth - 230), top: Math.min(ctxMenu.y, window.innerHeight - 320) }} onClick={(e) => e.stopPropagation()}>
               <div className="ctx-rx">{QUICK_EMOJIS.slice(0, 6).map((e) => <button key={e} title={e} onClick={() => { react(m.id, e, false); close(); }}>{e}</button>)}</div>
-              <button className="ctx-item" onClick={() => copy(link)}><Link2 size={14} /> {t("chat.copyLink")}</button>
               <button className="ctx-item" onClick={() => copy(m.content)}><Clipboard size={14} /> {t("chat.copyMarkdown")}</button>
+              <button className="ctx-item" onClick={() => copy(link)}><Link2 size={14} /> {t("chat.copyLink")}</button>
               <button className="ctx-item" onClick={() => { startThread(m); close(); }}><MessageCircle size={14} /> {t("chat.openThread")}</button>
               <button className="ctx-item" onClick={() => { savedIds.has(m.id) ? unsaveMsg(m.id) : saveMsg(m.id); close(); }}><Bookmark size={14} fill={savedIds.has(m.id) ? "currentColor" : "none"} /> {savedIds.has(m.id) ? t("chat.unsave") : t("chat.saveMessage")}</button>
               <button className="ctx-item" onClick={async () => { close(); await api("POST", "/api/tasks/convert-message", { messageId: m.id }); }}><CheckSquare size={14} /> {t("chat.convertToTask")}</button>
@@ -552,28 +679,54 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => { subscribeChannel(channelId); (async () => { const d = await api("GET", `/api/messages/channel/${channelId}?limit=200`); setMsgs(d.messages || []); })(); }, [channelId]); // join the thread room so replies arrive live (openThread/startThread do not make the socket a room member on their own)
   useEffect(() => onEvent((e) => {
-    if (e.type === "message" && e.channelId === channelId) setMsgs((m) => [...m, e.message]);
+    if (e.type === "message" && e.channelId === channelId) setMsgs((m) => {
+      const preview = absorbPersistedAgentMessagePreview(m, e.message);
+      if (preview.consumed) return preview.messages;
+      return [...dropAgentReplyPreviewsForMessage(m, e.message), e.message];
+    });
     else if (e.type === "message:updated" && e.message?.channelId === channelId) setMsgs((m) => m.map((x) => (x.id === e.message.id ? { ...x, ...e.message } : x)));
-  }), [channelId]);
+    else if (e.type === "agent:reply" && e.channelId === channelId) setMsgs((m) => applyAgentReplyPreview(m, e as AgentReplyEvent, agents.find((a) => a.id === e.agentId)));
+  }), [channelId, agents]);
+  const streamingPreviewActive = hasStreamingAgentReplyPreview(msgs);
+  useEffect(() => {
+    if (!streamingPreviewActive) return;
+    const timer = window.setInterval(() => {
+      setMsgs((m) => {
+        const tick = tickAgentReplyPreviews(m);
+        return tick.changed ? tick.messages : m;
+      });
+    }, AGENT_REPLY_STREAM_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [streamingPreviewActive]);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [msgs]);
-  const row = (m: Msg) => {
-    if (m.senderType === "system") return <div className="msg-sys" id={"m-" + m.id} key={m.id}>{m.content}</div>; // system messages render as a banner with no avatar
+  const row = (m: Msg, dateDivider?: ReactNode) => {
+    if (m.senderType === "system") return <Fragment key={m.id}>{dateDivider}<div className="msg-sys" id={"m-" + m.id}>{m.content}</div></Fragment>; // system messages render as a banner with no avatar
     const ag = m.senderType === "agent" && m.senderId ? agents.find((a) => a.id === m.senderId) : undefined; // agent sender → avatar and name are clickable to open the profile panel
+    const live = ag ? ((ag.activity && ag.activity !== "offline" ? ag.activity : ag.status) || "offline") : "offline";
+    const isAgentReplyPreview = m.messageType === AGENT_REPLY_PREVIEW_TYPE;
+    const agentReplyPreview = isAgentReplyPreview ? m as AgentReplyPreviewMsg : undefined;
+    if (agentReplyPreview && !agentReplyPreview.streamVisible) return null;
     return (
-    <div className="msg" key={m.id}>
-      {ag ? <span className="msg-av clickable" onClick={() => onOpenProfile("agent", m.senderId!)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={32} /></span>
+    <Fragment key={renderKeyForMessage(m)}>
+      {dateDivider}
+      <div className={"msg" + (agentReplyPreview ? " msg-enter" : "")}>
+      {ag ? <span className="msg-av clickable" onClick={() => onOpenProfile("agent", m.senderId!)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={32} />{live !== "offline" && <span className={"av-status " + live} />}</span>
         : m.senderId ? <span className="msg-av clickable" onClick={() => onOpenProfile("human", m.senderId!)}><Avatar seed={m.senderName} url={senderAvatar(m)} size={32} /></span>
         : <Avatar seed={m.senderName} url={senderAvatar(m)} size={32} />}
       {/* content column reuses .msg-col (flex:1;min-width:0) like the main chat — without it a flex child defaults to min-width:auto and a long unbreakable token blows the message past this narrow thread panel */}
       <div className="msg-col">
         <div>{ag ? <span className="who clickable" onClick={() => onOpenProfile("agent", m.senderId!)}>{m.senderName}</span>
           : m.senderId ? <span className="who clickable" onClick={() => onOpenProfile("human", m.senderId!)}>{m.senderName}</span>
-          : <span className="who">{m.senderName}</span>}<span className="ts">{fmtTime(m.createdAt)}</span></div>
-        {!!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
+          : <span className="who">{m.senderName}</span>}<span className="ts">{fmtDateTime(m.createdAt)}</span></div>
+        {isAgentReplyPreview && !m.content
+          ? <AgentReplyPreviewBody m={m} />
+          : !!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
         {!!m.attachments?.length && <div className="msg-atts">{m.attachments.map((a) => <AttCard key={a.id} a={a} url={attachmentUrl(a.id)} />)}</div>}
-        <Reactions m={m} mine={me?.id ?? ""} onReact={(emoji, remove) => react(m.id, emoji, remove)} />
+        {/* same guard as the channel feed: the preview's synthetic id must never be POSTed to /reactions */}
+        {!isAgentReplyPreview && <Reactions m={m} mine={me?.id ?? ""} onReact={(emoji, remove) => react(m.id, emoji, remove)} />}
       </div>
-    </div>
+      </div>
+    </Fragment>
     );
   };
   return (
@@ -586,7 +739,13 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
       <div className="scroll" ref={scrollRef}>
         <div className="thread-parent">{row(parent)}</div>
         <div className="thread-sep">{t("chat.replyCount", { count: msgs.length })}</div>
-        {msgs.map(row)}
+        {msgs.map((m, i) => {
+          const prevMsg = msgs[i - 1];
+          const dateDivider: ReactNode = m.createdAt && !isSameLocalDay(m.createdAt, prevMsg?.createdAt)
+            ? <div className="date-divider"><span className="date-divider-label">{fmtDateDivider(m.createdAt, i18n.language, t("chat.dateToday"), t("chat.dateYesterday"))}</span></div>
+            : null;
+          return row(m, dateDivider);
+        })}
       </div>
       {channels.find((c) => c.id === parent.channelId)?.type === "showcase"
         ? <div className="showcase-readonly"><Eye size={14} />{t("chat.showcaseReadOnly")}</div>
@@ -647,7 +806,7 @@ function ChannelFiles({ channelId }: { channelId: string }) {
           <div key={f.id} className="card file-row">
             <a className="file-main" href={attachmentUrl(f.id)} target="_blank" rel="noreferrer">
               {isImage(f.mimeType) ? <img className="file-thumb" src={attachmentUrl(f.id)} alt={f.filename} loading="lazy" /> : <IconFile size={22} />}
-              <div className="grow"><div className="who">{f.filename}</div><div className="meta">{fmtSize(f.sizeBytes)} · {f.uploader?.displayName || f.uploader?.name || (f.uploader?.type === "agent" ? "agent" : t("chat.memberKind"))} · {fmtTime(f.createdAt)}</div></div>
+              <div className="grow"><div className="who">{f.filename}</div><div className="meta">{fmtSize(f.sizeBytes)} · {f.uploader?.displayName || f.uploader?.name || (f.uploader?.type === "agent" ? "agent" : t("chat.memberKind"))} · {fmtDateTime(f.createdAt)}</div></div>
             </a>
             <div className="file-acts">
               {f.messageId && <button title={t("chat.jumpToMessage")} onClick={() => nav(`/s/${slug}/channel/${f.channelId}?msg=${f.messageId}`)}><IconExternalLink size={14} /></button>}

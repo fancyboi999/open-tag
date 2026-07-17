@@ -8,9 +8,11 @@
 //     NODE_OPTIONS carries flags it doesn't allow (e.g. `--use-env-proxy`).
 //  2. stdin is `ignore` (the prompt is an argv value); `-f` force-allows tools for headless runs.
 // System prompt is injected via {cwd}/AGENTS.md (Cursor reads it natively; there is no prompt flag).
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
+import { spawnSafe } from "./spawnSafe.js";
+import { killTree } from "./killTree.js";
 import type { Runtime, StartOpts, RuntimeCallbacks, RuntimeSession, TrajectoryEntry } from "./runtime.js";
 
 const MAX = 2000;
@@ -95,7 +97,7 @@ class CursorRun {
     this.turnBusy = true;
     this.cb.onActivity("working", "turn");
     const args = buildArgs(prompt, this.opts.model, this.sessionId);
-    const proc = spawn("cursor-agent", args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: this.env });
+    const proc = spawnSafe("cursor-agent", args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: this.env });
     this.proc = proc;
     let buf = "";
     let resultSeen = false;
@@ -151,7 +153,7 @@ class CursorRun {
   stop(): void {
     this.stopped = true;
     const p = this.proc; this.proc = null;
-    if (p) { try { p.kill("SIGTERM"); } catch { /* */ } }
+    if (p) { killTree(p); }
   }
 }
 

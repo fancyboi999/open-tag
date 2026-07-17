@@ -3,11 +3,13 @@
 // Hermes owns provider credentials and profile configuration. OpenTag only selects a Hermes profile
 // (temporarily stored in agent.model) and passes the OpenTag system prompt + message into an isolated
 // agent workspace. This keeps secrets in Hermes config, not in the OpenTag database.
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile, unlink } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
+import { spawnSafe } from "./spawnSafe.js";
+import { killTree } from "./killTree.js";
 import type { Runtime, StartOpts, RuntimeCallbacks, RuntimeSession } from "./runtime.js";
 
 const MAX = 4000;
@@ -185,7 +187,7 @@ class HermesRun {
     const prompt = buildHermesPrompt(message, this.opts);
     const args = buildHermesArgs(prompt, this.sessionId);
     const turnFile = path.join(tmpdir(), `open-tag-hermes-turn-${Date.now()}-${Math.random().toString(36).slice(2)}.jsonl`);
-    const proc = spawn("hermes", args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: { ...this.env, OPEN_TAG_TURN_FILE: turnFile } });
+    const proc = spawnSafe("hermes", args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: { ...this.env, OPEN_TAG_TURN_FILE: turnFile } });
     this.proc = proc;
     let stdout = "";
     const errTail: string[] = [];
@@ -295,7 +297,7 @@ class HermesRun {
     const p = this.proc;
     this.proc = null;
     if (p) {
-      try { p.kill("SIGTERM"); } catch { /* */ }
+      killTree(p);
     }
   }
 }

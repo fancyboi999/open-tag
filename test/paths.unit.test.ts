@@ -23,11 +23,12 @@ test("OPEN_TAG_HOME relocates every derived dir", () => {
   process.env.OPEN_TAG_HOME = "/tmp/ot-wtX";
   delete process.env.OPEN_TAG_LOG_DIR;
   delete process.env.OPEN_TAG_UPLOAD_DIR;
-  assert.equal(p.agentsDir(), "/tmp/ot-wtX/agents");
-  assert.equal(p.binDir(), "/tmp/ot-wtX/bin");
-  assert.equal(p.machineIdFile(), "/tmp/ot-wtX/machine-id");
-  assert.equal(p.logsDir(), "/tmp/ot-wtX/logs");
-  assert.equal(p.uploadsDir(), "/tmp/ot-wtX/uploads");
+  // path.join normalizes separators, so these expectations hold on Windows too
+  assert.equal(p.agentsDir(), path.join("/tmp/ot-wtX", "agents"));
+  assert.equal(p.binDir(), path.join("/tmp/ot-wtX", "bin"));
+  assert.equal(p.machineIdFile(), path.join("/tmp/ot-wtX", "machine-id"));
+  assert.equal(p.logsDir(), path.join("/tmp/ot-wtX", "logs"));
+  assert.equal(p.uploadsDir(), path.join("/tmp/ot-wtX", "uploads"));
 });
 
 test("legacy OPEN_TAG_LOG_DIR / OPEN_TAG_UPLOAD_DIR still win", () => {

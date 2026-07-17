@@ -9,14 +9,18 @@ on:
 
 jobs:
   typecheck-and-build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install root deps
         run: npm ci
@@ -35,6 +39,7 @@ jobs:
         env:
           JWT_SECRET: ci-test-secret
           DAEMON_BOOTSTRAP_KEY: ci-test-bootstrap-key
+        shell: bash
         run: npx tsx --test --test-force-exit test/*.unit.test.ts src/daemon/*.test.ts
 
       - name: Security audit (prod deps, high+)
