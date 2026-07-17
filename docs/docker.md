@@ -52,4 +52,7 @@ The same server also serves the documentation page at `http://localhost:7788/doc
 - Schema migration (`drizzle-kit push` without `--force`) and seed run on every container start; both are idempotent.
   Additive-only schema changes apply automatically; destructive changes cause the container to fail rather than
   silently drop data — see `docs/self-host.md` for the manual migration procedure.
+- Local attachment storage (`OPEN_TAG_STORAGE=local`, default): the entrypoint starts as root, `chown`s
+  `$OPEN_TAG_HOME/uploads` (and `logs`) so Docker named volumes are writable by `node`, then drops
+  privileges before running the app. See `docs/self-host.md` → Data directory.
 - The authoritative access-control model (three auth planes, capabilities, scopes) is `docs/authorization.md`; the deploy-facing `ALLOW_DEV_LOGIN` / `ADMIN_SETUP_TOKEN` flag summary is in `AGENTS.md`.

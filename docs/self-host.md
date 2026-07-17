@@ -289,6 +289,14 @@ Then add `uploads: {}` to the top-level `volumes:` section. Alternatively, use
 [S3-compatible object storage](../README.md#object-storage-attachments) so the control
 plane and daemon share one store across hosts.
 
+**Volume ownership:** Docker named volumes are created `root:root`. The control-plane
+image starts as root long enough for `scripts/docker-entrypoint.sh` to `chown` the
+uploads (and logs) dirs to the non-root `node` user, then drops privileges with
+`setpriv` before schema migration / seed / server. You should **not** need a manual
+`chown` on Coolify or compose. If you override the container user to a non-root UID
+(`user: "1000:1000"` / Coolify “Run as user”), the entrypoint cannot fix ownership —
+either leave the default user, or pre-chown the volume to that UID.
+
 ---
 
 ## Backup and restore

@@ -36,9 +36,13 @@ COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY --from=build /app/package.json ./package.json
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && chown -R node:node /app
-USER node
+# Start as root so the entrypoint can chown Docker named volumes (created root:root) under
+# OPEN_TAG_HOME/uploads. It immediately drops to `node` via setpriv before schema/seed/server —
+# the long-running process never stays root. Do not add `USER node` here or volume mounts will
+# again be unwritable (EACCES on POST /api/attachments/upload). See scripts/docker-entrypoint.sh.
 EXPOSE 7788
 # Liveness via the app's own /health (Node 22 has global fetch; no curl/wget needed in the slim image).
+# Runs as the image default user (root); only probes localhost, no privilege needed.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=40s --retries=6 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||7788)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

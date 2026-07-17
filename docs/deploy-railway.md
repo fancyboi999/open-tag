@@ -45,9 +45,10 @@ The server reads `PORT` from the environment (line 18 in `src/server/index.ts`:
 no Dockerfile change is needed.
 
 Container startup sequence (from `scripts/docker-entrypoint.sh`):
-1. `npx drizzle-kit push` — applies additive schema migrations (fails loud if destructive changes would occur — container refuses to start rather than silently destroying data).
-2. `npx tsx src/db/seed.ts` — seeds the default workspace (idempotent; skips if present).
-3. `exec npx tsx src/server/index.ts` — starts the server.
+1. If running as root (image default): `chown` local uploads/logs under `OPEN_TAG_HOME` so Docker named volumes are writable by `node`, then drop privileges with `setpriv` (the rest never runs as root).
+2. `npx drizzle-kit push` — applies additive schema migrations (fails loud if destructive changes would occur — container refuses to start rather than silently destroying data).
+3. `npx tsx src/db/seed.ts` — seeds the default workspace (idempotent; skips if present).
+4. `exec npx tsx src/server/index.ts` — starts the server.
 
 ---
 
