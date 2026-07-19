@@ -5,7 +5,7 @@
 // Run: npx tsx --test test/daemonHub.unit.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { registerDaemon, unregisterDaemon, registerMachineConn, unregisterMachineConn, broadcastToDaemons, isMachineConnected, sendToMachine } from "../src/server/daemonHub.js";
+import { registerDaemon, unregisterDaemon, registerMachineConn, unregisterMachineConn, broadcastToDaemons, isMachineConnected, sendToMachine, requestDaemon, requestDaemonByMachine, resolveDaemonRequest } from "../src/server/daemonHub.js";
 
 // Minimal fake ws: readyState=OPEN(1), counts sends + close.
 function fakeWs(): any {
@@ -66,4 +66,48 @@ test("machine-targeted send only reaches the selected connected machine", () => 
 
   unregisterDaemon(wsA);
   unregisterDaemon(wsB); unregisterMachineConn(wsB);
+});
+
+// ── rpc:nack semantics (tech-debt I88): a NACK from an outdated daemon must not win a broadcast race
+// against a daemon that actually supports the RPC — it only upgrades the timeout error; a directed
+// (single-target) NACK resolves immediately since no other responder exists. ──
+const sentRequestId = (ws: any) => JSON.parse(ws.sent[0]!).requestId as string;
+
+test("rpc:nack on a broadcast is held and upgrades the timeout error", async () => {
+  const sid = "s-nack-" + Math.random().toString(36).slice(2);
+  const ws = fakeWs();
+  registerDaemon(ws, sid); registerMachineConn("m-nack-a", ws);
+  const p = requestDaemon(sid, { type: "agent:workspace:write" }, 80);
+  const rid = sentRequestId(ws);
+  resolveDaemonRequest(rid, { type: "rpc:nack", requestId: rid, error: 'daemon 0.9.0 does not support "agent:workspace:write"' });
+  const r = await p;
+  assert.match(r.error, /does not support/, "timeout resolves with the NACK reason, not the generic timeout");
+  unregisterDaemon(ws); unregisterMachineConn(ws);
+});
+
+test("rpc:nack on a broadcast: a real response arriving later still wins", async () => {
+  const sid = "s-nack-" + Math.random().toString(36).slice(2);
+  const ws = fakeWs();
+  registerDaemon(ws, sid); registerMachineConn("m-nack-b", ws);
+  const p = requestDaemon(sid, { type: "agent:workspace:read" }, 200);
+  const rid = sentRequestId(ws);
+  resolveDaemonRequest(rid, { type: "rpc:nack", requestId: rid, error: "too old" });
+  resolveDaemonRequest(rid, { type: "workspace:file_content", requestId: rid, content: "hello" });
+  const r = await p;
+  assert.equal(r.content, "hello");
+  assert.equal(r.error, undefined);
+  unregisterDaemon(ws); unregisterMachineConn(ws);
+});
+
+test("rpc:nack on a directed (by-machine) request resolves immediately", async () => {
+  const ws = fakeWs();
+  registerMachineConn("m-nack-c", ws);
+  const t0 = Date.now();
+  const p = requestDaemonByMachine("m-nack-c", { type: "agent:workspace:write" }, 5000);
+  const rid = sentRequestId(ws);
+  resolveDaemonRequest(rid, { type: "rpc:nack", requestId: rid, error: "daemon dev does not support it" });
+  const r = await p;
+  assert.match(r.error, /does not support/);
+  assert.ok(Date.now() - t0 < 1000, "did not wait out the 5s timeout");
+  unregisterMachineConn(ws);
 });

@@ -4,7 +4,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { requireCap } from "../capabilities.js";
 import { DESC_TOO_LONG, INVALID_AGENT_NAME, addChannelMembers, descTooLong, invalidAgentName, dequeueAgent, resetAgent, startAgent, stopAgent, syncAgentProfile } from "../core.js";
-import { requestDaemon } from "../daemonHub.js";
+import { requestDaemon, requestDaemonByMachine } from "../daemonHub.js";
 import { publish } from "../realtime.js";
 import { ALL_SCOPE_KEYS, SCOPES, effectiveScopes, isScopeLiteral } from "../scopes.js";
 import { isUuid, readJson, sendErr, sendJson } from "../util.js";
@@ -122,6 +122,12 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     const r = await requestDaemon(serverId, { type: "agent:workspace:read", agentId: agId, path: url.searchParams.get("path") ?? "" });
     return (sendJson(res, 200, r.error ? { error: r.error } : { path: r.path, content: r.content }), true);
   }
+  // Personality/skills files live on the agent's OWN machine (agents.machineId): route the RPC to that
+  // machine's daemon instead of a serverId-wide broadcast, where any connected daemon answers first —
+  // wrong disk on a multi-machine server, and a silent timeout when an outdated daemon swallows the type.
+  // Agents without a machine binding (legacy rows, seed-dev's @dev-bot) keep the broadcast fallback.
+  const requestAgentDaemon = (a: { machineId: string | null }, msg: Record<string, unknown>) =>
+    a.machineId ? requestDaemonByMachine(a.machineId, msg) : requestDaemon(serverId, msg);
   // Agent personality: read/write/delete personality.md via daemon workspace
   const aper = /^\/api\/agents\/([^/]+)\/personality$/.exec(p);
   if (aper && method === "GET") {
@@ -129,7 +135,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     const agId = aper[1]!;
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
-    const r = await requestDaemon(serverId, { type: "agent:workspace:read", agentId: agId, path: "personality.md" });
+    const r = await requestAgentDaemon(a, { type: "agent:workspace:read", agentId: agId, path: "personality.md" });
     return (sendJson(res, 200, { content: r.content ?? "", error: r.error }), true);
   }
   if (aper && method === "PUT") {
@@ -140,7 +146,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     const b = await readJson(req);
     if (typeof b.content !== "string") return (sendErr(res, 400, "content required"), true);
     if (b.content.length > 50_000) return (sendErr(res, 413, "personality.md too large (max 50 KB)"), true);
-    const r = await requestDaemon(serverId, { type: "agent:workspace:write", agentId: agId, path: "personality.md", content: b.content });
+    const r = await requestAgentDaemon(a, { type: "agent:workspace:write", agentId: agId, path: "personality.md", content: b.content });
     if (r.error) return (sendErr(res, 500, r.error), true);
     await syncAgentProfile(serverId, agId, a.displayName, a.description);
     return (sendJson(res, 200, { ok: true }), true);
@@ -150,7 +156,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     const agId = aper[1]!;
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
-    const r = await requestDaemon(serverId, { type: "agent:workspace:delete", agentId: agId, path: "personality.md" });
+    const r = await requestAgentDaemon(a, { type: "agent:workspace:delete", agentId: agId, path: "personality.md" });
     if (r.error && !r.error.includes("ENOENT")) return (sendErr(res, 500, r.error), true);
     await syncAgentProfile(serverId, agId, a.displayName, a.description);
     return (sendJson(res, 200, { ok: true }), true);
@@ -186,7 +192,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
   if (askill && method === "GET") {
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, askill[1]!), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
-    try { const r = await requestDaemon(serverId, { type: "agent:skills:list", agentId: askill[1]!, runtime: a.runtime }); return (sendJson(res, 200, { global: r.global ?? [], workspace: r.workspace ?? [] }), true); }
+    try { const r = await requestAgentDaemon(a, { type: "agent:skills:list", agentId: askill[1]!, runtime: a.runtime }); return (sendJson(res, 200, { global: r.global ?? [], workspace: r.workspace ?? [] }), true); }
     catch { return (sendJson(res, 200, { global: [], workspace: [] }), true); }
   }
   // Agent Skills write/delete (upload/remove SKILL.md in the workspace <runtime>/skills/ dir)
@@ -201,10 +207,10 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     if (method === "PUT") {
       const b = await readJson(req);
       if (typeof b.content !== "string") return (sendErr(res, 400, "content required"), true);
-      const r = await requestDaemon(serverId, { type: "agent:workspace:write", agentId: agId, path: relPath, content: b.content });
+      const r = await requestAgentDaemon(a, { type: "agent:workspace:write", agentId: agId, path: relPath, content: b.content });
       if (r.error) return (sendErr(res, 500, r.error), true);
     } else {
-      const r = await requestDaemon(serverId, { type: "agent:workspace:delete", agentId: agId, path: relPath });
+      const r = await requestAgentDaemon(a, { type: "agent:workspace:delete", agentId: agId, path: relPath });
       if (r.error) return (sendErr(res, 500, r.error), true);
     }
     return (sendJson(res, 200, { ok: true }), true);

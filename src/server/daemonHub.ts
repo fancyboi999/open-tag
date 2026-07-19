@@ -47,12 +47,12 @@ export function sendToMachine(machineId: string, msg: unknown): boolean {
 }
 
 // ── WS-RPC: send a request to this server's daemon and await the response carrying the same requestId (file tree/file content, etc.) ──
-const pending = new Map<string, { resolve: (v: any) => void; timer: ReturnType<typeof setTimeout> }>();
+const pending = new Map<string, { resolve: (v: any) => void; timer: ReturnType<typeof setTimeout>; single?: boolean; nack?: { error?: string } }>();
 export function requestDaemon(serverId: string, msg: Record<string, unknown>, timeoutMs = 6000): Promise<any> {
   if (daemonCount(serverId) === 0) return Promise.resolve({ error: "no daemon online" });
   const requestId = randomUUID();
   return new Promise((resolve) => {
-    const timer = setTimeout(() => { pending.delete(requestId); resolve({ error: "daemon timeout" }); }, timeoutMs);
+    const timer = setTimeout(() => { const p = pending.get(requestId); pending.delete(requestId); resolve({ error: p?.nack?.error ?? "daemon timeout" }); }, timeoutMs);
     pending.set(requestId, { resolve, timer });
     broadcastToDaemons(serverId, { ...msg, requestId }); // if several machines on the same server receive it, resolveDaemonRequest keeps the first to arrive by requestId
   });
@@ -60,6 +60,11 @@ export function requestDaemon(serverId: string, msg: Record<string, unknown>, ti
 export function resolveDaemonRequest(requestId: string, data: unknown): void {
   const p = pending.get(requestId);
   if (!p) return;
+  // rpc:nack = "this daemon predates the RPC type" (version skew, tech-debt I88). On a broadcast a newer
+  // daemon may still answer properly, so don't let the NACK win the race — stash it and let the timeout
+  // resolve with its reason instead of a generic "daemon timeout". Single-target requests have exactly one
+  // possible responder, so a NACK there resolves immediately.
+  if ((data as any)?.type === "rpc:nack" && !p.single) { p.nack = data as { error?: string }; return; }
   clearTimeout(p.timer); pending.delete(requestId); p.resolve(data);
 }
 
@@ -72,7 +77,7 @@ export function requestDaemonByMachine(machineId: string, msg: Record<string, un
   const requestId = randomUUID();
   return new Promise((resolve) => {
     const timer = setTimeout(() => { pending.delete(requestId); resolve({ error: "daemon timeout" }); }, timeoutMs);
-    pending.set(requestId, { resolve, timer });
+    pending.set(requestId, { resolve, timer, single: true });
     try { ws.send(JSON.stringify({ ...msg, requestId })); }
     catch { clearTimeout(timer); pending.delete(requestId); resolve({ error: "send failed" }); }
   });

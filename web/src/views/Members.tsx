@@ -164,8 +164,10 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { await api("PATCH", "/api/agents/" + id, { avatarUrl: scheme }); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   const fetchPersonality = async () => { try { const r = await api("GET", `/api/agents/${id}/personality`); setPerContent(r.content || null); } catch { setPerContent(null); } };
   useEffect(() => { if (tab === "profile") fetchPersonality(); }, [id, tab]);
-  const uploadPersonality = async (f: File) => { setPerBusy(true); try { const text = await f.text(); await api("PUT", `/api/agents/${id}/personality`, { content: text }); toast.info("Personality saved"); await fetchPersonality(); } catch (e: any) { toast.error(String(e?.message || e)); } finally { setPerBusy(false); } };
-  const deletePersonality = async () => { if (!(await confirm({ title: "Delete personality", message: "Remove the personality.md file and restore the agent's default description?", confirmLabel: "Delete", danger: true }))) return; setPerBusy(true); try { await api("DELETE", `/api/agents/${id}/personality`); toast.info("Personality deleted"); setPerContent(null); } catch (e: any) { toast.error(String(e?.message || e)); } finally { setPerBusy(false); } };
+  // api() resolves error responses as {error} instead of throwing (store.tsx), so success/failure must be
+  // branched on the body — the catch only sees network-level failures.
+  const uploadPersonality = async (f: File) => { setPerBusy(true); try { const text = await f.text(); const r = await api("PUT", `/api/agents/${id}/personality`, { content: text }); if (r?.error) { toast.error(`Personality save failed: ${r.error}`); return; } toast.info("Personality saved"); await fetchPersonality(); } catch (e: any) { toast.error(String(e?.message || e)); } finally { setPerBusy(false); } };
+  const deletePersonality = async () => { if (!(await confirm({ title: "Delete personality", message: "Remove the personality.md file and restore the agent's default description?", confirmLabel: "Delete", danger: true }))) return; setPerBusy(true); try { const r = await api("DELETE", `/api/agents/${id}/personality`); if (r?.error) { toast.error(`Personality delete failed: ${r.error}`); return; } toast.info("Personality deleted"); setPerContent(null); } catch (e: any) { toast.error(String(e?.message || e)); } finally { setPerBusy(false); } };
   if (!a) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
   // Surface the server's concrete 503 reason ("no daemon online" / "runtime X unavailable on selected machine" …);
   // the generic machine-may-be-offline guess alone made users blind-retry (live 2026-07-05: 3× restart → 503).
@@ -290,7 +292,8 @@ function SkillsSection({ id }: { id: string }) {
       const name = f.name.replace(/\.md$/i, "");
       let content = raw;
       if (!/^---\s*\n/.test(raw)) content = `---\nname: ${name}\nuserInvocable: true\n---\n\n${raw}`;
-      await api("PUT", `/api/agents/${id}/skills/${encodeURIComponent(name)}`, { content });
+      const r = await api("PUT", `/api/agents/${id}/skills/${encodeURIComponent(name)}`, { content });
+      if (r?.error) { toast.error(`Skill upload failed: ${r.error}`); return; }
       toast.info(`Skill "${name}" uploaded`);
       await refetch();
     } catch (e: any) { toast.error(String(e?.message ?? e)); }
@@ -300,7 +303,8 @@ function SkillsSection({ id }: { id: string }) {
     if (!(await confirm({ title: `Delete skill "${dirName}"`, message: "Remove this skill from the agent's workspace?", confirmLabel: "Delete", danger: true }))) return;
     setBusy(true);
     try {
-      await api("DELETE", `/api/agents/${id}/skills/${encodeURIComponent(dirName)}`);
+      const r = await api("DELETE", `/api/agents/${id}/skills/${encodeURIComponent(dirName)}`);
+      if (r?.error) { toast.error(`Skill delete failed: ${r.error}`); return; }
       toast.info(`Skill "${dirName}" deleted`);
       await refetch();
     } catch (e: any) { toast.error(String(e?.message ?? e)); }

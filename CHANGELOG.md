@@ -9,6 +9,17 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-07-19
+
+### Fixed
+
+- **Version-skew NACK for unknown RPCs**: a daemon receiving an RPC `type` it doesn't know (a message
+  carrying a `requestId`) now replies `{type:"rpc:nack", requestId, error}` instead of silently dropping
+  it, so a ≥0.10.1 server can report "daemon too old — restart with `npx @fancyboi999/open-tag-daemon@latest`"
+  instead of a generic RPC timeout. (Server-side in the same change, outside this package: personality/skills
+  workspace RPCs are now routed to the agent's own machine via `requestDaemonByMachine` instead of a
+  serverId-wide broadcast, and the web UI surfaces RPC errors as toasts instead of a false "saved".)
+
 ## [0.10.0] — 2026-07-19
 
 <!-- PR #184 shipped as one package release: the 0.9.1/0.10.0 sections drafted during

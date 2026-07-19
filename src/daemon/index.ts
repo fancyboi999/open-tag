@@ -63,6 +63,11 @@ conn = new Connection(serverUrl, apiKey, (msg) => {
     case "agent:resource-budget": conn.send({ type: "agent:resource-budget", requestId: msg.requestId, ...mgr.budgetStatus() }); break;
     case "agent:dequeue": mgr.dequeue(msg.agentId); break;
     case "ping": conn.send({ type: "pong" }); break;
+    default:
+      // Fail loud on version skew: a daemon that predates an RPC type must NACK instead of silently dropping
+      // it, so the server surfaces "daemon too old" instead of a generic timeout (tech-debt I88). Only RPCs
+      // carry a requestId; unknown fire-and-forget messages stay ignored.
+      if (typeof msg.requestId === "string" && msg.requestId) conn.send({ type: "rpc:nack", requestId: msg.requestId, error: `daemon ${process.env.DAEMON_VERSION ?? "dev"} does not support "${msg.type}" — restart it with: npx @fancyboi999/open-tag-daemon@latest` });
   }
 }, () => {
   const runtimes = detectRuntimes();
