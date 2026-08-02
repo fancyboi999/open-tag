@@ -1,0 +1,7 @@
+{"kind":"turn_started"}
+{"kind":"phase","text":"hy3 · executing","detail":"planner route=executor_only depth=none reason=default_executor"}
+{"kind":"turn_started"}
+{"kind":"text","text":"PONG3"}
+{"kind":"message","text":"PONG3"}
+{"kind":"usage","usage":{"promptTokens":14121,"completionTokens":23,"totalTokens":14144,"cacheHitTokens":0,"cacheMissTokens":14121,"reasoningTokens":18,"source":"executor","cacheDiagnostics":{"prefixHash":"7d57aceb4008c2e4","prefixChanged":false,"systemHash":"918b53286dc2bb5e","toolsHash":"892b88cf51c03a79","logRewriteVersion":0,"toolSchemaTokens":12197,"cacheMissTokens":14121,"cacheHitTokens":0},"sessionCacheHitTokens":0,"sessionCacheMissTokens":14121}}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":4278,"num_turns":1,"result":"PONG3","session_id":"20260801-121455.600066000-hy3-ioa + planner kimi-k3-ioa","total_cost":0,"total_cost_usd":0,"usage":{"input_tokens":14121,"output_tokens":23,"cache_read_input_tokens":0,"cache_creation_input_tokens":14121}}

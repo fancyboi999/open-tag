@@ -9,6 +9,55 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-08-02
+
+### Added
+
+- **Reasonix runtime** (`reasonixRuntime.ts`): agents can now run on the Reasonix CLI
+  (DeepSeek-native terminal coding agent, verified against v1.18.0 and re-verified live on v1.19.1).
+  One-shot per turn —
+  each turn spawns `reasonix run --output-format stream-json --permission-mode bypassPermissions`
+  and parses the eventwire stream (the assembled `message` event → text, the incremental `text`
+  slices dropped, `tool_dispatch` → tool with the partial+full pair deduped). Multi-turn +
+  wake-resume chain by resuming the session file Reasonix persists under
+  `~/.reasonix/projects/<encoded-cwd>/sessions/` (`--resume` takes a file path, not an id).
+  `runtimeConfig.reasoningEffort` forwards via `--effort`, allow-listed to the values the CLI
+  accepts (`low|medium|high|max`). `reasonix` joins `detectRuntimes()`, its skills resolve from
+  `~/.reasonix/skills` + `<workspace>/.reasonix/skills`, and model discovery enumerates the
+  resolved config via `reasonix doctor --json`.
+
+### Fixed
+
+- **Reasonix turn-livelock on wake nudges** (found on a live NAS deploy): the wake nudge was
+  passed as a bare task, so Reasonix treated it as an original coding task and spiraled into a
+  tool-exploration loop (`tool_dispatch` ~60× in 150s), and without a step bound the run never
+  exited. The standing system prompt is now injected per turn via `runtimeInstructionEnvelope`,
+  each run is bounded with `--max-steps 3`, and `oneShotWake` is left off so nudges take the
+  normal delivery path.
+- **Reasonix streamed slices rendered one glyph per line**: `text` events carry one token slice
+  at a time, so they are now dropped in favor of the assembled `message` event.
+- **Reasonix model list never marked a default**: v1.18.0/v1.19.1 reports `is_default: false` on *every*
+  provider even when `config.default_model` names one, so keying the default off that flag left
+  the list unmarked and the create-agent modal preselected whichever provider came first in config
+  order instead of the configured default. The default now resolves from `config.default_model`
+  (`<provider>/<model>`, a bare provider name, or a bare model id).
+- **Reasonix resume path was realpath-resolved, inverting the real behavior**: Reasonix keys
+  session storage on its *logical* cwd (it honors `PWD`), so a run in a symlinked directory such as
+  `/tmp/x` (getcwd `/private/tmp/x` on macOS) writes `projects/-tmp-x` and `-private-tmp-x` is
+  never created. The computed path used `realpathSync`, so it missed on every symlinked cwd and
+  resume survived only via the by-id fallback. It now encodes the cwd as given, with
+  `findReasonixSessionFile` (a by-id search of `~/.reasonix/projects/*/sessions/`) remaining the
+  fallback for bind-mount hosts (e.g. a Synology NAS where the home dir's logical path and real
+  path differ).
+- **Reasonix `--effort` accepted values the CLI rejects**: the allow-list carried the claude/codex
+  vocabulary (`none`/`xhigh`), which an openai-kind provider refuses with a non-zero exit
+  (`effort must be low, medium, or high`) — on a first turn that reported the agent as crashed.
+  Narrowed to the probed set `low|medium|high|max`.
+- **Reasonix agents listed and wrote Claude's skills**: `reasonix` was missing from the daemon and
+  server skills registries, so both fell back to `.claude` — a reasonix agent enumerated
+  `~/.claude/skills` and a skill upload landed in `.claude/skills/`. Added its documented dirs
+  (`~/.reasonix/skills`, honoring `REASONIX_HOME`, + `<workspace>/.reasonix/skills`).
+
 ## [0.14.0] — 2026-07-28
 
 ### Added

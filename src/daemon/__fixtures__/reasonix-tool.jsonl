@@ -1,0 +1,17 @@
+{"kind":"turn_started"}
+{"kind":"phase","text":"hy3 · executing","detail":"planner route=executor_only depth=none reason=default_executor"}
+{"kind":"turn_started"}
+{"kind":"tool_dispatch","tool":{"id":"chatcmpl-tool-8efb09e4fa0f70e7","name":"ls","readOnly":true,"partial":true}}
+{"kind":"usage","usage":{"promptTokens":14134,"completionTokens":37,"totalTokens":14171,"cacheHitTokens":0,"cacheMissTokens":14134,"reasoningTokens":18,"source":"executor","cacheDiagnostics":{"prefixHash":"7d57aceb4008c2e4","prefixChanged":false,"systemHash":"918b53286dc2bb5e","toolsHash":"892b88cf51c03a79","logRewriteVersion":0,"toolSchemaTokens":12197,"cacheMissTokens":14134,"cacheHitTokens":0},"sessionCacheHitTokens":0,"sessionCacheMissTokens":14134}}
+{"kind":"tool_dispatch","tool":{"id":"chatcmpl-tool-8efb09e4fa0f70e7","name":"ls","args":"{\"path\": \".\"}","readOnly":true}}
+{"kind":"tool_result","tool":{"id":"chatcmpl-tool-8efb09e4fa0f70e7","name":"ls","args":"{\"path\": \".\"}","output":"alpha.txt\t0\nbeta.txt\t0\n","readOnly":true,"durationMs":39}}
+{"kind":"text","text":"这个"}
+{"kind":"text","text":"目录包含 "}
+{"kind":"text","text":"2 个"}
+{"kind":"text","text":"文件（"}
+{"kind":"text","text":"alpha.txt "}
+{"kind":"text","text":"和 beta.txt"}
+{"kind":"text","text":"）。"}
+{"kind":"message","text":"这个目录包含 2 个文件（alpha.txt 和 beta.txt）。"}
+{"kind":"usage","usage":{"promptTokens":14172,"completionTokens":25,"totalTokens":14197,"cacheHitTokens":0,"cacheMissTokens":14172,"reasoningTokens":7,"source":"executor","cacheDiagnostics":{"prefixHash":"7d57aceb4008c2e4","prefixChanged":false,"systemHash":"918b53286dc2bb5e","toolsHash":"892b88cf51c03a79","logRewriteVersion":0,"toolSchemaTokens":12197,"cacheMissTokens":14172,"cacheHitTokens":0},"sessionCacheHitTokens":0,"sessionCacheMissTokens":28306}}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":4862,"num_turns":1,"result":"这个目录包含 2 个文件（alpha.txt 和 beta.txt）。","session_id":"20260801-121654.460043000-hy3-ioa + planner kimi-k3-ioa","total_cost":0,"total_cost_usd":0,"usage":{"input_tokens":28306,"output_tokens":62,"cache_read_input_tokens":0,"cache_creation_input_tokens":28306}}
