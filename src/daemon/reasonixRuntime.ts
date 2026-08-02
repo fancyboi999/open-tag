@@ -29,10 +29,16 @@
 //     prompt instead.
 //  5. `tool_dispatch` is emitted twice per call (a `partial` marker, then the full event with
 //     args). The mapper dedupes by tool id and only surfaces the full dispatch.
-//  6. `--max-steps 3` bounds each one-shot run. Without it reasonix loops planner/executor until it
+//  6. `--max-steps 100` bounds each one-shot run. Without it reasonix loops planner/executor until it
 //     deems the task "done" — on open-tag wake nudges that is often never, so the process never
 //     exits and the daemon stalls on proc "exit" (seen live on the NAS: a completed turn that never
-//     terminated). Each turn is a fresh resumed run, so multi-step work spans turns, not steps.
+//     terminated). A tight bound starved replies: the collaboration loop needs `message check` →
+//     `message decide` → work → `message send` (~4+ tool rounds), so `--max-steps 3` hit the limit
+//     mid-turn, reasonix forbade further tool calls, and the synthesized summary never reached the
+//     channel. The cap is deliberately WIDE (100) as an observation setting: a livelock always
+//     churns `tool_dispatch`, so if the cap were load-bearing it would fire and log a warn; if no
+//     turn ever hits it, reasonix self-terminates on real tasks and the cap can be removed. Each
+//     turn is a fresh resumed run, so multi-step work spans turns, not steps.
 //  7. v1.18.0 AND v1.19.1 emit NO `reasoning` events: reasoning-capable providers report
 //     `reasoningTokens > 0` in `usage` while the stream carries only `text` slices, with or without
 //     `--show-thinking` (probed on hy3 / kimi-k3 / deepseek-pro). So thinking never reaches the
@@ -48,6 +54,14 @@ import { initialTurnAdmission, protocolAdmission, runtimeInstructionEnvelope, ty
 
 const MAX = 2000;
 const clip = (s: unknown) => String(s ?? "").slice(0, MAX);
+// Observation value: wide enough that real tasks never hit it, still bounding a livelock churn. A
+// warn logs whenever a turn reaches it (see handleReasonixEvent's max-steps detection), so if it
+// never fires across a watch period the cap is redundant and can be removed; if it fires, reasonix
+// still needs the bound.
+const MAX_STEPS = 100;
+// The exact sentence reasonix injects once the tool-call round limit is reached, so the daemon can
+// tell "cap fired" apart from a normal message and log it for the observation above.
+const MAX_STEPS_REACHED_MARKER = "tool-call round limit";
 // Probed against reasonix v1.18.0 and v1.19.1: an openai-kind provider rejects anything outside
 // low|medium|high with an exit-0 `is_error: true` result ("effort must be low, medium, or high");
 // `max` is accepted. `none`/`xhigh`/`minimal` (the claude/codex effort vocabulary) fail that way,
@@ -74,6 +88,7 @@ export interface ReasonixEmit {
   activity?: { activity: string; detail: string };
   sessionId?: string;
   error?: string;
+  maxStepsReached?: boolean;
 }
 
 // handleReasonixEvent maps one parsed `reasonix run --output-format stream-json` line to open-tag
@@ -113,7 +128,10 @@ export function handleReasonixEvent(evt: any, seenTools?: Set<string>, acc?: Rea
       // incremental token slices; the assembled `message` event below is the authoritative output
       break;
     case "message":
-      if (evt.text) out.trajectory.push({ kind: "text", text: clip(evt.text) });
+      if (evt.text) {
+        if (String(evt.text).includes(MAX_STEPS_REACHED_MARKER)) out.maxStepsReached = true;
+        out.trajectory.push({ kind: "text", text: clip(evt.text) });
+      }
       break;
     case "reasoning": { // NOT emitted by v1.18.0/v1.19.1 (see header note 7) — mapped defensively for future builds
       const slice = evt.text ?? "";
@@ -182,9 +200,10 @@ export function buildArgs(message: string, opts: StartOpts, sessionFile: string 
   if (effort) args.push("--effort", effort);
   // Bound tool-call rounds per one-shot turn. Without --max-steps reasonix loops its planner/executor
   // until it deems a task "done" (often never on open-tag wake nudges), so the process never exits
-  // and the daemon stalls waiting on proc "exit". Each open-tag turn is a fresh resumed run, so a
-  // bounded number of steps per run still allows multi-step work across turns.
-  args.push("--max-steps", "3");
+  // and the daemon stalls waiting on proc "exit". MAX_STEPS is an observation setting (see its
+  // definition): wide enough that real collaboration turns (check → decide → work → send) never hit
+  // it, still bounding a livelock; a warn logs when a turn actually reaches it.
+  args.push("--max-steps", String(MAX_STEPS));
   if (sessionFile) args.push("--resume", sessionFile);
   args.push(message);
   return args;
@@ -282,6 +301,7 @@ class ReasonixRun {
         this.cb.onSession(emit.sessionId);
       }
       if (emit.error) { flushThinking(); this.cb.onTrajectory([{ kind: "text", text: "[reasonix error] " + emit.error }]); this.cb.onActivity("error", emit.error.slice(0, 200)); }
+      if (emit.maxStepsReached) this.cb.log.warn("reasonix reached --max-steps (cap may still be load-bearing)", { steps: MAX_STEPS });
       if (emit.activity) this.cb.onActivity(emit.activity.activity, emit.activity.detail);
       if (emit.trajectory.length) this.cb.onTrajectory(emit.trajectory);
     };

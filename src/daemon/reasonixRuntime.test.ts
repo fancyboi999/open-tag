@@ -130,12 +130,19 @@ test("text token slices are dropped; the assembled message event is the authorit
   assert.deepEqual(msg.trajectory, [{ kind: "text", text: "没有配置 MCP 服务器。" }]);
 });
 
+test("the reasonix max-steps injection is flagged so the daemon can log the cap firing", () => {
+  const normal = handleReasonixEvent({ kind: "message", text: "## 本轮执行结果汇总" });
+  assert.equal(normal.maxStepsReached, undefined, "an ordinary message must not be mistaken for the cap");
+  const capped = handleReasonixEvent({ kind: "message", text: "Do not call any more tools — your tool-call round limit (--max-steps) has been reached. Instead, synthesize a final answer…" });
+  assert.equal(capped.maxStepsReached, true, "the round-limit sentence marks the turn as cap-terminated");
+});
+
 test("buildArgs always bounds tool-call rounds with --max-steps so a turn cannot loop forever", () => {
   const opts = { model: "deepseek-v4-flash", runtimeConfig: null } as any;
   const args = buildArgs("hello", opts, null);
   const i = args.indexOf("--max-steps");
   assert.ok(i >= 0, "must pass --max-steps");
-  assert.equal(Number(args[i + 1]), 3, "default bound is 3 tool-call rounds per one-shot turn");
+  assert.equal(Number(args[i + 1]), 100, "wide observation bound: real turns never hit it, a livelock still terminates");
   assert.equal(args[args.length - 1], "hello", "the message is the trailing argv");
   const resumed = buildArgs("again", opts, "/home/u/.reasonix/projects/x/sessions/s.jsonl");
   assert.ok(resumed.includes("--resume"), "resume file is passed through");

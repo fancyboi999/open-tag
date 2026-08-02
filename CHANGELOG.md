@@ -32,8 +32,15 @@ from `main`; see commit history for fine-grained server/web changes.
   passed as a bare task, so Reasonix treated it as an original coding task and spiraled into a
   tool-exploration loop (`tool_dispatch` ~60× in 150s), and without a step bound the run never
   exited. The standing system prompt is now injected per turn via `runtimeInstructionEnvelope`,
-  each run is bounded with `--max-steps 3`, and `oneShotWake` is left off so nudges take the
+  each run is bounded with `--max-steps 100`, and `oneShotWake` is left off so nudges take the
   normal delivery path.
+- **Reasonix never published replies**: `--max-steps 3` was too tight for the open-tag
+  collaboration loop (`message check` → `message decide` → work → `message send`), so a working
+  agent hit the limit mid-turn, Reasonix forbade further tool calls, and the synthesized final
+  answer stayed in the session — no channel reply was posted. The bound is set to `--max-steps 100`
+  as an observation value: wide enough that real turns never hit it while a livelock still
+  terminates, and a daemon warn logs whenever a turn does reach it — so if it never fires across a
+  watch period the cap is redundant and can be removed; if it fires, Reasonix still needs the bound.
 - **Reasonix streamed slices rendered one glyph per line**: `text` events carry one token slice
   at a time, so they are now dropped in favor of the assembled `message` event.
 - **Reasonix model list never marked a default**: v1.18.0/v1.19.1 reports `is_default: false` on *every*
