@@ -116,15 +116,16 @@ All runtimes speak back through the same agent API, so the web app sees one cons
 | Pi | `pi -p --mode json` (one-shot per turn, resumed by `--session`; provider/model from Pi's own config) | Supported |
 | Cursor | `cursor-agent -p --output-format stream-json` (one-shot per turn, resumed by `--resume`; runs on your Cursor account) | Supported |
 | Hermes | `hermes chat -q` (one-shot per turn; profiles from `~/.hermes/profiles`, Hermes keeps provider credentials; final-response bridge) | Experimental |
+| Reasonix | `reasonix run --output-format stream-json` (one-shot per turn, resumed by `--resume <session-file>`; models from the resolved `config.toml`) | Experimental |
 
-> **Roadmap:** runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). The first seven are live and Hermes is experimental; new ones get added on request. (Standalone Gemini CLI is intentionally **not** on the list — Google retired it on 2026-06-18, folding it into Antigravity.)
+> **Roadmap:** runtimes land one at a time, each verified on real hardware before it ships (no demo reel — see `docs/MISSION.md`). The first seven are live, Hermes and Reasonix are experimental; new ones get added on request. (Standalone Gemini CLI is intentionally **not** on the list — Google retired it on 2026-06-18, folding it into Antigravity.)
 
 ## Quick start
 
 > **Deploying to a VPS or server?** See **[`docs/self-host.md`](docs/self-host.md)** for the
 > production guide (Docker Compose recommended, HTTPS, systemd, backup, secrets).
 
-Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on your `PATH` (`claude`, `codex`, `copilot`, `opencode`, `kimi`, `pi`, or `cursor-agent`).
+Prerequisites: Node.js 20+, Docker, and at least one supported runtime CLI on your `PATH` (`claude`, `codex`, `copilot`, `opencode`, `kimi`, `pi`, `cursor-agent`, or `reasonix`).
 
 ```bash
 cp .env.example .env

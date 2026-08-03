@@ -112,9 +112,12 @@ const PROVIDER_HOME_SKILLS: Record<string, SkillRoot> = {
   opencode: { dir: path.join(HOME, ".config", "opencode", "skills"), label: "~/.config/opencode/skills" },
   cursor: { dir: path.join(HOME, ".cursor", "skills"), label: "~/.cursor/skills" },
   pi: { dir: path.join(HOME, ".pi", "agent", "skills"), label: "~/.pi/agent/skills" },
+  // reasonix v1.19.1: "Add SKILL.md / <name>.md under .reasonix/skills (project) or ~/.reasonix/skills
+  // (global)". Its home honors REASONIX_HOME (same pattern as codex/CODEX_HOME).
+  reasonix: { dir: path.join(process.env.REASONIX_HOME || path.join(HOME, ".reasonix"), "skills"), label: "~/.reasonix/skills" },
 };
 // Project-local (workspace) provider dir name per runtime, relative to the agent workspace/cwd.
-const PROVIDER_WS_DIR: Record<string, string> = { claude: ".claude", codex: ".codex", copilot: ".copilot", hermes: ".hermes", kimi: ".skills", opencode: ".opencode", cursor: ".cursor", pi: ".pi" };
+const PROVIDER_WS_DIR: Record<string, string> = { claude: ".claude", codex: ".codex", copilot: ".copilot", hermes: ".hermes", kimi: ".skills", opencode: ".opencode", cursor: ".cursor", pi: ".pi", reasonix: ".reasonix" };
 
 /** Resolve which skills dirs to scan for an agent, by its runtime. Pure (no I/O) — unit-tested. */
 export function skillRootsFor(runtime: string, agentId: string, projectPath?: string | null): { global: SkillRoot[]; workspace: SkillRoot | null } {

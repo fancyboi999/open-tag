@@ -271,7 +271,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     const a = (await db.select().from(schema.agents).where(and(eq(schema.agents.id, agId), eq(schema.agents.serverId, serverId))))[0];
     if (!a) return (sendErr(res, 404, "agent not found"), true);
     if (a.projectPath) return (sendErr(res, 409, "project-local skills are read-only; manage them in the bound project"), true);
-    const wsName = ({ claude: ".claude", codex: ".codex", copilot: ".copilot", hermes: ".hermes", kimi: ".skills", opencode: ".opencode", cursor: ".cursor", pi: ".pi" } as Record<string, string>)[a.runtime] || ".claude";
+    const wsName = ({ claude: ".claude", codex: ".codex", copilot: ".copilot", hermes: ".hermes", kimi: ".skills", opencode: ".opencode", cursor: ".cursor", pi: ".pi", reasonix: ".reasonix" } as Record<string, string>)[a.runtime] || ".claude";
     const relPath = `${wsName}${a.runtime === "kimi" ? "" : "/skills"}/${skillName}/SKILL.md`;
     if (method === "PUT") {
       const b = await readJson(req);

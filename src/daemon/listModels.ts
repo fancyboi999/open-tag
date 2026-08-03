@@ -2,7 +2,8 @@
 // The daemon shells out to the runtime's list command on its own machine and parses stdout, so the
 // candidates reflect what that machine + login can actually use (not a hard-coded server table).
 //
-// Scope: opencode / cursor / pi enumerate models; Hermes enumerates local profiles.
+// Scope: opencode / cursor / pi enumerate models; Hermes enumerates local profiles; reasonix
+// enumerates the providers/models of its resolved config via `reasonix doctor --json`.
 //  - claude / codex have no "list models" command — their catalogs stay static, server-side, but
 //    supported thinking/reasoning controls are probed dynamically.
 //  - copilot / kimi would need an ACP (JSON-RPC over stdio) handshake — not done yet.
@@ -95,6 +96,47 @@ export function parseCodexModels(jsonStr: string): DiscoveredModel[] {
       .filter((l: ThinkingLevel) => l.value);
     const thinking = levels.length ? { levels, default: typeof m?.default_reasoning_level === "string" ? m.default_reasoning_level : undefined } : undefined;
     out.push({ id: slug, label: typeof m?.display_name === "string" && m.display_name ? m.display_name : slug, provider: "openai", ...(thinking ? { thinking } : {}) });
+  }
+  return out;
+}
+
+// reasonix has no "list models" command — its catalog is config-driven (reasonix.toml /
+// ~/.reasonix/config.toml). `reasonix doctor --json` emits the RESOLVED config, which is more
+// faithful than re-parsing TOML ourselves (project > user > built-in defaults already applied).
+// Each provider carries `models` (or a single `model`).
+//
+// The resolved default lives in `config.default_model`, NOT in a per-provider `is_default` flag:
+// v1.18.0 emits `is_default: false` on every provider even when one is the default, so keying off
+// it left the whole list unmarked and the modal preselected whatever provider came first in config
+// order. `default_model` is either `"<provider>/<model>"` or a bare provider/model name — match a
+// provider by name or a model id by its trailing segment.
+export function parseReasonixModels(jsonStr: string): DiscoveredModel[] {
+  let parsed: any;
+  try { parsed = JSON.parse(jsonStr); } catch { return []; }
+  const providers = Array.isArray(parsed?.providers) ? parsed.providers : [];
+  const rawDefault = typeof parsed?.config?.default_model === "string" ? parsed.config.default_model : "";
+  const slash = rawDefault.indexOf("/");
+  const defProvider = slash >= 0 ? rawDefault.slice(0, slash) : rawDefault;
+  const defModel = slash >= 0 ? rawDefault.slice(slash + 1) : "";
+  // Each provider contributes its `models` list (or its single `model`), in config order.
+  const entries: { id: string; provider: any }[] = [];
+  for (const p of providers) {
+    const list = Array.isArray(p?.models) && p.models.length ? p.models : (typeof p?.model === "string" && p.model ? [p.model] : []);
+    for (const m of list) entries.push({ id: String(m), provider: p });
+  }
+  // Resolve default_model to exactly ONE model id: an explicit `is_default` provider wins, else a
+  // `<provider>/<model>` or bare-provider-name match, else a bare model id. Nothing matches → no default.
+  const flagged = entries.find((e) => e.provider?.is_default === true);
+  const defaultId = flagged?.id
+    ?? (defModel ? entries.find((e) => e.provider?.name === defProvider && e.id === defModel)?.id : undefined)
+    ?? entries.find((e) => e.provider?.name === defProvider)?.id // bare provider name (default_model = "hy3")
+    ?? entries.find((e) => e.id === rawDefault)?.id;            // bare model id (default_model = "hy3-ioa")
+  const out: DiscoveredModel[] = [];
+  const seen = new Set<string>();
+  for (const { id, provider } of entries) {
+    if (!isModelId(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, label: id, provider: provider?.name ?? "reasonix", ...(id === defaultId ? { default: true } : {}) });
   }
   return out;
 }
@@ -292,6 +334,11 @@ export async function listModels(runtime: string): Promise<DiscoveredModel[] | n
     case "codex": {
       const r = await runList("codex", ["debug", "models"]);
       const models = parseCodexModels(r.stdout);
+      return models.length ? models : null;
+    }
+    case "reasonix": {
+      const r = await runList("reasonix", ["doctor", "--json"]);
+      const models = parseReasonixModels(r.stdout || r.stderr);
       return models.length ? models : null;
     }
     case "hermes": {

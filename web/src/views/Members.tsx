@@ -568,7 +568,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
       onClose();
     } catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
-  const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "opencode", label: "OpenCode" }, { value: "kimi", label: "Kimi Code" }, { value: "pi", label: "Pi" }, { value: "cursor", label: "Cursor" }, { value: "hermes", label: "Hermes" }];
+  const RUNTIMES = [{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }, { value: "copilot", label: "Copilot CLI" }, { value: "opencode", label: "OpenCode" }, { value: "kimi", label: "Kimi Code" }, { value: "pi", label: "Pi" }, { value: "cursor", label: "Cursor" }, { value: "hermes", label: "Hermes" }, { value: "reasonix", label: "Reasonix" }];
   const machineOpts = machines.length ? machines.map((m) => ({ value: m.id, label: m.name || m.hostname || m.id, hint: m.status === "online" ? t("members.machineOnline") : t("members.machineOffline") })) : [];
   const selModel = models.find((m) => m.id === model);
   const thinkingLevels = selModel?.thinking?.levels ?? [];

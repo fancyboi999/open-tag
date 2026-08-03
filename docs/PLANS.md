@@ -21,6 +21,8 @@
   independent evaluator loop, scheduled doc-gardening. Done: `ARCHITECTURE.md` codemap, `docs/` skeleton,
   `CLAUDE.md` slimmed to an `AGENTS.md` import, git, `/doc-sync` skill (`.agents/skills/doc-sync/`).
 
+- **Reasonix runtime** — new compute-plane adapter (experimental) for the DeepSeek-native Reasonix CLI: one-shot-per-turn via `reasonix run --output-format stream-json`, resumed by `--resume <session-file>` (session file under `$REASONIX_HOME/projects/<encoded-cwd>/sessions/`), model enumeration via `reasonix doctor --json`. Execution plan: [`docs/exec-plans/active/reasonix-runtime.md`](./exec-plans/active/reasonix-runtime.md).
+
 *(Completed plans live in `docs/exec-plans/completed/`.)*
 
 ## Completed slice history (index only)
