@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { handlePiEvent } from "./piRuntime.js";
+import { handlePiEvent, piCommand, piNoJsonError } from "./piRuntime.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 function fixtureEvents(name: string): any[] {
@@ -62,4 +62,14 @@ test("a model error in the message (stopReason=error, pi still exits 0) is surfa
 test("stopReason=error without errorMessage still surfaces a fallback message (not silently swallowed)", () => {
   const emit = handlePiEvent({ type: "message_end", message: { role: "assistant", content: [], stopReason: "error" } });
   assert.match(emit.error ?? "", /pi model error/);
+});
+
+test("an explicit Pi command bypasses shell shims while the default remains pi", () => {
+  assert.equal(piCommand({}), "pi");
+  assert.equal(piCommand({ OPEN_TAG_PI_COMMAND: " omp-direct " }), "omp-direct");
+});
+
+test("exit 0 without any JSON events is an error, not a handled turn", () => {
+  assert.match(piNoJsonError(0) ?? "", /without parseable JSON events/);
+  assert.equal(piNoJsonError(1), null);
 });
