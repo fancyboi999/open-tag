@@ -1,0 +1,8 @@
+#AOCI-ROOT-MANIFEST: 1
+#Format-Version: cognition-volumes/v1
+#Locale: zh-CN
+#Project: OpenTag 是浏览器驱动的多智能体协作控制面，通过自托管 daemon 连接本地 agent runtime，统一管理消息、任务、项目目录与实时状态
+#Global-Invariants: 控制面与 daemon 经显式凭据边界认证；PostgreSQL 与 Redis 状态保持权威；项目目录访问默认拒绝越界；代码、测试、文档与 AOCI 认知保持同步
+#Volume: id=meta kind=meta path=aoci.meta.txt format=meta-v1 depends=- state=enabled
+#Volume: id=code kind=code path=aoci.code.txt format=object-fras-v2 depends=meta state=enabled
+#Volume: id=database kind=database path=aoci.database.txt format=table-fras-v2 depends=meta state=enabled

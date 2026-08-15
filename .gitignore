@@ -9,6 +9,8 @@ logs/
 .DS_Store
 drizzle/
 .claude/settings.local.json
+.codex/config.toml
+AGENTS.md.backup.*
 
 # personal / machine-local dev context — never published
 CLAUDE.local.md
