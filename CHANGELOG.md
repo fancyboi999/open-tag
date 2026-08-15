@@ -9,6 +9,27 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+## [0.14.1] — 2026-08-15
+
+### Fixed
+
+- Kimi now recovers from a missing resume session by clearing the stale id both locally and in
+  OpenTag, then retrying the same admitted Turn once without `-r`. The current message is no longer
+  dropped, and future wakes no longer repeat the bad resume.
+- Runtime Turns that fail terminally after input admission now release the per-agent FIFO through a
+  dedicated failure signal without being reported as online. Later Turns no longer remain queued
+  after recoverable one-shot CLI failures, authoritative Codex `turn/completed` failures
+  (`failed` / `interrupted` / `cancelled` / `aborted`), or matching legacy `task_complete` errors
+  and `turn_aborted` events, while the failed Turn's error receipt remains visible.
+- The published daemon now declares `koffi` as a runtime dependency, so clean Windows npm/npx
+  installs can load the Job Object FFI instead of relying on a monorepo checkout to supply it.
+- Codex model discovery now captures up to 1 MiB per output stream, so current `codex debug models`
+  catalogs larger than 256 KiB remain valid JSON instead of silently falling back to a stale list.
+  The server fallback also includes the exact `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`
+  model IDs.
+- Codex app-server sessions now forward CLI-advertised `max` and `ultra` reasoning efforts instead of
+  silently dropping them after the user selects one.
+
 ## [0.14.0] — 2026-07-28
 
 ### Added

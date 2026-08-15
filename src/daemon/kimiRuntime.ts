@@ -63,6 +63,13 @@ function buildArgs(prompt: string, model: string | undefined, sessionId: string 
   return args;
 }
 
+export function isMissingKimiSession(stderr: string, sessionId: string): boolean {
+  const text = stderr.toLowerCase();
+  const id = sessionId.toLowerCase();
+  return [`session "${id}" not found`, `session '${id}' not found`, `session ${id} not found`]
+    .some((message) => text.includes(message));
+}
+
 export function buildKimiPrompt(systemPrompt: string, input: string): string {
   return runtimeInstructionEnvelope(systemPrompt, input);
 }
@@ -119,7 +126,8 @@ class KimiRun {
     const prompt = buildKimiPrompt(this.opts.systemPrompt, input.text);
     this.turnBusy = true;
     this.cb.onActivity("working", "turn");
-    const args = buildArgs(prompt, this.opts.model, this.sessionId);
+    const resumeSessionId = this.sessionId;
+    const args = buildArgs(prompt, this.opts.model, resumeSessionId);
     // stdin "ignore": kimi -p takes the prompt as argv; a live stdin is unnecessary (and risks blocking).
     const proc = spawnSafe("kimi", args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: this.env });
     this.proc = proc;
@@ -159,9 +167,14 @@ class KimiRun {
       if (this.currentInput === input) this.currentInput = null;
       if (code === 0) { this.everSucceeded = true; this.cb.onActivity("online", ""); this.pump(); return; }
       const tail = errTail.join("").trim();
-      // Stale session: if kimi can't find the session (server restarted, TTL expired), clear it so the
-      // next turn starts fresh rather than looping on the same bad resume id.
-      if (/not found|no session|session .* not/i.test(tail)) this.sessionId = null;
+      if (resumeSessionId && this.sessionId === resumeSessionId && isMissingKimiSession(tail, resumeSessionId)) {
+        this.cb.log.warn("kimi resume session missing; retrying fresh", { sessionId: resumeSessionId });
+        this.sessionId = null;
+        this.queue.unshift(input);
+        this.cb.onSession(null);
+        this.pump();
+        return;
+      }
       const last = tail.split("\n").filter(Boolean).pop() || `kimi exited ${code ?? "signal"}`;
       this.cb.onTrajectory([{ kind: "text", text: "[kimi error] " + clip(tail).slice(0, 500) }]);
       this.cb.onActivity("error", last.slice(0, 200));
