@@ -4,6 +4,7 @@
 //   *authoritative remaining* aggregated unread, so the client can render an honest badge with no false "all clear"
 // - reading the channel clears the channel-own portion (thread portion stays); reading the thread clears the
 //   thread portion. Each source is cleared independently; neither over-clears nor resurrects the other.
+// - read cursors are monotonic: a late request carrying an older seq cannot rewind an already newer checkpoint.
 //
 // Requires infra up. Run:
 //   npx tsx test/readReturnsRemainingUnread.integration.ts
@@ -42,8 +43,9 @@ async function apiCall(opts: { method: string; path: string; body?: object }) {
   return { status: status(), body: body() };
 }
 async function badge(chId: string) { const r = await apiCall({ method: "GET", path: "/api/channels/unread" }); return r.body?.[chId] ?? 0; }
-async function readContainer(chId: string) { return apiCall({ method: "POST", path: `/api/channels/${chId}/read`, body: {} }); }
+async function readContainer(chId: string, seq?: number) { return apiCall({ method: "POST", path: `/api/channels/${chId}/read`, body: seq === undefined ? {} : { seq } }); }
 async function latestSeq(chId: string) { const [row] = await db.select({ seq: schema.messages.seq }).from(schema.messages).where(eq(schema.messages.channelId, chId)).orderBy(desc(schema.messages.seq)).limit(1); return Number(row?.seq ?? 0); }
+async function readSeq(chId: string) { const [row] = await db.select({ seq: schema.channelMembers.lastReadSeq }).from(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, chId), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, viewerId))); return Number(row?.seq ?? 0); }
 // Baseline cursor advance via direct DB write — keeps the setup independent of the very endpoint under test.
 async function dbMarkRead(chId: string) {
   await db.insert(schema.channelMembers)
@@ -85,7 +87,7 @@ async function main() {
   await dbMarkRead(thread.id);
   check("baseline: caught up, badge 0", (await badge(channelId)) === 0);
   await createMessage({ serverId, channelId: thread.id, senderType: "user", senderId: ownerId, senderName: "owner", content: "thread reply (thread-source unread)" });
-  await createMessage({ serverId, channelId, senderType: "user", senderId: ownerId, senderName: "owner", content: "channel-timeline message (channel-source unread)" });
+  const channelOwn = await createMessage({ serverId, channelId, senderType: "user", senderId: ownerId, senderName: "owner", content: "channel-timeline message (channel-source unread)" });
 
   console.log("\n[1] badge aggregates channel-own + thread unread");
   check("badge = 2 (1 channel-own + 1 thread)", (await badge(channelId)) === 2);
@@ -113,6 +115,20 @@ async function main() {
     const r = await readContainer(channelId);
     check("re-read returns remaining 0", r.body?.unread === 0);
     check("GET /unread still 0", (await badge(channelId)) === 0);
+  }
+
+  console.log("\n[5] a late stale read request cannot move the cursor backward");
+  {
+    const staleSeq = parent.seq;
+    const newestSeq = channelOwn.seq;
+    check("fixture has an older and newer channel sequence", staleSeq < newestSeq);
+    const current = await readContainer(channelId, newestSeq);
+    check("newer read catches up and clears the badge", current.body?.unread === 0 && (await readSeq(channelId)) === newestSeq);
+    const late = await readContainer(channelId, staleSeq);
+    check("late stale read still returns 200", late.status === 200);
+    check("late stale read reports no resurrected unread", late.body?.unread === 0);
+    check("DB cursor stays at the newest sequence", (await readSeq(channelId)) === newestSeq);
+    check("GET /unread remains 0", (await badge(channelId)) === 0);
   }
 
   await cleanup();

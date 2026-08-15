@@ -1,6 +1,6 @@
 // Auto-extracted from the former routes-api.ts monolith — bodies are verbatim.
 import type { ServerCtx } from "./ctx.js";
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { requireCap } from "../capabilities.js";
 import { addChannelMembers, getOrCreateDM, getOrCreateThread } from "../core.js";
@@ -366,7 +366,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
       const b = await readJson(req).catch(() => ({}));
       let seq = Number(b?.seq ?? 0);
       if (!seq) { const [m] = await db.select({ s: schema.messages.seq }).from(schema.messages).where(eq(schema.messages.channelId, chId!)).orderBy(desc(schema.messages.seq)).limit(1); seq = Number(m?.s ?? 0); }
-      await db.update(schema.channelMembers).set({ lastReadSeq: seq }).where(and(eq(schema.channelMembers.channelId, chId!), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));
+      await db.update(schema.channelMembers).set({ lastReadSeq: sql<number>`greatest(${schema.channelMembers.lastReadSeq}, ${seq})` }).where(and(eq(schema.channelMembers.channelId, chId!), eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));
       // Return the authoritative remaining badge for the affected sidebar channel (a thread read rolls onto its
       // parent) so the client renders an honest count instead of blindly zeroing it — which made already-read
       // channels "resurrect" as unread once a followed thread still held unopened replies.

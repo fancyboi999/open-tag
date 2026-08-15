@@ -267,7 +267,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
       }
       // Persisted observation de-duplicates stable messages beyond a collecting gap. The scalar channel
       // cursor advances only through the contiguous prefix, so the hidden Turn cannot be skipped forever.
-      if (visibility.cursorPrefix.length) await db.update(schema.channelMembers).set({ lastReadSeq: visibility.cursorPrefix.at(-1)!.seq })
+      if (visibility.cursorPrefix.length) await db.update(schema.channelMembers).set({ lastReadSeq: sql<number>`greatest(${schema.channelMembers.lastReadSeq}, ${visibility.cursorPrefix.at(-1)!.seq})` })
         .where(and(eq(schema.channelMembers.channelId, cm.channelId), eq(schema.channelMembers.memberType, "agent"), eq(schema.channelMembers.memberId, agent.id)));
     }
     const coordination: any[] = [];
@@ -410,7 +410,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
         replyToMessageId: replyToMessageId ?? undefined,
         reviewedMessageIds: [...new Set([...(existingDraft?.reviewedMessageIds ?? []), ...newer.map((message) => message.id)])],
       });
-      if (visibility.cursorPrefix.length) await db.update(schema.channelMembers).set({ lastReadSeq: visibility.cursorPrefix.at(-1)!.seq }).where(and(eq(schema.channelMembers.channelId, tgt.channelId), eq(schema.channelMembers.memberType, "agent"), eq(schema.channelMembers.memberId, agent.id))); // Advance only through the contiguous admitted prefix; a queued Turn must remain unread.
+      if (visibility.cursorPrefix.length) await db.update(schema.channelMembers).set({ lastReadSeq: sql<number>`greatest(${schema.channelMembers.lastReadSeq}, ${visibility.cursorPrefix.at(-1)!.seq})` }).where(and(eq(schema.channelMembers.channelId, tgt.channelId), eq(schema.channelMembers.memberType, "agent"), eq(schema.channelMembers.memberId, agent.id))); // Advance only through the contiguous admitted prefix; a queued Turn must remain unread.
       const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, tgt.channelId)))[0]!;
       const tname = await addressableTarget(ch, agent.id);
       const history = newer.map((m) => fmt(m, tname)).join("\n");
