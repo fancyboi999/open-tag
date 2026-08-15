@@ -335,6 +335,7 @@ uuidRouteBoundary.unit.test.ts[TS8T]: F:验证数据库UUID路由边界仅接受
 workspaceRoot.unit.test.ts[TC7T]: F:验证工作区浏览返回由当前数据根派生的绝对代理目录和文件树 | R:code:src/daemon/workspace.ts,code:src/paths.ts | A:listWorkspace,OPEN_TAG_HOME,root,files | S:代理目录不存在时仍返回纯路径根和空树而非错误，OPEN_TAG_HOME必须在模块导入前确定
 clipboardFallback.unit.test.ts[TU8S]: F:验证全部复制入口在安全来源、局域网HTTP、权限拒绝和双路径失败下的统一行为 | R:code:web/src/lib/clipboard.ts,code:web/src/views/ConnectComputerWizard.tsx,code:web/src/views/Chat.tsx,code:web/src/views/Members.tsx,code:web/src/views/misc.tsx,code:web/src/messageRender.tsx | A:consumers,installClipboardEnvironment,copyText | S:连接机器向导只有确认写入后才能显示已复制，双路径失败必须保留手动复制内容
 searchStaleResponse.unit.test.ts[TU5T]: F:验证搜索查询变化、清空或组件卸载后，已发出的迟到响应不能覆盖当前界面状态 | R:code:web/src/views/misc.tsx | A:Search | S:-
+reminderStatusI18n.unit.test.ts[TL5T]: F:验证提醒状态徽章在运行时切换英文和中文后使用当前语言重新翻译 | R:code:web/src/views/Members.tsx,code:web/src/i18n.ts,code:web/src/locales/en.json,code:web/src/locales/zh.json | A:statusMap,i18n.changeLanguage | S:-
 ===OpenTag /home/d/no_human_control/open-tag-aoci-bug-hunt/web/===
 index.html[EU5T]: F:提供浏览器单页应用的挂载壳与搜索分享元数据 | R:code:web/src/main.tsx,code:web/public/favicon.svg | A:#root | S:预渲染脚本依赖原样存在的空根节点标记
 package-lock.json[FV4L]: F:锁定 Web 工作区全部 npm 依赖的版本与完整性摘要 | R:code:web/package.json | A:- | S:由 npm 生成且不得手工维护
@@ -408,7 +409,7 @@ ConnectComputerWizard.tsx[AH8S]: F:引导创建重连机器并展示一次性守
 Features.tsx[AU6L]: F:渲染双语公开功能案例页及其按需动画演示 | R:code:web/src/views/ProductMock.tsx,code:web/src/landing/MarketingNav.tsx,code:web/src/landing/landing.css | A:Lang,FeatureCase,currentLang,COPY,Features | S:动画库加载失败不得阻断静态页面内容
 Landing.tsx[AU7L]: F:渲染双语公共落地页的产品能力运行时与行动入口 | R:code:web/src/landing/MarketingNav.tsx,code:web/src/views/ProductMock.tsx,code:web/src/landing/landing.css | A:Landing | S:语言偏好必须在 localStorage 中持久化
 LiveAgentBar.tsx[AR6S]: F:汇总并展示工作区内正在工作或思考的代理状态 | R:code:web/src/store.tsx,code:web/src/Avatar.tsx | A:LiveAgentBar | S:只展示 working 与 thinking 状态并按最近活动排序
-Members.tsx[AI9L]: F:管理成员名册代理档案权限技能工作区与机器绑定 | R:code:web/src/store.tsx,code:web/src/views/ProjectDirectoryPicker.tsx,code:web/src/messageRender.tsx,code:web/src/Select.tsx,code:web/src/lib/clipboard.ts | A:Members,AgentProfile,CreateAgentModal,HumanProfile | S:所有变更调用都必须检查已解析JSON中的error字段；邀请链接和工作区路径仅在确认复制后显示成功
+Members.tsx[AI9L]: F:管理成员名册代理档案权限技能工作区提醒与机器绑定 | R:code:web/src/store.tsx,code:web/src/views/ProjectDirectoryPicker.tsx,code:web/src/messageRender.tsx,code:web/src/Select.tsx,code:web/src/lib/clipboard.ts,code:web/src/i18n.ts | A:Members,AgentProfile,CreateAgentModal,HumanProfile,RemindersTab | S:所有变更调用都必须检查已解析JSON中的error字段；提醒状态必须在渲染时翻译，不能在模块加载时冻结语言；复制操作仅在确认写入后显示成功
 ProductMock.tsx[AU5M]: F:渲染营销页面使用的静态多代理协作产品示意界面 | R:code:web/src/Avatar.tsx,code:web/src/landing/landing.css | A:ProductMockLang,ProductMockMessage,ProductMockCase,ProductMock | S:-
 ProjectDirectoryPicker.tsx[AH8M]: F:通过守护机器浏览发现并选择代理项目目录 | R:code:web/src/store.tsx,code:web/src/views/projectDirectoryPickerPaths.ts | A:ProjectDirectoryField | S:异步目录响应必须按请求序号丢弃过期结果
 Showcase.tsx[AU6S]: F:用静态数据渲染无需认证接口的只读协作展示页 | R:code:web/src/showcaseData.ts,code:web/src/messageRender.tsx,code:web/src/views/ChatSidebar.tsx | A:Showcase | S:展示页不得依赖 StoreProvider 或后端接口
