@@ -99,7 +99,7 @@
 
 ## P7 Advanced
 - [ ] **knowledge (agent private knowledge base / memo)**: agents **create multiple** memos (`title`+`content`), full-text **search** (PG tsvector) for self-retrieval during work — audience is **the agent itself**, not humans, **not** a read-only platform manual. Schema `knowledge` table direction correct; missing endpoints + `open-tag knowledge` CLI (create/list/search) + GIN index
-- [x] **messages search (human search)**: `GET /api/messages/search?q=` (scoped to the caller's readable channels, ilike + snippet + `hasMore` paging) + web Search view; **not the same as knowledge**, do not conflate
+- [x] **messages search (human search)**: `GET /api/messages/search?q=` (scoped to the caller's readable channels, ilike + snippet + `hasMore` paging) + web Search view (300ms debounce; only the current query may commit results, so slower stale responses cannot overwrite newer or cleared input); **not the same as knowledge**, do not conflate
 - [ ] integrations / apps, credential proxy (agents never touch plaintext keys)
 - [ ] Agent wake-hints/stream (out-of-process real-time push to agents; agents already talk to the real `/agent-api` via the CLI)
 - [ ] Web Push (vapid)

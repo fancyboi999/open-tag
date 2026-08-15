@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-08-14T20:25:12Z",
-  "updated_at": "2026-08-15T08:10:01Z",
+  "updated_at": "2026-08-15T08:18:14Z",
   "files": {
     ".agents/skills/doc-sync/SKILL.md": {
       "role": "index",
@@ -162,9 +162,9 @@
       "normalized_sha256": "22f33524da679faf67584cb9ccc97e0eb37b97b0c3cf8f2668d5ec2ffe419a86"
     },
     "FEATURES.md": {
-      "sha256": "ad14a23f214e2c879b54d0806a3ffa1f495c61a1b75c5d75f27f6d64acaa40fc",
-      "size": 26341,
-      "normalized_sha256": "ad14a23f214e2c879b54d0806a3ffa1f495c61a1b75c5d75f27f6d64acaa40fc"
+      "sha256": "0e9071f18600050d402e9f010b17420f6d73b87650c7ab661a2a7211be8a2a69",
+      "size": 26468,
+      "normalized_sha256": "0e9071f18600050d402e9f010b17420f6d73b87650c7ab661a2a7211be8a2a69"
     },
     "LICENSE": {
       "role": "index",
@@ -203,9 +203,9 @@
       "normalized_sha256": "472b8dfe9ad70e4e5ef23e7c404086c41dd34d5a26a15b60af4af518bad442a4"
     },
     "aoci.code.txt": {
-      "sha256": "af69b45616f659c0aa313438c2ce7106e6d8257033854caf2a473274f72c1f90",
-      "size": 128120,
-      "normalized_sha256": "af69b45616f659c0aa313438c2ce7106e6d8257033854caf2a473274f72c1f90"
+      "sha256": "9039e26cc4a9426015926405a390511ac3eac59de24f2e1518ab3cc068114511",
+      "size": 128395,
+      "normalized_sha256": "9039e26cc4a9426015926405a390511ac3eac59de24f2e1518ab3cc068114511"
     },
     "aoci.database.txt": {
       "sha256": "237eee4383d6502c3c741fec77bb244bbd175f5330f0818fb03002600f79c49a",
@@ -1702,6 +1702,11 @@
       "size": 3518,
       "normalized_sha256": "567a7fe8c16757b250e10f29042187b1c888d8d8ec79727c03513f5a5b117598"
     },
+    "test/searchStaleResponse.unit.test.ts": {
+      "sha256": "06c4cfa964a22912b5de6901f3c5647d22921e831da6e9d28b03ba0337783b05",
+      "size": 874,
+      "normalized_sha256": "06c4cfa964a22912b5de6901f3c5647d22921e831da6e9d28b03ba0337783b05"
+    },
     "test/sectionHeaderLayout.unit.test.ts": {
       "role": "index",
       "sha256": "e11ab18833d5061f2035e5f15bdf9e4e91d6a667b0677ff83f25ee4d2b2b4034",
@@ -2241,9 +2246,9 @@
       "normalized_sha256": "4e4cb0c4c324177b1c4a633b88fe70d847816da58d7459b5909112842c28703f"
     },
     "web/src/views/misc.tsx": {
-      "sha256": "ab53ea2d7727ac4b7ef837aa81c6a5aa2b943f2f81ed6c37fb49a4b460c5ba19",
-      "size": 36403,
-      "normalized_sha256": "ab53ea2d7727ac4b7ef837aa81c6a5aa2b943f2f81ed6c37fb49a4b460c5ba19"
+      "sha256": "650f6fc0faa549b5e5977f36222b8c67bcf116831c8aca45ddfcb46b383c737a",
+      "size": 36504,
+      "normalized_sha256": "650f6fc0faa549b5e5977f36222b8c67bcf116831c8aca45ddfcb46b383c737a"
     },
     "web/src/views/projectDirectoryPickerPaths.test.ts": {
       "role": "index",

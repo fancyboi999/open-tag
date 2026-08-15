@@ -334,6 +334,7 @@ threadUnread.unit.test.ts[TM7T]: F:验证前端线程元数据和父频道徽标
 uuidRouteBoundary.unit.test.ts[TS8T]: F:验证数据库UUID路由边界仅接受规范完整标识并拒绝客户端合成预览标识 | R:code:src/server/util.ts | A:isUuid | S:短标识只属于明确支持解析的代理接口，通用UUID列边界不得让畸形值进入Postgres并变成22P02错误
 workspaceRoot.unit.test.ts[TC7T]: F:验证工作区浏览返回由当前数据根派生的绝对代理目录和文件树 | R:code:src/daemon/workspace.ts,code:src/paths.ts | A:listWorkspace,OPEN_TAG_HOME,root,files | S:代理目录不存在时仍返回纯路径根和空树而非错误，OPEN_TAG_HOME必须在模块导入前确定
 clipboardFallback.unit.test.ts[TU8S]: F:验证全部复制入口在安全来源、局域网HTTP、权限拒绝和双路径失败下的统一行为 | R:code:web/src/lib/clipboard.ts,code:web/src/views/ConnectComputerWizard.tsx,code:web/src/views/Chat.tsx,code:web/src/views/Members.tsx,code:web/src/views/misc.tsx,code:web/src/messageRender.tsx | A:consumers,installClipboardEnvironment,copyText | S:连接机器向导只有确认写入后才能显示已复制，双路径失败必须保留手动复制内容
+searchStaleResponse.unit.test.ts[TU5T]: F:验证搜索查询变化、清空或组件卸载后，已发出的迟到响应不能覆盖当前界面状态 | R:code:web/src/views/misc.tsx | A:Search | S:-
 ===OpenTag /home/d/no_human_control/open-tag-aoci-bug-hunt/web/===
 index.html[EU5T]: F:提供浏览器单页应用的挂载壳与搜索分享元数据 | R:code:web/src/main.tsx,code:web/public/favicon.svg | A:#root | S:预渲染脚本依赖原样存在的空根节点标记
 package-lock.json[FV4L]: F:锁定 Web 工作区全部 npm 依赖的版本与完整性摘要 | R:code:web/package.json | A:- | S:由 npm 生成且不得手工维护
@@ -412,7 +413,7 @@ ProductMock.tsx[AU5M]: F:渲染营销页面使用的静态多代理协作产品�
 ProjectDirectoryPicker.tsx[AH8M]: F:通过守护机器浏览发现并选择代理项目目录 | R:code:web/src/store.tsx,code:web/src/views/projectDirectoryPickerPaths.ts | A:ProjectDirectoryField | S:异步目录响应必须按请求序号丢弃过期结果
 Showcase.tsx[AU6S]: F:用静态数据渲染无需认证接口的只读协作展示页 | R:code:web/src/showcaseData.ts,code:web/src/messageRender.tsx,code:web/src/views/ChatSidebar.tsx | A:Showcase | S:展示页不得依赖 StoreProvider 或后端接口
 Skeleton.tsx[CU4T]: F:提供工作区外壳与聊天记录的布局稳定加载占位 | R:code:web/src/styles.css | A:ChatSkeleton,WorkspaceSkeleton | S:占位布局必须镜像真实桌面列结构并在移动端隐藏侧列
-misc.tsx[AG8L]: F:实现任务收件箱机器搜索设置收藏等辅助页面 | R:code:web/src/store.tsx,code:web/src/TaskBoard.tsx,code:web/src/views/ConnectComputerWizard.tsx,code:web/src/machineUi.ts,code:web/src/lib/clipboard.ts | A:Tasks,Inbox,Computers,Search,Settings | S:daemon命令与邀请复制必须使用共享回退，写入失败时不得显示成功
+misc.tsx[AG8L]: F:实现任务收件箱机器搜索设置收藏等辅助页面 | R:code:web/src/store.tsx,code:web/src/TaskBoard.tsx,code:web/src/views/ConnectComputerWizard.tsx,code:web/src/machineUi.ts,code:web/src/lib/clipboard.ts | A:Tasks,Inbox,Computers,Search,Settings | S:搜索查询变更或清空后旧请求结果不得提交到当前界面；daemon命令与邀请复制必须使用共享回退，写入失败时不得显示成功
 projectDirectoryPickerPaths.test.ts[TH6T]: F:验证 POSIX Windows 盘符 UNC 与混合分隔符的目录面包屑 | R:code:web/src/views/projectDirectoryPickerPaths.ts | A:- | S:-
 projectDirectoryPickerPaths.ts[KH7T]: F:在限定根目录内把 POSIX Windows 与 UNC 路径拆成面包屑 | R:code:web/src/views/ProjectDirectoryPicker.tsx | A:ProjectDirectoryEntry,projectPathBreadcrumbs | S:未匹配根目录时只能返回当前路径单项以避免越界导航
 

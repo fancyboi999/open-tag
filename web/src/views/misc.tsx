@@ -319,8 +319,14 @@ export function Search() {
   useEffect(() => {
     const v = q.trim();
     if (!v) { setResults([]); setSearched(false); return; }
-    const h = setTimeout(async () => { const d = await api("GET", `/api/messages/search?q=${encodeURIComponent(v)}`); setResults(d?.results || []); setSearched(true); }, 300);
-    return () => clearTimeout(h);
+    let cancelled = false;
+    const h = setTimeout(async () => {
+      const d = await api("GET", `/api/messages/search?q=${encodeURIComponent(v)}`);
+      if (cancelled) return;
+      setResults(d?.results || []);
+      setSearched(true);
+    }, 300);
+    return () => { cancelled = true; clearTimeout(h); };
   }, [q]);
   return (
     <>
