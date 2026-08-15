@@ -1,7 +1,7 @@
 // System alert center: derives live, actionable system warnings from store state and renders them in a
 // rail-anchored notification popover. Intentionally NOT a generic toast/queue — these are *standing conditions*
 // (recomputed from state) the operator should act on, not one-shot feedback. Two signals today:
-//   - outdated daemon  → an online machine whose reported daemonVersion differs from the latest published one
+//   - outdated daemon  → an online machine whose reported daemonVersion is lower than the latest published one
 //                        (latestDaemonVersion comes from packages/daemon/package.json via the machines endpoint)
 //   - machine offline  → an offline machine that still hosts agents (those agents can't run until it reconnects)
 // Benign states (idle/no-agent, an offline machine with no agents) deliberately raise NO alert, so the rail
@@ -10,29 +10,13 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 import { useStore } from "./store.tsx";
+import { isDaemonOutdated } from "./machineUi.ts";
 
 export interface SystemAlert {
   id: string;            // stable signature, used as the dismiss key (e.g. "machine-offline:<id>")
   title: string;         // already-translated
   body: string;          // already-translated
   machineId?: string;    // when set, the "View" action navigates to this computer
-}
-
-export function isDaemonOutdated(current: string | undefined, latest: string | undefined): boolean {
-  const cur = parseSemver(current);
-  const next = parseSemver(latest);
-  if (!cur || !next) return false;
-  for (let i = 0; i < 3; i++) {
-    if (cur[i]! < next[i]!) return true;
-    if (cur[i]! > next[i]!) return false;
-  }
-  return false;
-}
-
-function parseSemver(v: string | undefined): [number, number, number] | null {
-  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v ?? "");
-  if (!m) return null;
-  return [Number(m[1]), Number(m[2]), Number(m[3])];
 }
 
 export function useSystemAlerts(): SystemAlert[] {

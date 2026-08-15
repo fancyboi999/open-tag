@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isDaemonOutdated } from "./alerts.tsx";
+import { isDaemonOutdated } from "./machineUi.ts";
 
 test("daemon is outdated only when its semantic version is lower than latest", () => {
   assert.equal(isDaemonOutdated("0.6.0", "0.6.1"), true);

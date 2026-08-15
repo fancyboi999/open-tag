@@ -291,7 +291,7 @@ logStreams.unit.test.ts[TO5T]: F:验证服务日志级别分流且命令行标�
 machineDeleteFk.integration.ts[TH8M]: F:验证删除机器时释放软删除代理外键并继续阻止仍绑定活跃代理的删除 | R:code:src/server/routes-api/servers.ts,code:src/db/schema.ts,code:src/server/auth.ts | A:DELETE /api/servers/:sid/machines/:mid | S:软删除代理行须保留审计记录但machineId置空；活跃代理存在时返回409且机器不删除
 machineOfflineAgents.integration.ts[TR8S]: F:验证过期离线机器上的所有非停用代理被统一转为离线 | R:code:src/server/machineLiveness.ts,code:src/db/schema.ts | A:reconcileOfflineMachineAgents | S:仅同时离线且心跳过期的机器受影响，睡眠代理的sessionId必须保留以支持下次恢复
 machineRename.integration.ts[TH7S]: F:验证机器重命名的权限、工作区隔离、输入校验和持久化 | R:code:src/server/routes-api/servers.ts,code:src/server/auth.ts,code:src/db/schema.ts | A:PATCH /api/servers/:sid/machines/:mid | S:跨工作区机器返回404，缺少管理能力返回403，名称须为去空白后不超过80字符的字符串
-machineUpdateGuide.unit.test.ts[TH5T]: F:验证仅在线旧版守护进程显示可执行的更新指引模板 | R:code:web/src/machineUi.ts | A:isDaemonUpdateAvailable,daemonUpdateCommandTemplate | S:浏览器无法恢复只存哈希的机器密钥，模板必须显示占位符而不得伪造密钥
+machineUpdateGuide.unit.test.ts[TH5T]: F:验证仅在线且版本低于最新语义版本的守护进程显示更新指引，并覆盖新版与开发版不降级 | R:code:web/src/machineUi.ts | A:isDaemonUpdateAvailable,daemonUpdateCommandTemplate | S:浏览器无法恢复只存哈希的机器密钥，模板必须显示占位符而不得伪造密钥
 markdownAlerts.unit.test.ts[TU5S]: F:验证GitHub警示块引用转换会识别类型、移除标记并保留正文语义 | R:code:web/src/messageRender.tsx | A:remarkGithubAlerts | S:紧凑粘贴语法只移除作为分隔符的首个大于号，正文中的比较符必须原样保留
 markdownColorSwatches.unit.test.ts[TU5T]: F:验证Markdown颜色令牌转换覆盖合法CSS色值并拒绝链接内或不安全内容 | R:code:web/src/messageRender.tsx | A:remarkColorSwatches,colorValueFromTag,tag:color | S:-
 markdownCss.unit.test.ts[TU5M]: F:验证聊天和工作区预览共享完整、可读且安全的富Markdown视觉契约 | R:code:web/src/styles.css,code:web/src/messageRender.tsx,code:web/src/views/Members.tsx,code:web/index.html | A:CodeBlock,markdownUrlTransform,markdownSchema,.md,.ws-md | S:工作区预览必须使用与聊天相同的转换和清理插件，字体令牌只能引用已加载字体或系统回退
@@ -367,14 +367,14 @@ QuickSwitcher.tsx[AU6T]: F:提供键盘驱动的频道私信与成员快速跳�
 Select.tsx[CU6T]: F:提供带键盘导航和固定定位菜单的自定义选择控件 | R:- | A:Opt,Select | S:菜单必须传送到 body 以避开变换祖先造成的定位与裁剪
 ServerSwitcher.tsx[AU5T]: F:提供工作区切换与新工作区创建入口 | R:code:web/src/store.tsx | A:ServerSwitcher | S:-
 TaskBoard.tsx[AW8M]: F:管理任务的筛选视图创建状态迁移与看板拖放交互 | R:code:web/src/store.tsx,code:web/src/Select.tsx,code:web/src/PaneEmpty.tsx | A:ST_LABEL,ynOptions,TaskBoard | S:拖放与菜单迁移必须复用同一乐观状态提交路径
-alerts.test.ts[TR4T]: F:验证守护进程版本比较对稳定版预发布版与缺失值的判定 | R:code:web/src/alerts.tsx | A:- | S:-
-alerts.tsx[DR7S]: F:从机器状态派生可操作告警并渲染通知中心 | R:code:web/src/store.tsx,code:web/src/machineUi.ts | A:SystemAlert,isDaemonOutdated,useSystemAlerts,NotificationCenter | S:已忽略告警仅按稳定告警标识持久化
+alerts.test.ts[TR4T]: F:验证共享守护进程语义版本比较只把低版本判为过期，排除相等、新版、缺失和非语义版本 | R:code:web/src/machineUi.ts | A:isDaemonOutdated | S:-
+alerts.tsx[DR7S]: F:从机器状态派生可操作告警并渲染通知中心 | R:code:web/src/store.tsx,code:web/src/machineUi.ts | A:SystemAlert,useSystemAlerts,NotificationCenter | S:已忽略告警仅按稳定告警标识持久化
 entry-server.tsx[EV6T]: F:为构建期落地页预渲染提供服务端字符串入口 | R:code:web/src/views/Landing.tsx,code:web/src/store.tsx,code:web/scripts/prerender.js | A:renderLanding | S:预渲染必须使用静态无会话 Store 快照
 format.ts[CL4T]: F:按当前界面语言格式化消息时间与日期分隔符 | R:code:web/src/i18n.ts | A:fmtDateTime,isSameLocalDay,fmtDateDivider | S:-
 i18n.ts[CL7T]: F:初始化中英文翻译资源并恢复用户语言偏好 | R:code:web/src/locales/en.json,code:web/src/locales/zh.json | A:default | S:未知语言和缺失翻译必须回退到英文
 iconMotion.css[FU3T]: F:定义图标悬停聚焦与选中状态的共享微动效 | R:code:web/src/main.tsx | A:.im,.im-pop,.im-spin,.im-pulse,.im-bell,.im-wiggle | S:减少动态效果偏好下必须禁用动画和变换
 icons.tsx[CU5T]: F:提供应用界面共用的无依赖 SVG 图标组件 | R:- | A:IconSearch,IconChat,IconInbox,IconTasks,IconUsers,IconMonitor | S:-
-machineUi.ts[CH7T]: F:统一计算机器版本状态及生成更新与连接命令 | R:code:web/src/alerts.tsx,code:web/src/views/ConnectComputerWizard.tsx,code:web/src/views/misc.tsx | A:MachineVersionState,isDaemonUpdateAvailable,daemonUpdateCommandTemplate,daemonConnectCommand | S:缺少最新版本信息时不得提示更新
+machineUi.ts[CH7T]: F:统一比较机器守护进程语义版本并生成更新与连接命令 | R:code:web/src/alerts.tsx,code:web/src/views/ConnectComputerWizard.tsx,code:web/src/views/misc.tsx | A:MachineVersionState,isDaemonOutdated,isDaemonUpdateAvailable,daemonUpdateCommandTemplate,daemonConnectCommand | S:仅在线且当前版本低于最新语义版本时提示更新；相等、新版、缺失或非语义版本不得引导降级
 main.tsx[EU9S]: F:挂载 React 应用并执行认证工作区与公共页面路由守卫 | R:code:web/src/store.tsx,code:web/src/routing.ts,code:web/src/Layout.tsx | A:- | S:会话判定完成前不得渲染营销页且 URL 中已知工作区优先驱动当前工作区
 messageRender.tsx[DM9M]: F:把消息Markdown安全转换为含引用告警代码与色块的交互内容 | R:code:web/src/store.tsx,code:web/src/views/misc.tsx,code:web/src/views/Chat.tsx,code:web/src/lib/clipboard.ts | A:markdownSchema,processMessageContent,remarkHtmlAsText,remarkGithubAlerts,remarkColorSwatches,MessageContent | S:原始HTML必须作为文字显示且用户提及仅对服务端记录的提及启用交互；代码复制失败必须提供手动复制内容
 routing.ts[CI8T]: F:集中计算会话初态登录提示与登录后默认路由 | R:code:web/src/main.tsx,code:web/src/store.tsx | A:AuthState,TOKEN_KEY,readSessionHints,initialAuthState,homeRoute | S:加载中或已认证会话不得短暂显示营销页面

@@ -3,12 +3,27 @@ export interface MachineVersionState {
   daemonVersion?: string;
 }
 
+export function isDaemonOutdated(current: string | undefined, latest: string | undefined): boolean {
+  const cur = parseSemver(current);
+  const next = parseSemver(latest);
+  if (!cur || !next) return false;
+  for (let i = 0; i < 3; i++) {
+    if (cur[i]! < next[i]!) return true;
+    if (cur[i]! > next[i]!) return false;
+  }
+  return false;
+}
+
+function parseSemver(v: string | undefined): [number, number, number] | null {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v ?? "");
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
 export function isDaemonUpdateAvailable(machine: MachineVersionState | null | undefined, latestDaemonVersion: string): boolean {
   return !!machine
     && machine.status === "online"
-    && !!machine.daemonVersion
-    && !!latestDaemonVersion
-    && machine.daemonVersion !== latestDaemonVersion;
+    && isDaemonOutdated(machine.daemonVersion, latestDaemonVersion);
 }
 
 export function daemonUpdateCommandTemplate(origin: string): string {

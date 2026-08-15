@@ -14,10 +14,12 @@ test("online machine on an older daemon version needs update guidance", () => {
   assert.equal(isDaemonUpdateAvailable({ status: "online", daemonVersion: "0.5.0" }, "0.6.0"), true);
 });
 
-test("update guidance is not shown for offline, current, unknown, or no-latest states", () => {
+test("update guidance is not shown for offline, current, newer, unknown, or no-latest states", () => {
   assert.equal(isDaemonUpdateAvailable({ status: "offline", daemonVersion: "0.5.0" }, "0.6.0"), false);
   assert.equal(isDaemonUpdateAvailable({ status: "online", daemonVersion: "0.6.0" }, "0.6.0"), false);
+  assert.equal(isDaemonUpdateAvailable({ status: "online", daemonVersion: "0.7.0" }, "0.6.0"), false);
   assert.equal(isDaemonUpdateAvailable({ status: "online", daemonVersion: "" }, "0.6.0"), false);
+  assert.equal(isDaemonUpdateAvailable({ status: "online", daemonVersion: "dev" }, "0.6.0"), false);
   assert.equal(isDaemonUpdateAvailable({ status: "online", daemonVersion: "0.5.0" }, ""), false);
 });
 

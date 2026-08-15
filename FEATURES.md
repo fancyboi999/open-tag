@@ -94,7 +94,7 @@
 - [x] **Profile page seven facets**: overview / permissions / DMs / reminders / workspace / integrations / activity — all real components + API, no placeholders (third-party login itself deferred — tech-debt I18)
 - [x] **Members view: agents grouped by machine + online status** (`byMachine` grouping + `dot` activity/status)
 - [x] **Capability-gated UI consistency + custom role picker**: Computers connect/reconnect/delete gated on `manageMachines`; channel-members modal agent ops gated on `manageChannels`; the member-role picker uses the design-system `<Select>` — closes the UI-exposure gap (the backend already 403'd all three)
-- [x] **System alert center (rail notification popover)** (`web/src/alerts.tsx`): standing warnings derived from live store state — an online machine on an outdated daemon (vs `latestDaemonVersion`, read from `packages/daemon/package.json`) and an offline machine still hosting agents; each alert offers View + session-scoped Dismiss; the rail button shows only while undismissed alerts exist. Outdated online machines get an **Update daemon** guide in Computers (saved-key: stop + rerun `@latest`; lost-key: stop, wait for offline, Reconnect rotation)
+- [x] **System alert center (rail notification popover)** (`web/src/alerts.tsx`): standing warnings derived from live store state — an online machine on an older valid semantic daemon version and an offline machine still hosting agents; the shared comparator also gates Computers' **Update daemon** action, while equal, newer, missing, and development versions never suggest a downgrade. Each alert offers View + session-scoped Dismiss
 - [ ] External agent (Create External Agent — remote/external agent not attached to a local daemon): not yet implemented
 
 ## P7 Advanced
