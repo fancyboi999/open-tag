@@ -174,6 +174,7 @@ class CursorRun {
         // Only mark online + pump on genuine success; on error, respect the error status already set.
         if (!resultError) { this.everSucceeded = true; this.cb.onActivity("online", ""); }
         else if (!this.everSucceeded) { this.rejectQueue(new Error("cursor initial turn failed")); this.reportExit(1); return; }
+        else this.cb.onAcceptedTurnFailure();
         this.pump(); return;
       }
       // Non-zero exit: hard failure. Don't double-report if in-JSON error was already surfaced.
@@ -184,6 +185,7 @@ class CursorRun {
         this.cb.onActivity("error", last.slice(0, 200));
       }
       if (!this.everSucceeded) { this.rejectQueue(new Error(`cursor-agent exited ${code ?? "signal"}`)); this.reportExit(code ?? 1); return; }
+      this.cb.onAcceptedTurnFailure();
       this.pump();
     });
   }

@@ -394,6 +394,11 @@ export class AgentManager {
       pid: 0,
     };
     let initialAdmissionSettled = false;
+    const completeTurn = () => {
+      if (this.agents.get(agentId) !== running || !running.turnActive) return;
+      running.turnActive = false;
+      this.startNextQueuedDelivery(agentId, running);
+    };
     const cb: RuntimeCallbacks = {
       onSession: (sid) => { running.sessionId = sid; this.send({ type: "agent:session", agentId, sessionId: sid }); },
       onInitialTurnAdmission: (error) => {
@@ -407,13 +412,13 @@ export class AgentManager {
           this.acceptPendingStartup(agentId, runtime.name, running);
         }
       },
+      onAcceptedTurnFailure: completeTurn,
       onActivity: (activity, detail) => {
         this.resetIdle(agentId);
         this.sendAgentActivity(agentId, activity, detail ?? "");
         if (activity === "online") {
-          running.turnActive = false;
           this.finishReplyPreview(agentId);
-          this.startNextQueuedDelivery(agentId, running);
+          completeTurn();
         } else if (activity === "error") {
           this.finishReplyPreview(agentId, "error");
         } else if (activity === "sleeping" || activity === "offline") {
@@ -476,7 +481,7 @@ export class AgentManager {
     if (this.agents.get(agentId) !== running) throw new Error(`runtime exited before start completed: ${agentId}`);
 
     this.send({ type: "agent:status", agentId, status: "active" });
-    this.sendAgentActivity(agentId, "working", "starting");
+    if (running.turnActive) this.sendAgentActivity(agentId, "working", "starting");
     this.log.info("agent started", { agentId, runtime: runtime.name, model: config.model ?? "(default)", resume: !!config.sessionId, experimental: runtime.experimental ?? false });
     this.resetIdle(agentId);
     if (pendingDeliveryCount > 0 && this.pendingDelivers.has(agentId)) {

@@ -198,6 +198,7 @@ class CopilotRun {
       this.cb.onTrajectory([{ kind: "text", text: "[copilot error] " + clip(tail).slice(0, 500) }]);
       this.cb.onActivity("error", last.slice(0, 200));
       if (!this.everSucceeded) { this.rejectQueue(new Error(last)); this.reportExit(code ?? 1); return; } // first-turn hard failure → crashed
+      this.cb.onAcceptedTurnFailure();
       this.pump(); // a later turn failed; keep the session alive so the next message can retry
     });
   }

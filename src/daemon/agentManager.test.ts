@@ -309,7 +309,7 @@ test("a delivery arriving during the startup nudge waits for that runtime turn t
   }
 });
 
-test("a runtime error waits for the terminal online transition before advancing FIFO", async () => {
+test("an admitted terminal failure advances FIFO without treating every runtime error as terminal", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "open-tag-agent-manager-"));
   const delivered: string[] = [];
   let callbacks: RuntimeCallbacks | undefined;
@@ -335,9 +335,9 @@ test("a runtime error waits for the terminal online transition before advancing 
     callbacks!.onActivity("error", "turn failed");
     await new Promise((resolve) => setTimeout(resolve, 10));
     assert.equal(delivered.length, 1, "non-terminal runtime error must not start the next Turn early");
-    callbacks!.onActivity("online");
+    callbacks!.onAcceptedTurnFailure();
     await second;
-    assert.equal(delivered.length, 2, "the terminal online transition advances queued work once");
+    assert.equal(delivered.length, 2, "the dedicated failure terminal advances queued work once");
     mgr.stopAll();
   } finally {
     rmSync(root, { recursive: true, force: true });

@@ -265,9 +265,11 @@ class HermesRun {
           this.cb.onSession(nextSessionId);
         }
         const bridged = await this.bridgeFinalResponse(turnFile, out);
+        if (this.stopped) return;
         if (out) this.cb.onTrajectory([{ kind: "text", text: clip(out) }]);
         if (bridged !== false) this.cb.onActivity("online", "");
         this.turnBusy = false;
+        if (bridged === false) this.cb.onAcceptedTurnFailure();
         this.pump();
         return;
       }
@@ -289,6 +291,7 @@ class HermesRun {
         this.reportExit(code ?? 1);
         return;
       }
+      this.cb.onAcceptedTurnFailure();
       this.pump();
     });
   }
@@ -298,6 +301,7 @@ class HermesRun {
     try { state = parseHermesTurnEvents(await readFile(turnFile, "utf8")); }
     catch { /* no CLI side-channel events recorded */ }
     finally { try { await unlink(turnFile); } catch { /* best-effort cleanup */ } }
+    if (this.stopped) return null;
     const decision = hermesBridgeDecision(stdout, state);
     if (!decision.ok) {
       if (stdout.trim() && decision.reason !== "already-sent" && decision.reason !== "empty-inbox") {
@@ -319,6 +323,7 @@ class HermesRun {
           body: JSON.stringify({ messageId: decision.replyTo, decision: "request_reply", reason: "ownership", summary: "one-shot runtime produced a substantive final response" }),
         });
         const grantBody = await responseJson(grantRes);
+        if (this.stopped) return null;
         if (!grantRes.ok || !grantBody?.grant) {
           this.cb.log.info("hermes final response stayed silent without reply grant", { status: grantRes.status, target: decision.target });
           return null;
@@ -329,6 +334,7 @@ class HermesRun {
         "x-agent-id": this.env.OPEN_TAG_AGENT_ID ?? "",
         "content-type": "application/json",
       }, decision.target, decision.content, decision.replyTo);
+      if (this.stopped) return null;
       if (!result.ok) {
         if (result.held) {
           this.cb.log.warn("hermes final response freshness-held; draft saved for review", { target: decision.target });
@@ -344,6 +350,7 @@ class HermesRun {
         return true;
       }
     } catch (e) {
+      if (this.stopped) return null;
       this.cb.log.warn("hermes final response bridge failed", { detail: String((e as any)?.message ?? e), target: decision.target });
       this.cb.onActivity("error", "hermes bridge send failed");
       return false;

@@ -78,6 +78,7 @@ test("stdin runtime rejects initial admission exactly once when Claude cannot sp
     session = claudeRuntime.start({ cwd: root, stateDir: root, env: { [PATH_KEY]: root }, systemPrompt: "system", initialPrompt: "start" }, {
       onSession: () => {},
       onInitialTurnAdmission: (error) => admissions.push(error),
+      onAcceptedTurnFailure: () => {},
       onActivity: () => {},
       onTrajectory: () => {},
       onExit: () => {},

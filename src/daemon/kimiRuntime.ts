@@ -166,6 +166,7 @@ class KimiRun {
       this.cb.onTrajectory([{ kind: "text", text: "[kimi error] " + clip(tail).slice(0, 500) }]);
       this.cb.onActivity("error", last.slice(0, 200));
       if (!this.everSucceeded) { this.rejectQueue(new Error(last)); this.reportExit(code ?? 1); return; } // first-turn hard failure (bad config/auth) → crashed
+      this.cb.onAcceptedTurnFailure();
       this.pump();
     });
   }

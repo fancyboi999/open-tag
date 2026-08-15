@@ -25,13 +25,24 @@ function turnParams(opts: StartOpts, threadId: string, text: string): Record<str
   return { threadId, input: [{ type: "text", text }], ...(effort ? { effort } : {}) };
 }
 
+interface CodexTurnTerminal { failed: boolean; detail?: string; turnId?: string }
+interface CodexInput {
+  text: string;
+  initial: boolean;
+  admission: ProtocolAdmission;
+  accepted: boolean;
+  settled: boolean;
+  turnId: string | null;
+  pendingTerminals: Map<string, CodexTurnTerminal>;
+}
+
 class CodexClient {
   private nextId = 0;
   private pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
   private buf = "";
   private proto: "unknown" | "legacy" | "raw" = "unknown";
   threadId = "";
-  onTurnDone: ((aborted: boolean) => void) | null = null;
+  onTurnDone: ((terminal: CodexTurnTerminal) => void) | null = null;
 
   constructor(private proc: ChildProcess, private cb: RuntimeCallbacks) {
     proc.stdout?.on("data", (c: Buffer) => {
@@ -81,19 +92,22 @@ class CodexClient {
       this.proto = "legacy"; if (params.msg) this.handleLegacy(params.msg); return;
     }
     if (this.proto !== "legacy") {
-      if (this.proto === "unknown" && (method === "turn/started" || method === "turn/completed" || method === "thread/started" || method.startsWith("item/"))) this.proto = "raw";
+      if (this.proto === "unknown" && (method === "turn/started" || method === "turn/completed" || method === "thread/started" || method === "error" || method.startsWith("item/"))) this.proto = "raw";
       if (this.proto === "raw") this.handleRaw(method, params);
     }
   }
 
   private handleRaw(method: string, params: any): void {
     if (this.threadId && params.threadId && params.threadId !== this.threadId) return; // ignore events from other threads
-    if (method === "turn/started") { this.cb.onActivity("working", "turn"); }
+    if (method === "turn/started") {
+      this.cb.onActivity("working", "turn");
+    }
     else if (method === "turn/completed") {
       const status = params?.turn?.status;
-      const aborted = ["cancelled", "canceled", "aborted", "interrupted"].includes(status);
+      const failed = status === "failed" || ["interrupted", "cancelled", "canceled", "aborted"].includes(status);
+      const detail = params?.turn?.error?.message || (failed ? `codex turn ${status || "failed"}` : undefined);
       if (status === "failed") this.cb.onTrajectory([{ kind: "text", text: "[codex turn failed] " + (params?.turn?.error?.message || "") }]);
-      this.cb.onActivity("online", ""); this.onTurnDone?.(aborted);
+      this.onTurnDone?.({ failed, detail, turnId: typeof params?.turn?.id === "string" ? params.turn.id : undefined });
     } else if (method === "item/agentMessage/delta" || method === "item/reasoning/summaryTextDelta" || method === "item/reasoning/textDelta") {
       // The current UI stores each trajectory entry as a separate row, so token deltas would spam
       // the timeline. Emit the completed item text below instead.
@@ -111,7 +125,10 @@ class CodexClient {
         this.cb.onTrajectory([{ kind: "tool", toolName: item.type, toolInput: clip(toolInput).slice(0, 160) }]);
       }
     } else if (method === "error") {
-      if (!params.willRetry) { this.cb.onTrajectory([{ kind: "text", text: "[codex error] " + (params?.error?.message || params?.message || "") }]); this.onTurnDone?.(false); }
+      if (!params.willRetry) {
+        const detail = params?.error?.message || params?.message || "codex turn failed";
+        this.cb.onTrajectory([{ kind: "text", text: "[codex error] " + detail }]);
+      }
     }
   }
 
@@ -121,8 +138,12 @@ class CodexClient {
       case "agent_message": if (msg.message) this.cb.onTrajectory([{ kind: "text", text: clip(msg.message) }]); break;
       case "exec_command_begin": this.cb.onActivity("working", "Running command…"); this.cb.onTrajectory([{ kind: "tool", toolName: "exec_command", toolInput: clip(msg.command).slice(0, 120) }]); break;
       case "patch_apply_begin": this.cb.onTrajectory([{ kind: "tool", toolName: "patch_apply" }]); break;
-      case "task_complete": this.cb.onActivity("online", ""); this.onTurnDone?.(false); break;
-      case "turn_aborted": this.onTurnDone?.(true); break;
+      case "task_complete": {
+        const detail = msg?.error?.message || (msg?.error ? "codex turn failed" : undefined);
+        this.onTurnDone?.({ failed: !!msg?.error, detail, turnId: typeof msg.turn_id === "string" ? msg.turn_id : undefined });
+        break;
+      }
+      case "turn_aborted": this.onTurnDone?.({ failed: true, detail: "codex turn aborted", turnId: typeof msg.turn_id === "string" ? msg.turn_id : undefined }); break;
     }
   }
 }
@@ -139,8 +160,8 @@ export const codexRuntime: Runtime = {
     let ready = false;
     let spawnFailed = false;
     let reportedExit = false;
-    const queue: Array<{ text: string; initial: boolean; admission: ProtocolAdmission }> = [];
-    let activeInput: { text: string; initial: boolean; admission: ProtocolAdmission } | null = null;
+    const queue: CodexInput[] = [];
+    let activeInput: CodexInput | null = null;
     let turnBusy = false;
 
     function reportExit(code: number | null): void {
@@ -149,9 +170,41 @@ export const codexRuntime: Runtime = {
       cb.onExit(code);
     }
 
-    client.onTurnDone = () => { activeInput = null; turnBusy = false; pump(); };
+    function settleTurn(item: CodexInput, terminal: CodexTurnTerminal): void {
+      if (activeInput !== item || item.settled) return;
+      if (terminal.turnId && item.turnId && terminal.turnId !== item.turnId) return;
+      if (!item.accepted) {
+        const key = terminal.turnId ?? "";
+        const pending = item.pendingTerminals.get(key);
+        if (!pending || terminal.failed) item.pendingTerminals.set(key, terminal);
+        return;
+      }
+      item.settled = true;
+      activeInput = null;
+      turnBusy = false;
+      if (terminal.failed) {
+        cb.onActivity("error", terminal.detail ?? "codex turn failed");
+        cb.onAcceptedTurnFailure();
+      } else {
+        cb.onActivity("online", "");
+      }
+      pump();
+    }
+    client.onTurnDone = (terminal) => {
+      const item = activeInput;
+      if (!item) return;
+      settleTurn(item, terminal);
+    };
     function enqueue(text: string, initial = false): Promise<void> {
-      const input = { text, initial, admission: protocolAdmission() };
+      const input: CodexInput = {
+        text,
+        initial,
+        admission: protocolAdmission(),
+        accepted: false,
+        settled: false,
+        turnId: null,
+        pendingTerminals: new Map(),
+      };
       queue.push(input);
       pump();
       return input.admission.promise;
@@ -168,7 +221,17 @@ export const codexRuntime: Runtime = {
       turnBusy = true;
       cb.onActivity("working", "turn");
       client.request("turn/start", turnParams(opts, client.threadId, item.text))
-        .then(() => { item.admission.accept(); if (item.initial) admission.accept(); })
+        .then((result) => {
+          const responseTurnId = typeof result?.turn?.id === "string" ? result.turn.id : null;
+          if (!responseTurnId) throw new Error("codex turn/start returned no turnId");
+          item.turnId = responseTurnId;
+          item.accepted = true;
+          item.admission.accept();
+          if (item.initial) admission.accept();
+          const pendingTerminal = item.pendingTerminals.get(responseTurnId) ?? item.pendingTerminals.get("");
+          item.pendingTerminals.clear();
+          if (pendingTerminal) settleTurn(item, pendingTerminal);
+        })
         .catch((e) => {
           item.admission.reject(e);
           if (item.initial) admission.reject(e);

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { buildHermesArgs, buildHermesPrompt, hermesBridgeDecision, hermesProfile, hermesProfileHome, hermesRuntime, hermesRuntimeEnv, parseHermesSessionId, parseHermesTurnEvents, postHermesBridgeMessage } from "./hermesRuntime.js";
@@ -173,6 +173,7 @@ test("Hermes rejects initial admission exactly once when its argv process cannot
     session = hermesRuntime.start({ cwd: root, stateDir: root, env: { [PATH_KEY]: root }, systemPrompt: "system", initialPrompt: "start" }, {
       onSession: () => {},
       onInitialTurnAdmission: (error) => admissions.push(error),
+      onAcceptedTurnFailure: () => {},
       onActivity: () => {},
       onTrajectory: () => {},
       onExit: () => {},
@@ -223,6 +224,7 @@ test("Hermes completes an empty-inbox turn so a queued delivery can run", async 
     }, {
       onSession: () => {},
       onInitialTurnAdmission: () => {},
+      onAcceptedTurnFailure: () => {},
       onActivity: (activity) => activities.push(activity),
       onTrajectory: () => {},
       onExit: () => {},
@@ -237,6 +239,73 @@ test("Hermes completes an empty-inbox turn so a queued delivery can run", async 
     assert.equal(activities.filter((activity) => activity === "online").length, 2);
     assert.equal(activities.includes("error"), false);
   } finally {
+    session?.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Hermes stop during its async response bridge emits only the exit terminal", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "open-tag-hermes-stop-bridge-"));
+  const binDir = path.join(root, "bin");
+  mkdirSync(binDir);
+  if (process.platform === "win32") {
+    writeFileSync(path.join(binDir, "hermes.cmd"), [
+      "@echo off",
+      "echo {\"type\":\"check\",\"target\":\"dm:@User\",\"count\":1,\"messageId\":\"1234abcd\",\"grant\":\"primary\"}>>\"%OPEN_TAG_TURN_FILE%\"",
+      "echo Final answer.",
+      "exit /b 0",
+    ].join("\r\n"), "utf8");
+  } else {
+    const executable = path.join(binDir, "hermes");
+    writeFileSync(executable, [
+      "#!/bin/sh",
+      "printf '%s\\n' '{\"type\":\"check\",\"target\":\"dm:@User\",\"count\":1,\"messageId\":\"1234abcd\",\"grant\":\"primary\"}' >> \"$OPEN_TAG_TURN_FILE\"",
+      "printf '%s\\n' 'Final answer.'",
+      "exit 0",
+    ].join("\n"), "utf8");
+    chmodSync(executable, 0o755);
+  }
+
+  const originalFetch = globalThis.fetch;
+  let markFetchStarted!: () => void;
+  const fetchStarted = new Promise<void>((resolve) => { markFetchStarted = resolve; });
+  let releaseFetch!: () => void;
+  globalThis.fetch = (() => {
+    markFetchStarted();
+    return new Promise<Response>((resolve) => {
+      releaseFetch = () => resolve({ ok: false, status: 500, json: async () => ({ error: "bridge failed" }) } as Response);
+    });
+  }) as typeof fetch;
+  const activities: string[] = [];
+  const failures: number[] = [];
+  const exits: Array<number | null> = [];
+  let session: ReturnType<typeof hermesRuntime.start> | undefined;
+  try {
+    session = hermesRuntime.start({
+      cwd: root,
+      stateDir: root,
+      env: { [PATH_KEY]: binDir, HOME: root, OPEN_TAG_SERVER_URL: "http://server", OPEN_TAG_AGENT_ID: "a", OPEN_TAG_AGENT_TOKEN: "t" },
+      systemPrompt: "system",
+      initialPrompt: "start",
+    }, {
+      onSession: () => {},
+      onInitialTurnAdmission: () => {},
+      onAcceptedTurnFailure: () => failures.push(failures.length + 1),
+      onActivity: (activity) => activities.push(activity),
+      onTrajectory: () => {},
+      onExit: (code) => exits.push(code),
+      log: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as any,
+    });
+    await fetchStarted;
+    const activityCountAtStop = activities.length;
+    session.stop();
+    releaseFetch();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(exits, [0]);
+    assert.deepEqual(failures, [], "a stopped session cannot also report a reusable Turn failure");
+    assert.equal(activities.length, activityCountAtStop, "the completed bridge cannot emit Activity after stop");
+  } finally {
+    globalThis.fetch = originalFetch;
     session?.stop();
     rmSync(root, { recursive: true, force: true });
   }
