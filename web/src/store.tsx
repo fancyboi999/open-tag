@@ -1,6 +1,8 @@
 // Global state + API + socket.io event bus (React Context). Chat messages and traces are consumed by views via onEvent.
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
+import { drainMessageSyncPages } from "./messageSync";
+import { acceptLatestReadResponse } from "./readResponse";
 import { messageUnreadDelta, threadUnreadDelta } from "./threadUnread";
 import { initialAuthState, TOKEN_KEY, type AuthState } from "./routing.ts";
 
@@ -89,6 +91,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const meIdRef = useRef<string | undefined>(undefined); // current user id; read by socket handlers (own-message unread suppression) and stable across workspace switches
   const sockRef = useRef<Socket | null>(null); // active socket connection; emits join:channel when joining/creating a channel mid-session for room isolation
   const subscribedRef = useRef<Set<string>>(new Set()); // channels/threads explicitly subscribed by the active view; re-emitted on every (re)connect so a reconnect re-joins them
+  const readRequestOrderRef = useRef(0);
+  const appliedReadResponsesRef = useRef(new Map<string, number>());
   const listeners = useRef(new Set<(e: Ev) => void>());
 
   const api = async (method: string, path: string, body?: unknown) => {
@@ -142,11 +146,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // A channel's badge = its own-timeline unread + its followed threads' unread. Reading a container (channel OR
   // thread) clears only that container's portion; the server returns the affected sidebar channel's authoritative
   // remaining (a thread read rolls onto its parent). We set the badge to that exact value instead of blind-zeroing
-  // it — blind-zeroing hid still-unopened thread replies, which then "resurrected" on the next unread refetch.
+  // it. Channel and thread requests can converge on the same parent key, so only the newest response for that key
+  // may commit; blind-zeroing or a late older aggregate would both make the badge lie.
   const markRead = (id: string) => {
+    const order = ++readRequestOrderRef.current;
+    const ownerServerId = sidRef.current;
     api("POST", `/api/channels/${id}/read`, {}).then((r) => {
       const key = r?.channelId; if (!key) return;
-      setUnread((u) => { const n = { ...u }; if (Number(r.unread) > 0) n[key] = Number(r.unread); else delete n[key]; return n; });
+      if (sidRef.current !== ownerServerId) return;
+      if (!acceptLatestReadResponse(appliedReadResponsesRef.current, key, order)) return;
+      setUnread((u) => {
+        if (sidRef.current !== ownerServerId) return u;
+        const n = { ...u }; if (Number(r.unread) > 0) n[key] = Number(r.unread); else delete n[key]; return n;
+      });
     }).catch(() => {});
   };
   const uploadFiles = async (channelId: string, files: FileList | File[]) => {
