@@ -6,7 +6,7 @@ import { hashToken, newKey } from "../auth.js";
 import { can, capabilitiesFor, requireCap } from "../capabilities.js";
 import { createServer } from "../core.js";
 import { publish } from "../realtime.js";
-import { DYNAMIC_RUNTIMES, getDynamicModels } from "../runtimeModels.js";
+import { CODEX_FALLBACK_MODELS, DYNAMIC_RUNTIMES, getDynamicModels } from "../runtimeModels.js";
 import { PROJECT_BROWSER_CAPABILITY, requestDaemonByMachine } from "../daemonHub.js";
 import { isUuid, readJson, sendErr, sendJson } from "../util.js";
 import { createRequire } from "node:module";
@@ -125,20 +125,11 @@ export async function handleServersServerScope(ctx: ServerCtx): Promise<boolean>
   const rm = /^\/api\/servers\/[^/]+\/machines\/([^/]+)\/runtime-models\/([^/]+)$/.exec(p);
   if (rm && method === "GET") {
     const machineId = rm[1]!, runtime = rm[2]!;
-    // The static lists below are the FALLBACK. opencode/cursor/pi are probed live on the machine (further
-    // down) and only use these on miss/offline/timeout. claude/codex use their native CLI (no gateway
-    // model list), so their catalog is curated here. copilot/kimi have no list command — live per-account
-    // discovery would need an ACP probe (tracked in docs/tech-debt-tracker.md); "auto" is first/default
-    // for copilot so it picks an accessible model (one the account lacks fails loudly at runtime).
+    // These are fallbacks when the target machine is absent or its live probe fails. Copilot/Kimi have
+    // no one-shot list command; account-aware discovery still needs an ACP probe (tech-debt I39).
     const MODELS: Record<string, { id: string; label: string }[]> = {
       claude: [{ id: "sonnet", label: "Sonnet" }, { id: "opus", label: "Opus" }, { id: "haiku", label: "Haiku" }],
-      codex: [
-        { id: "gpt-5.5", label: "GPT-5.5" }, { id: "gpt-5.4", label: "GPT-5.4" },
-        { id: "gpt-5.3-codex", label: "GPT-5.3 Codex" }, { id: "gpt-5.3-codex-spark", label: "GPT-5.3 Codex Spark" },
-        { id: "gpt-5.2-codex", label: "GPT-5.2 Codex" }, { id: "gpt-5.2", label: "GPT-5.2" },
-        { id: "gpt-5.1-codex-max", label: "GPT-5.1 Codex Max" }, { id: "gpt-5.1-codex", label: "GPT-5.1 Codex" },
-        { id: "gpt-5-codex", label: "GPT-5 Codex" },
-      ],
+      codex: CODEX_FALLBACK_MODELS,
       copilot: [
         { id: "auto", label: "Auto (recommended)" },
         { id: "gpt-5.5", label: "GPT-5.5" }, { id: "gpt-5.4", label: "GPT-5.4" }, { id: "gpt-5.2-codex", label: "GPT-5.2 Codex" },

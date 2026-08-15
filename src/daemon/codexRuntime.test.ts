@@ -87,6 +87,46 @@ test("initial admission rejects exactly once when Codex turn/start RPC rejects",
   }
 });
 
+for (const reasoningEffort of ["max", "ultra"] as const) test(`GPT-5.6 model and ${reasoningEffort} effort reach Codex thread/start and turn/start`, async () => {
+  const root = mkdtempSync(path.join(tmpdir(), `open-tag-codex-gpt56-${reasoningEffort}-`));
+  const executable = path.join(root, "codex");
+  const requestsFile = path.join(root, "requests.jsonl");
+  const admissions: Array<Error | undefined> = [];
+  let session: ReturnType<typeof codexRuntime.start> | undefined;
+  try {
+    writeFileSync(executable, `#!${process.execPath}\nconst fs = require("node:fs");\nconst path = require("node:path");\nconst readline = require("node:readline");\nconst rl = readline.createInterface({ input: process.stdin });\nrl.on("line", (line) => {\n  const request = JSON.parse(line);\n  if (request.id === undefined) return;\n  fs.appendFileSync(path.join(process.cwd(), "requests.jsonl"), line + "\\n");\n  if (request.method === "initialize") console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: {} }));\n  else if (request.method === "thread/start") console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { thread: { id: "thread-gpt56" } } }));\n  else if (request.method === "turn/start") {\n    console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { turn: { id: "turn-gpt56" } } }));\n    console.log(JSON.stringify({ jsonrpc: "2.0", method: "turn/completed", params: { threadId: "thread-gpt56", turn: { status: "completed" } } }));\n  }\n});\n`);
+    chmodSync(executable, 0o755);
+    session = codexRuntime.start({
+      cwd: root,
+      stateDir: root,
+      env: { PATH: root },
+      systemPrompt: "system",
+      initialPrompt: "start",
+      model: "gpt-5.6-sol",
+      runtimeConfig: { reasoningEffort },
+    }, {
+      onSession: () => {},
+      onInitialTurnAdmission: (error) => admissions.push(error),
+      onActivity: () => {},
+      onTrajectory: () => {},
+      onExit: () => {},
+      log,
+    });
+
+    await waitFor(() => admissions.length > 0);
+    assert.equal(admissions[0], undefined);
+    const requests = readFileSync(requestsFile, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    const threadStart = requests.find((request) => request.method === "thread/start");
+    const turnStart = requests.find((request) => request.method === "turn/start");
+    assert.equal(threadStart.params.model, "gpt-5.6-sol");
+    assert.equal(threadStart.params.config.model_reasoning_effort, reasoningEffort);
+    assert.equal(turnStart.params.effort, reasoningEffort);
+  } finally {
+    session?.stop();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("running Codex turn/start rejection NACKs, clears the fence, and executes the same-id retry", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "open-tag-codex-running-retry-"));
   const executable = path.join(root, "codex");

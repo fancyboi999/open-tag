@@ -9,6 +9,17 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+## [0.14.1] — 2026-08-15
+
+### Fixed
+
+- Codex model discovery now captures up to 1 MiB per output stream, so current `codex debug models`
+  catalogs larger than 256 KiB remain valid JSON instead of silently falling back to a stale list.
+  The server fallback also includes the exact `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`
+  model IDs.
+- Codex app-server sessions now forward CLI-advertised `max` and `ultra` reasoning efforts instead of
+  silently dropping them after the user selects one.
+
 ## [0.14.0] — 2026-07-28
 
 ### Added

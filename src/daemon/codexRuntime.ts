@@ -8,7 +8,7 @@ import { initialTurnAdmission, protocolAdmission, type ProtocolAdmission, type R
 
 const MAX = 2000;
 const clip = (s: unknown) => String(s ?? "").slice(0, MAX);
-const EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
+const EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
 function extractThreadId(r: any): string {
   return (r && (r.threadId || r.thread?.id || r.thread_id || r.id)) || "";
 }

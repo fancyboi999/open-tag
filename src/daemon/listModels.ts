@@ -2,9 +2,8 @@
 // The daemon shells out to the runtime's list command on its own machine and parses stdout, so the
 // candidates reflect what that machine + login can actually use (not a hard-coded server table).
 //
-// Scope: opencode / cursor / pi enumerate models; Hermes enumerates local profiles.
-//  - claude / codex have no "list models" command — their catalogs stay static, server-side, but
-//    supported thinking/reasoning controls are probed dynamically.
+// Scope: opencode / cursor / pi / codex enumerate models; Hermes enumerates local profiles.
+//  - claude keeps a static server-side catalog but probes supported thinking controls dynamically.
 //  - copilot / kimi would need an ACP (JSON-RPC over stdio) handshake — not done yet.
 //  Both gaps are tracked in docs/tech-debt-tracker.md.
 //
@@ -32,9 +31,6 @@ const titleCase = (s: string): string => (s ? s[0]!.toUpperCase() + s.slice(1) :
 function isModelId(s: string): boolean {
   return /^[A-Za-z][A-Za-z0-9\-_./]*$/.test(s);
 }
-
-// claude/codex have no "list models" command — their catalog is static, but each model's reasoning-effort
-// levels ARE probed (so the UI offers exactly what the installed CLI supports, not a guess).
 
 // `claude --help` advertises the effort *superset* on one `--effort` line:
 //   `--effort <level>   Effort level for the current session (low, medium, high, xhigh, max)`
@@ -228,15 +224,15 @@ function discoverHermesProfiles(): DiscoveredModel[] {
   return discoverHermesProfilesFromRoots(roots);
 }
 
-// ── shelling out (not unit-tested — covered by the live E2E run) ──
+// ── bounded shell probes (the large-output path is covered by a fake-CLI regression test) ──
 
 const LIST_TIMEOUT_MS = 7_000; // a single probe must stay under runtimeModels' 8s WS-RPC budget, else the server gives up while the daemon keeps spawning
-const OUT_CAP = 256 * 1024; // bound memory if a CLI floods stdout
+const OUT_CAP = 1024 * 1024; // a current Codex catalog exceeds 256 KiB; keep each stream bounded at 1 MiB
 
 // Run a runtime's list command and capture stdout/stderr. Uses the daemon's own env (so the CLI sees
 // the same login/config the agent runs use) minus NODE_OPTIONS — a proxy flag there makes some
 // bundled CLIs refuse to start (same gotcha the opencode/cursor/pi runtimes guard against).
-function runList(bin: string, args: string[], timeoutMs: number = LIST_TIMEOUT_MS): Promise<{ stdout: string; stderr: string; code: number | null }> {
+export function runList(bin: string, args: string[], timeoutMs: number = LIST_TIMEOUT_MS): Promise<{ stdout: string; stderr: string; code: number | null }> {
   return new Promise((resolve) => {
     const env = { ...process.env };
     delete env.NODE_OPTIONS;
@@ -248,8 +244,8 @@ function runList(bin: string, args: string[], timeoutMs: number = LIST_TIMEOUT_M
     }
     let stdout = "";
     let stderr = "";
-    proc.stdout?.on("data", (c: Buffer) => { if (stdout.length < OUT_CAP) stdout += c.toString(); });
-    proc.stderr?.on("data", (c: Buffer) => { if (stderr.length < OUT_CAP) stderr += c.toString(); });
+    proc.stdout?.on("data", (c: Buffer) => { if (stdout.length < OUT_CAP) stdout += c.toString().slice(0, OUT_CAP - stdout.length); });
+    proc.stderr?.on("data", (c: Buffer) => { if (stderr.length < OUT_CAP) stderr += c.toString().slice(0, OUT_CAP - stderr.length); });
     const timer = setTimeout(() => { try { proc.kill(process.platform === "win32" ? undefined : "SIGKILL"); } catch { /* */ } }, timeoutMs);
     proc.on("error", (e) => { clearTimeout(timer); resolve({ stdout, stderr: stderr || String((e as any)?.message ?? e), code: 1 }); });
     proc.on("exit", (code) => { clearTimeout(timer); resolve({ stdout, stderr, code }); });
@@ -257,8 +253,8 @@ function runList(bin: string, args: string[], timeoutMs: number = LIST_TIMEOUT_M
 }
 
 // Probe the live model list for a runtime on this machine. Returns null for runtimes we can't probe
-// (claude/codex/copilot/kimi) or when the probe yields nothing — the caller falls back to a static
-// list. Never throws; a missing CLI surfaces as the spawn "error" event → empty output → null.
+// (copilot/kimi) or when the probe yields nothing — the caller falls back to a static list. Never
+// throws; a missing CLI surfaces as the spawn "error" event → empty output → null.
 export async function listModels(runtime: string): Promise<DiscoveredModel[] | null> {
   switch (runtime) {
     case "opencode": {

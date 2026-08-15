@@ -1,9 +1,10 @@
-// Unit tests for daemon model discovery parsers (opencode / cursor / pi). Pure string → model[].
-// Fixtures are stdout samples from multica's discovery research (server/pkg/agent/models.go).
-// Run: npx tsx --test --test-force-exit test/listModels.unit.test.ts
+// Unit tests for daemon model discovery parsers, bounded CLI capture, and server fallbacks.
+// Parser fixtures mirror real runtime discovery output; the large-output case uses a fake executable.
+// Run: npx tsx --test test/listModels.unit.test.ts
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseOpencodeModels, parseCursorModels, parsePiModels, parseClaudeEffortLevels, claudeThinkingForModel, parseCodexModels } from "../src/daemon/listModels.ts";
+import { claudeThinkingForModel, parseClaudeEffortLevels, parseCodexModels, parseCursorModels, parseOpencodeModels, parsePiModels, runList } from "../src/daemon/listModels.ts";
+import { CODEX_FALLBACK_MODELS } from "../src/server/runtimeModels.ts";
 
 // ── opencode ──
 test("opencode: plain (non-verbose) lines → provider/model", () => {
@@ -114,22 +115,39 @@ test("claude effort: unknown model id keeps the full superset (defensive — new
   assert.deepEqual(claudeThinkingForModel("future-model", FULL)?.levels.map((l) => l.value), ["low", "medium", "high", "xhigh", "max"]);
 });
 
-// ── codex thinking (`codex debug models` JSON; fixture mirrors real codex-cli 0.142.0) ──
+// ── codex models + thinking (`codex debug models` JSON) ──
 test("codex: parses JSON, drops non-list visibility, maps per-model reasoning levels", () => {
   const json = JSON.stringify({
     models: [
-      { slug: "gpt-5.5", display_name: "GPT-5.5", default_reasoning_level: "medium", visibility: "list", supported_in_api: true,
-        supported_reasoning_levels: [{ effort: "low", description: "Fast" }, { effort: "medium" }, { effort: "high" }, { effort: "xhigh" }] },
+      { slug: "gpt-5.6-sol", display_name: "GPT-5.6 Sol", default_reasoning_level: "low", visibility: "list", supported_in_api: true,
+        supported_reasoning_levels: [{ effort: "low", description: "Fast" }, { effort: "medium" }, { effort: "high" }, { effort: "xhigh" }, { effort: "max" }, { effort: "ultra" }] },
+      { slug: "gpt-5.6-terra", display_name: "GPT-5.6 Terra", default_reasoning_level: "medium", visibility: "list", supported_in_api: true,
+        supported_reasoning_levels: [{ effort: "low" }, { effort: "medium" }, { effort: "high" }, { effort: "xhigh" }, { effort: "max" }, { effort: "ultra" }] },
+      { slug: "gpt-5.6-luna", display_name: "GPT-5.6 Luna", default_reasoning_level: "medium", visibility: "list", supported_in_api: true,
+        supported_reasoning_levels: [{ effort: "low" }, { effort: "medium" }, { effort: "high" }, { effort: "xhigh" }, { effort: "max" }] },
       { slug: "codex-auto-review", display_name: "Auto Review", visibility: "hide", supported_reasoning_levels: [{ effort: "low" }] },
     ],
   });
   const out = parseCodexModels(json);
-  assert.deepEqual(out.map((m) => m.id), ["gpt-5.5"]); // "hide" model filtered out
-  assert.equal(out[0]!.label, "GPT-5.5");
+  assert.deepEqual(out.map((m) => m.id), ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]); // "hide" model filtered out
+  assert.equal(out[0]!.label, "GPT-5.6 Sol");
   assert.equal(out[0]!.provider, "openai");
-  assert.deepEqual(out[0]!.thinking?.levels.map((l) => l.value), ["low", "medium", "high", "xhigh"]);
+  assert.deepEqual(out[0]!.thinking?.levels.map((l) => l.value), ["low", "medium", "high", "xhigh", "max", "ultra"]);
   assert.equal(out[0]!.thinking?.levels[0]!.label, "Low"); // title-cased
-  assert.equal(out[0]!.thinking?.default, "medium");
+  assert.equal(out[0]!.thinking?.default, "low");
+});
+
+test("codex: live probe accepts a catalog larger than the old 256 KiB ceiling", async () => {
+  const script = `const payload = { models: [{ slug: "gpt-5.6-sol", display_name: "GPT-5.6 Sol", visibility: "list", supported_reasoning_levels: [{ effort: "low" }] }], padding: "x".repeat(400000) }; process.stdout.write(JSON.stringify(payload));`;
+  const result = await runList(process.execPath, ["-e", script]);
+  assert.equal(result.code, 0);
+  assert.deepEqual(parseCodexModels(result.stdout).map((m) => m.id), ["gpt-5.6-sol"]);
+});
+
+test("codex: static fallback contains exact GPT-5.6 CLI slugs", () => {
+  const ids = CODEX_FALLBACK_MODELS.map((model) => model.id);
+  assert.deepEqual(ids.slice(0, 3), ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]);
+  assert.equal(ids.includes("gpt-5.6"), false);
 });
 
 test("codex: malformed JSON → []", () => {
