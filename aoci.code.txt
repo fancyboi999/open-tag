@@ -333,6 +333,7 @@ threadUnread.integration.ts[TM9M]: F:验证关注线程的未读聚合、本人�
 threadUnread.unit.test.ts[TM7T]: F:验证前端线程元数据和父频道徽标使用一致的未读增量及本人过滤规则 | R:code:web/src/threadUnread.ts | A:nextThreadMeta,threadUnreadDelta,messageUnreadDelta | S:普通消息未读增量必须忽略线程频道事件以防与线程聚合重复计数
 uuidRouteBoundary.unit.test.ts[TS8T]: F:验证数据库UUID路由边界仅接受规范完整标识并拒绝客户端合成预览标识 | R:code:src/server/util.ts | A:isUuid | S:短标识只属于明确支持解析的代理接口，通用UUID列边界不得让畸形值进入Postgres并变成22P02错误
 workspaceRoot.unit.test.ts[TC7T]: F:验证工作区浏览返回由当前数据根派生的绝对代理目录和文件树 | R:code:src/daemon/workspace.ts,code:src/paths.ts | A:listWorkspace,OPEN_TAG_HOME,root,files | S:代理目录不存在时仍返回纯路径根和空树而非错误，OPEN_TAG_HOME必须在模块导入前确定
+clipboardFallback.unit.test.ts[TU8S]: F:验证全部复制入口在安全来源、局域网HTTP、权限拒绝和双路径失败下的统一行为 | R:code:web/src/lib/clipboard.ts,code:web/src/views/ConnectComputerWizard.tsx,code:web/src/views/Chat.tsx,code:web/src/views/Members.tsx,code:web/src/views/misc.tsx,code:web/src/messageRender.tsx | A:consumers,installClipboardEnvironment,copyText | S:连接机器向导只有确认写入后才能显示已复制，双路径失败必须保留手动复制内容
 ===OpenTag /home/d/no_human_control/open-tag-aoci-bug-hunt/web/===
 index.html[EU5T]: F:提供浏览器单页应用的挂载壳与搜索分享元数据 | R:code:web/src/main.tsx,code:web/public/favicon.svg | A:#root | S:预渲染脚本依赖原样存在的空根节点标记
 package-lock.json[FV4L]: F:锁定 Web 工作区全部 npm 依赖的版本与完整性摘要 | R:code:web/package.json | A:- | S:由 npm 生成且不得手工维护
@@ -375,7 +376,7 @@ iconMotion.css[FU3T]: F:定义图标悬停聚焦与选中状态的共享微动�
 icons.tsx[CU5T]: F:提供应用界面共用的无依赖 SVG 图标组件 | R:- | A:IconSearch,IconChat,IconInbox,IconTasks,IconUsers,IconMonitor | S:-
 machineUi.ts[CH7T]: F:统一计算机器版本状态及生成更新与连接命令 | R:code:web/src/alerts.tsx,code:web/src/views/ConnectComputerWizard.tsx,code:web/src/views/misc.tsx | A:MachineVersionState,isDaemonUpdateAvailable,daemonUpdateCommandTemplate,daemonConnectCommand | S:缺少最新版本信息时不得提示更新
 main.tsx[EU9S]: F:挂载 React 应用并执行认证工作区与公共页面路由守卫 | R:code:web/src/store.tsx,code:web/src/routing.ts,code:web/src/Layout.tsx | A:- | S:会话判定完成前不得渲染营销页且 URL 中已知工作区优先驱动当前工作区
-messageRender.tsx[DM9M]: F:把消息 Markdown 安全转换为含引用告警代码与色块的交互内容 | R:code:web/src/store.tsx,code:web/src/views/misc.tsx,code:web/src/views/Chat.tsx | A:markdownSchema,processMessageContent,remarkHtmlAsText,remarkGithubAlerts,remarkColorSwatches,MessageContent | S:原始 HTML 必须作为文字显示且用户提及仅对服务端记录的提及启用交互
+messageRender.tsx[DM9M]: F:把消息Markdown安全转换为含引用告警代码与色块的交互内容 | R:code:web/src/store.tsx,code:web/src/views/misc.tsx,code:web/src/views/Chat.tsx,code:web/src/lib/clipboard.ts | A:markdownSchema,processMessageContent,remarkHtmlAsText,remarkGithubAlerts,remarkColorSwatches,MessageContent | S:原始HTML必须作为文字显示且用户提及仅对服务端记录的提及启用交互；代码复制失败必须提供手动复制内容
 routing.ts[CI8T]: F:集中计算会话初态登录提示与登录后默认路由 | R:code:web/src/main.tsx,code:web/src/store.tsx | A:AuthState,TOKEN_KEY,readSessionHints,initialAuthState,homeRoute | S:加载中或已认证会话不得短暂显示营销页面
 showcaseData.ts[FB5T]: F:声明无需接口即可渲染的公开协作案例数据 | R:code:web/src/views/Showcase.tsx,code:web/public/showcase/reports-2026-Q2.csv | A:ShowcaseLine,ShowcaseAttachment,ShowcaseTask,ShowcaseCase,AGENTS,CASES | S:-
 startFailReason.ts[CR5T]: F:把代理启动失败原因映射为可本地化的错误键与参数 | R:code:web/src/views/Members.tsx | A:startFailReasonKey | S:未知服务端原因必须返回 null 以允许调用方显示原文
@@ -393,24 +394,25 @@ agentReplyPreview.ts[DM8S]: F:维护持久消息到达前代理流式回复的�
 avatarIdentity.test.ts[TU4T]: F:验证同名身份在组件形态变化时保持相同头像种子 | R:code:web/src/lib/avatarIdentity.ts | A:- | S:-
 avatarIdentity.ts[CU4T]: F:为缺少显式头像种子的命名身份生成稳定回退种子 | R:code:web/src/views/Chat.tsx | A:NamedAvatarIdentity,avatarSeedFor | S:回退顺序必须保持 displayName 再 name 再 id 再 userId
 msgPaging.ts[DP6T]: F:计算消息分页合并上限与加载后的滚动恢复策略 | R:code:web/src/views/Chat.tsx | A:PAGE_SIZE,MSG_CAP,appendWithCap,nextScrollState | S:只有用户位于底部时才可裁剪超出 MSG_CAP 的最老消息
+clipboard.ts[LU8T]: F:统一浏览器文本复制并为普通HTTP局域网来源提供无依赖回退 | R:code:web/src/views/ConnectComputerWizard.tsx,code:web/src/views/Chat.tsx,code:web/src/views/Members.tsx,code:web/src/views/misc.tsx,code:web/src/messageRender.tsx | A:copyText | S:非安全上下文或Clipboard API拒绝时必须尝试临时textarea；只有writeText完成或execCommand返回true才可报告成功
 ===OpenTag /home/d/no_human_control/open-tag-aoci-bug-hunt/web/src/locales/===
 en.json[FL7L]: F:提供界面全部翻译键的英文文案 | R:code:web/src/i18n.ts,code:web/src/locales/zh.json | A:- | S:键集合必须与中文资源完全一致
 zh.json[FL7L]: F:提供界面全部翻译键的中文文案 | R:code:web/src/i18n.ts,code:web/src/locales/en.json | A:- | S:键集合必须与英文资源完全一致
 ===OpenTag /home/d/no_human_control/open-tag-aoci-bug-hunt/web/src/views/===
 Auth.tsx[AI9S]: F:处理登录注册邀请加入及会话令牌落地跳转 | R:code:web/src/routing.ts,code:web/src/store.tsx | A:AuthPage,JoinPage | S:成功认证后必须写入统一令牌键并刷新会话状态
-Chat.tsx[AM9L]: F:编排频道私信线程消息分页实时回复附件与任务交互 | R:code:web/src/store.tsx,code:web/src/views/Composer.tsx,code:web/src/messageRender.tsx,code:web/src/lib/agentReplyPreview.ts,code:web/src/lib/msgPaging.ts,code:web/src/threadUnread.ts | A:BACK_TO_BOTTOM_SCROLL_MS,MESSAGE_ENTER_PIN_MS,backToBottomEase,animateBackToBottom,keepPinnedToBottomDuringEnter,Chat | S:历史分页不得触发新消息入场动画且滚动锚定状态必须按频道隔离
+Chat.tsx[AM9L]: F:编排频道私信线程消息分页实时回复附件与任务交互 | R:code:web/src/store.tsx,code:web/src/views/Composer.tsx,code:web/src/messageRender.tsx,code:web/src/lib/agentReplyPreview.ts,code:web/src/lib/msgPaging.ts,code:web/src/threadUnread.ts,code:web/src/lib/clipboard.ts | A:BACK_TO_BOTTOM_SCROLL_MS,MESSAGE_ENTER_PIN_MS,backToBottomEase,animateBackToBottom,keepPinnedToBottomDuringEnter,Chat | S:历史分页不得触发新消息入场动画且滚动锚定状态必须按频道隔离；复制消息或链接失败必须显示手动复制入口
 ChatSidebar.tsx[AM8S]: F:渲染频道私信侧栏并处理频道创建编辑成员与固定状态 | R:code:web/src/store.tsx,code:web/src/Avatar.tsx,code:web/src/ConfirmModal.tsx | A:channelCreateErrorMsg,ChatSidebar,CreateChannelModal | S:私密频道创建必须显式提交选中成员
 Composer.tsx[AM8S]: F:提交文本任务与附件并提供提及自动完成和上传进度 | R:code:web/src/store.tsx,code:web/src/Avatar.tsx | A:Composer | S:只有上传完成的附件标识才可随消息提交
-ConnectComputerWizard.tsx[AH8S]: F:引导创建重连机器并展示一次性守护进程连接命令 | R:code:web/src/store.tsx,code:web/src/machineUi.ts | A:ConnectComputerWizard | S:取消时只删除本次新建且从未上线的机器记录
+ConnectComputerWizard.tsx[AH8S]: F:引导创建重连机器并展示一次性守护进程连接命令 | R:code:web/src/store.tsx,code:web/src/machineUi.ts,code:web/src/lib/clipboard.ts | A:ConnectComputerWizard | S:取消时只删除本次新建且从未上线的机器记录；连接命令只有确认写入后才能显示复制成功
 Features.tsx[AU6L]: F:渲染双语公开功能案例页及其按需动画演示 | R:code:web/src/views/ProductMock.tsx,code:web/src/landing/MarketingNav.tsx,code:web/src/landing/landing.css | A:Lang,FeatureCase,currentLang,COPY,Features | S:动画库加载失败不得阻断静态页面内容
 Landing.tsx[AU7L]: F:渲染双语公共落地页的产品能力运行时与行动入口 | R:code:web/src/landing/MarketingNav.tsx,code:web/src/views/ProductMock.tsx,code:web/src/landing/landing.css | A:Landing | S:语言偏好必须在 localStorage 中持久化
 LiveAgentBar.tsx[AR6S]: F:汇总并展示工作区内正在工作或思考的代理状态 | R:code:web/src/store.tsx,code:web/src/Avatar.tsx | A:LiveAgentBar | S:只展示 working 与 thinking 状态并按最近活动排序
-Members.tsx[AI9L]: F:管理成员名册代理档案权限技能工作区与机器绑定 | R:code:web/src/store.tsx,code:web/src/views/ProjectDirectoryPicker.tsx,code:web/src/messageRender.tsx,code:web/src/Select.tsx | A:Members,AgentProfile,CreateAgentModal,HumanProfile | S:所有变更调用都必须检查已解析 JSON 中的 error 字段
+Members.tsx[AI9L]: F:管理成员名册代理档案权限技能工作区与机器绑定 | R:code:web/src/store.tsx,code:web/src/views/ProjectDirectoryPicker.tsx,code:web/src/messageRender.tsx,code:web/src/Select.tsx,code:web/src/lib/clipboard.ts | A:Members,AgentProfile,CreateAgentModal,HumanProfile | S:所有变更调用都必须检查已解析JSON中的error字段；邀请链接和工作区路径仅在确认复制后显示成功
 ProductMock.tsx[AU5M]: F:渲染营销页面使用的静态多代理协作产品示意界面 | R:code:web/src/Avatar.tsx,code:web/src/landing/landing.css | A:ProductMockLang,ProductMockMessage,ProductMockCase,ProductMock | S:-
 ProjectDirectoryPicker.tsx[AH8M]: F:通过守护机器浏览发现并选择代理项目目录 | R:code:web/src/store.tsx,code:web/src/views/projectDirectoryPickerPaths.ts | A:ProjectDirectoryField | S:异步目录响应必须按请求序号丢弃过期结果
 Showcase.tsx[AU6S]: F:用静态数据渲染无需认证接口的只读协作展示页 | R:code:web/src/showcaseData.ts,code:web/src/messageRender.tsx,code:web/src/views/ChatSidebar.tsx | A:Showcase | S:展示页不得依赖 StoreProvider 或后端接口
 Skeleton.tsx[CU4T]: F:提供工作区外壳与聊天记录的布局稳定加载占位 | R:code:web/src/styles.css | A:ChatSkeleton,WorkspaceSkeleton | S:占位布局必须镜像真实桌面列结构并在移动端隐藏侧列
-misc.tsx[AG8L]: F:实现任务收件箱机器搜索设置收藏等辅助页面 | R:code:web/src/store.tsx,code:web/src/TaskBoard.tsx,code:web/src/views/ConnectComputerWizard.tsx,code:web/src/machineUi.ts | A:Tasks,Inbox,Computers,Search,Settings,copyText | S:剪贴板写入失败必须回退到隐藏 textarea 的 execCommand
+misc.tsx[AG8L]: F:实现任务收件箱机器搜索设置收藏等辅助页面 | R:code:web/src/store.tsx,code:web/src/TaskBoard.tsx,code:web/src/views/ConnectComputerWizard.tsx,code:web/src/machineUi.ts,code:web/src/lib/clipboard.ts | A:Tasks,Inbox,Computers,Search,Settings | S:daemon命令与邀请复制必须使用共享回退，写入失败时不得显示成功
 projectDirectoryPickerPaths.test.ts[TH6T]: F:验证 POSIX Windows 盘符 UNC 与混合分隔符的目录面包屑 | R:code:web/src/views/projectDirectoryPickerPaths.ts | A:- | S:-
 projectDirectoryPickerPaths.ts[KH7T]: F:在限定根目录内把 POSIX Windows 与 UNC 路径拆成面包屑 | R:code:web/src/views/ProjectDirectoryPicker.tsx | A:ProjectDirectoryEntry,projectPathBreadcrumbs | S:未匹配根目录时只能返回当前路径单项以避免越界导航
 

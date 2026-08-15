@@ -7,6 +7,7 @@ import { fmtDateTime, isSameLocalDay, fmtDateDivider } from "../format";
 import { PAGE_SIZE, appendWithCap, nextScrollState } from "../lib/msgPaging";
 import { AGENT_REPLY_PREVIEW_TYPE, AGENT_REPLY_STREAM_TICK_MS, absorbPersistedAgentMessagePreview, applyAgentReplyPreview, dropAgentReplyPreviewsForMessage, hasStreamingAgentReplyPreview, mergePersistedAgentMessageUpdate, renderKeyForMessage, tickAgentReplyPreviews, type AgentReplyEvent, type AgentReplyPreviewMsg } from "../lib/agentReplyPreview";
 import { avatarSeedFor } from "../lib/avatarIdentity";
+import { copyText } from "../lib/clipboard.ts";
 import { MessageContent, type NameItem, type Nav } from "../messageRender.tsx";
 import { nextThreadMeta } from "../threadUnread";
 import { Smile, X, ExternalLink, CheckCircle2, MessageCircle, MoreHorizontal, Link2, Clipboard, Bookmark, CheckSquare, Circle, Play, Eye, Ban, ArrowDown, BellOff, Lock, Globe, Archive, Trash2, Users } from "lucide-react";
@@ -386,7 +387,9 @@ export function Chat() {
   const taskAssignee = (m: Msg) => { if (!m.taskAssigneeId) return ""; const a = agents.find((x) => x.id === m.taskAssigneeId); if (a) return " @" + (a.displayName || a.name); const h = humans.find((x) => x.userId === m.taskAssigneeId); return h ? " @" + (h.displayName || h.name) : ""; };
   // Handles task status change / claim from the task badge; socket message:updated event refreshes the message automatically
   const doTask = async (m: Msg, action: string, body?: unknown) => { try { await api("PATCH", `/api/tasks/${m.id}/${action}`, body); } catch { /* will self-correct on next reload */ } };
-  const copyMarkdown = (content: string) => { navigator.clipboard?.writeText(content).catch(() => {}); };
+  const copyMarkdown = async (content: string) => {
+    if (!await copyText(content)) window.prompt(t("chat.copyMarkdown"), content);
+  };
   const agentLiveState = (a?: (typeof agents)[number]) => {
     if (!a) return "offline";
     const activity = a.activity && a.activity !== "offline" ? a.activity : "";
@@ -591,14 +594,14 @@ export function Chat() {
       {ctxMenu && (() => {
         const m = ctxMenu.m;
         const close = () => setCtxMenu(null);
-        const copy = (t: string) => { navigator.clipboard?.writeText(t).catch(() => {}); close(); };
+        const copy = async (text: string, label: string) => { if (!await copyText(text)) window.prompt(label, text); close(); };
         const link = `${location.origin}/s/${slug}/channel/${m.channelId}?msg=${m.id}`;
         return (
           <div className="ctx-backdrop" onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }}>
             <div className="ctx-menu" style={{ left: Math.min(ctxMenu.x, window.innerWidth - 230), top: Math.min(ctxMenu.y, window.innerHeight - 320) }} onClick={(e) => e.stopPropagation()}>
               <div className="ctx-rx">{QUICK_EMOJIS.slice(0, 6).map((e) => <button key={e} title={e} onClick={() => { react(m.id, e, false); close(); }}>{e}</button>)}</div>
-              <button className="ctx-item" onClick={() => copy(m.content)}><Clipboard size={14} /> {t("chat.copyMarkdown")}</button>
-              <button className="ctx-item" onClick={() => copy(link)}><Link2 size={14} /> {t("chat.copyLink")}</button>
+              <button className="ctx-item" onClick={() => copy(m.content, t("chat.copyMarkdown"))}><Clipboard size={14} /> {t("chat.copyMarkdown")}</button>
+              <button className="ctx-item" onClick={() => copy(link, t("chat.copyLink"))}><Link2 size={14} /> {t("chat.copyLink")}</button>
               <button className="ctx-item" onClick={() => { startThread(m); close(); }}><MessageCircle size={14} /> {t("chat.openThread")}</button>
               <button className="ctx-item" onClick={() => { savedIds.has(m.id) ? unsaveMsg(m.id) : saveMsg(m.id); close(); }}><Bookmark size={14} fill={savedIds.has(m.id) ? "currentColor" : "none"} /> {savedIds.has(m.id) ? t("chat.unsave") : t("chat.saveMessage")}</button>
               <button className="ctx-item" onClick={async () => { close(); await api("POST", "/api/tasks/convert-message", { messageId: m.id }); }}><CheckSquare size={14} /> {t("chat.convertToTask")}</button>

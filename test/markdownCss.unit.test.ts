@@ -151,7 +151,7 @@ test("Workspace Markdown preview keeps parity with chat for rich GFM elements", 
   assert.match(messageRenderSrc, /function languageFromReact/);
   assert.match(messageRenderSrc, /language-\(\[\^\\s\]\+\)/);
   assert.match(messageRenderSrc, /<span className="md-code-lang">\{lang\}<\/span>/);
-  assert.match(messageRenderSrc, /import \{ copyText \} from "\.\/views\/misc\.tsx"/);
+  assert.match(messageRenderSrc, /import \{ copyText \} from "\.\/lib\/clipboard\.ts"/);
   assert.match(messageRenderSrc, /await copyText\(text\)/);
   assert.match(messageRenderSrc, /pre\(\{ children \}\)\s*\{\s*return <CodeBlock>\{children\}<\/CodeBlock>/);
   assert.match(messageRenderSrc, /export function markdownUrlTransform/);

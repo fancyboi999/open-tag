@@ -18,6 +18,7 @@ import { startFailReasonKey } from "../startFailReason.ts";
 import { CodeBlock, ColorSwatch, GithubAlertBlockquote, colorValueFromTag, markdownSchema, markdownUrlTransform, remarkColorSwatches, remarkGithubAlerts, remarkHtmlAsText } from "../messageRender.tsx";
 import i18n from "../i18n";
 import { ProjectDirectoryField } from "./ProjectDirectoryPicker.tsx";
+import { copyText } from "../lib/clipboard.ts";
 
 // Unified agent status label: fine-grained activity (working/thinking/online) takes priority;
 // offline/absent falls back to lifecycle status (active/sleeping/inactive).
@@ -85,7 +86,10 @@ function InviteHumanModal({ onClose }: { onClose: () => void }) {
     if (!l) l = await api("POST", `/api/servers/${serverId}/join-links`, { role: "member", maxUses: null });
     if (l?.token) setLink(`${location.origin}/join/${l.token}`);
   })(); /* eslint-disable-next-line */ }, [serverId]);
-  const copy = async () => { try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* */ } };
+  const copy = async () => {
+    if (!await copyText(link)) { window.prompt(t("members.copyLink"), link); return; }
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -476,7 +480,10 @@ function WorkspaceTab({ id }: { id: string }) {
   useEffect(() => { setSel(null); setExpanded(new Set()); setRoot(`~/.open-tag/agents/${id}/`); (async () => { const d = await api("GET", `/api/agents/${id}/workspace-files`); if (d.error) { setErr(d.error); setFiles([]); } else { setErr(""); setFiles(d.files || []); if (d.root) setRoot(d.root.endsWith("/") ? d.root : d.root + "/"); } })(); }, [id]);
   const open = async (f: any) => { setMode("preview"); const d = await api("GET", `/api/agents/${id}/workspace-files/read?path=${encodeURIComponent(f.path)}`); setSel({ path: f.path, content: d.content, error: d.error }); };
   const toggleDir = (path: string) => setExpanded((s) => { const n = new Set(s); n.has(path) ? n.delete(path) : n.add(path); return n; });
-  const copyRoot = () => navigator.clipboard?.writeText(root).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  const copyRoot = async () => {
+    if (!await copyText(root)) { window.prompt(t("members.copyPath"), root); return; }
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
   // Collapse filter: a node is visible iff all its ancestor directories are expanded (top-level visible by default, subdirs collapsed)
   const visible = files.filter((f) => { const parts = f.path.split("/"); if (!showHidden && parts.some((seg: string) => seg.startsWith("."))) return false; for (let i = 1; i < parts.length; i++) if (!expanded.has(parts.slice(0, i).join("/"))) return false; return true; });
   const isMd = !!sel && /\.md$/i.test(sel.path);

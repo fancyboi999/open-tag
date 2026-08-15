@@ -203,11 +203,11 @@ test("new messages expand from below so existing messages move smoothly", () => 
 });
 
 test("message toolbar stays inside the message border and exposes save/copy/more directly", () => {
-  assert.match(chatSrc, /const copyMarkdown = \(content: string\) => \{ navigator\.clipboard\?\.writeText\(content\)\.catch\(\(\) => \{\}\); \};/);
+  assert.match(chatSrc, /const copyMarkdown = async \(content: string\) => \{\s*if \(!await copyText\(content\)\) window\.prompt\(t\("chat\.copyMarkdown"\), content\);\s*\};/);
   assert.match(chatSrc, /<button className=\{"im" \+ \(isSaved \? " on" : ""\)\} title=\{isSaved \? t\("chat\.unsave"\) : t\("chat\.saveMessage"\)\} onClick=\{\(\) => \{ isSaved \? unsaveMsg\(m\.id\) : saveMsg\(m\.id\); \}\}><Bookmark size=\{15\} className="im-pop im-fill" fill=\{isSaved \? "currentColor" : "none"\} \/><\/button>/);
   assert.match(chatSrc, /<button className="im" title=\{t\("chat\.copyMarkdown"\)\} onClick=\{\(\) => copyMarkdown\(m\.content\)\}><Clipboard size=\{15\} className="im-pop" \/><\/button>/);
   assert.match(chatSrc, /<button className="im" title=\{t\("chat\.more"\)\} onClick=\{\(e\) => \{ const r = e\.currentTarget\.getBoundingClientRect\(\); setCtxMenu\(\{ m, x: r\.right - 212, y: r\.bottom \+ 4 \}\); \}\}><MoreHorizontal size=\{15\} className="im-pop" \/><\/button>/);
-  assert.match(chatSrc, /className="ctx-item" onClick=\{\(\) => copy\(m\.content\)\}/);
+  assert.match(chatSrc, /className="ctx-item" onClick=\{\(\) => copy\(m\.content, t\("chat\.copyMarkdown"\)\)\}/);
 
   const toolbar = ruleBody(".msg-toolbar");
   assert.match(toolbar, /top\s*:\s*7px\b/, `toolbar should sit inside the message border: ${toolbar}`);

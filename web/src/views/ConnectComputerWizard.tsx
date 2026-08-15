@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { IconMonitor } from "../icons.tsx";
 import { CheckCircle2 } from "lucide-react";
 import { daemonConnectCommand } from "../machineUi.ts";
+import { copyText } from "../lib/clipboard.ts";
 
 // Self-contained onboarding nudge state (reused from the old AddComputerModal): once-per-tab session
 // dismiss + a permanent global opt-out checkbox. Only the "onboard" mode reads/writes these.
@@ -98,7 +99,10 @@ export function ConnectComputerWizard({ mode, machine, onClose }: { mode: Mode; 
   }, [step, res, isOnline, mode, machine]);
 
   const cmd = res ? daemonConnectCommand(window.location.origin, res.key) : "";
-  const copy = (text: string) => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  const copy = async (text: string) => {
+    if (!await copyText(text)) { window.prompt(t("misc.connectModalCopyBtn"), text); return; }
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
 
   const finish = async () => {
     // Empty input means "use the hostname" (matches the placeholder) — otherwise the machine would keep the

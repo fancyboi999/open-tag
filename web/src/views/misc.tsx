@@ -12,6 +12,7 @@ import { ConnectComputerWizard } from "./ConnectComputerWizard.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 import { useTranslation } from "react-i18next";
 import { daemonUpdateCommandTemplate, isDaemonUpdateAvailable } from "../machineUi.ts";
+import { copyText } from "../lib/clipboard.ts";
 
 export function Tasks() {
   const { channels, slug } = useStore();
@@ -278,7 +279,10 @@ function DaemonUpdateModal({ onClose, machine }: { onClose: () => void; machine:
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const cmd = daemonUpdateCommandTemplate(window.location.origin);
-  const copy = () => { navigator.clipboard?.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  const copy = async () => {
+    if (!await copyText(cmd)) { window.prompt(t("misc.connectModalCopyBtn"), cmd); return; }
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -522,36 +526,6 @@ export function Saved() {
 }
 
 // Invite members (join-links): owner/admin generates invite links (configurable role/max-uses) → share → recipient registers or logs in to join.
-export async function copyText(text: string): Promise<boolean> {
-  if (navigator.clipboard && window.isSecureContext) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      // Fall back to the textarea path below.
-    }
-  }
-
-  const el = document.createElement("textarea");
-  el.value = text;
-  el.setAttribute("readonly", "");
-  el.style.position = "fixed";
-  el.style.top = "-1000px";
-  el.style.left = "-1000px";
-  el.style.opacity = "0";
-  document.body.appendChild(el);
-  el.focus();
-  el.select();
-  el.setSelectionRange(0, text.length);
-  try {
-    return document.execCommand("copy");
-  } catch {
-    return false;
-  } finally {
-    document.body.removeChild(el);
-  }
-}
-
 function InvitesSettings({ api, serverId }: { api: any; serverId: string }) {
   const { capabilities } = useStore();
   const { t } = useTranslation();

@@ -10,7 +10,7 @@ import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { copyText } from "./views/misc.tsx";
+import { copyText } from "./lib/clipboard.ts";
 
 const alertTypes = new Set(["note", "tip", "important", "warning", "caution"]);
 
@@ -99,6 +99,7 @@ export function CodeBlock({ children }: { children: ReactNode }) {
       window.setTimeout(() => setCopied(false), 1200);
     } else {
       setCopied(false);
+      window.prompt(t("md.copyCode"), text);
     }
   };
   return (
