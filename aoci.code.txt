@@ -26,6 +26,7 @@ package-lock.json[FV7L]: F:锁定根服务、CLI、daemon 构建和数据库工�
 package.json[FV9T]: F:声明根项目元数据、开发运维命令、运行依赖和 TypeScript 工具链 | R:code:package-lock.json,code:docker-compose.yml,code:scripts/prod-up.sh,code:scripts/wt-add.sh,code:scripts/dev-e2e-up.sh,code:scripts/build-daemon-pkg.mjs | A:scripts,dependencies,devDependencies,optionalDependencies,overrides,project metadata | S:typecheck 同时覆盖根与 web，S3 SDK 为可选依赖且守护进程包有独立发布版本
 railway.json[OV8T]: F:配置 Railway 使用根 Dockerfile、健康检查和失败重启策略 | R:code:Dockerfile,code:docs/deploy-railway.md,code:src/server/index.ts | A:schema,build.builder,dockerfilePath,healthcheckPath,healthcheckTimeout,restartPolicy | S:-
 tsconfig.json[FC9T]: F:配置根 TypeScript 的 NodeNext、严格检查、Node 类型和源码包含范围 | R:code:package.json,code:drizzle.config.ts | A:target,module,moduleResolution,strict,noUncheckedIndexedAccess,include | S:-
+测试账号密码.md[FS9T]: F:记录本地沙盘部署的测试登录入口与凭据 | R:code:docs/self-host.md,code:src/server/routes-api/auth.ts | A:- | S:内容含明文测试凭据，仅限本机沙盘登录；索引不得复述凭据值，文件不得提交到版本控制或发送到外部系统
 ===OpenTag /home/d/no_human_control/open-tag-aoci-bug-hunt/.agents/skills/doc-sync/===
 SKILL.md[SQ9T]: F:规定每次变更和周期审计的文档同步、陈旧检查及失败披露流程 | R:code:AGENTS.md,code:ARCHITECTURE.md,code:FEATURES.md,code:docs/generated/db-schema.md,code:docs/tech-debt-tracker.md,code:CHANGELOG.md | A:Mode 1 per-change sync,变更面映射,状态单一来源,陈旧与卫生检查,Mode 2 periodic audit,Fail loud | S:代码与所欠文档必须同一提交，已解决债务移入 archive 而非留存状态副本
 ===OpenTag /home/d/no_human_control/open-tag-aoci-bug-hunt/.claude/===

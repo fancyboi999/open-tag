@@ -47,6 +47,7 @@
   "ledger_enabled": true,
   "line_ending_tolerance": true,
   "cognition_refresh_threshold": 30,
+  "database_cognition_batch_objects": 21,
   "overview_delivery": {
     "chunk_tokens": 8000
   },
@@ -71,7 +72,7 @@
     {
       "source_id": "primary",
       "engine": "postgresql",
-      "database": "opentag_aoci_bug_hunt",
+      "database": "opentag",
       "namespaces": [
         "public"
       ],
