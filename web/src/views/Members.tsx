@@ -359,22 +359,50 @@ function SkillsSection({ id, projectBound }: { id: string; projectBound: boolean
 // Permissions tab (GET/PUT /api/agents/:id/scopes — grouped scope checkboxes with enforcement)
 function PermissionsTab({ id }: { id: string }) {
   const { t } = useTranslation();
-  const { api } = useStore();
+  const { api, capabilities } = useStore();
+  const toast = useToast();
+  const canManage = !!capabilities.manageAgents;
   const [data, setData] = useState<any>(null);
   const [granted, setGranted] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   useEffect(() => { (async () => { const d = await api("GET", `/api/agents/${id}/scopes`); setData(d); setGranted(new Set(d.granted || [])); })(); }, [id]);
   if (!data) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
   const toggle = (k: string) => setGranted((g) => { const n = new Set(g); n.has(k) ? n.delete(k) : n.add(k); return n; });
-  const save = async (scopes: string[]) => { const d = await api("PUT", `/api/agents/${id}/scopes`, { scopes }); setData({ ...data, ...d }); setGranted(new Set(d.granted || [])); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  const save = async (scopes: string[]) => {
+    if (!canManage || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaved(false);
+    try {
+      const result = await api("PUT", `/api/agents/${id}/scopes`, { scopes });
+      if (result?.error) throw new Error(result.error);
+      if (result?.agentId !== id || result?.mode !== "custom" || !Number.isInteger(result?.revision)
+        || !Array.isArray(result?.granted) || !result.granted.every((scope: unknown) => typeof scope === "string")) {
+        throw new Error("invalid permission response");
+      }
+      setData({ ...data, ...result });
+      setGranted(new Set(result.granted));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch {
+      toast.error(t("members.permissionsSaveFailed"));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
   const groups: Record<string, any[]> = {};
   for (const s of data.catalog || []) (groups[s.group] ||= []).push(s);
   return (
     <div className="scroll">
       <div className="perm-head">
         <span className="meta">{data.mode === "custom" ? t("members.permCustom") : t("members.permDefault")} · rev {data.revision}</span>
-        <button className="joinbtn" onClick={() => save((data.catalog || []).map((s: any) => s.key))}>{t("members.grantAll")}</button>
-        <button className="ok" style={{ marginLeft: "auto" }} onClick={() => save([...granted])}>{t("members.save")}</button>
+        {canManage && <>
+          <button className="joinbtn" disabled={saving} onClick={() => save((data.catalog || []).map((s: any) => s.key))}>{t("members.grantAll")}</button>
+          <button className="ok" style={{ marginLeft: "auto" }} disabled={saving} onClick={() => save([...granted])}>{t("members.save")}</button>
+        </>}
         {saved && <span className="saved">{t("members.savedConfirm")}</span>}
       </div>
       {/* Scope group/label/description come from the server catalog (src/server/scopes.ts, English). Translate
@@ -385,7 +413,7 @@ function PermissionsTab({ id }: { id: string }) {
           <div className="sec sec-sub">{t(`members.scopeGroup.${g}`, { defaultValue: g })}</div>
           {list.map((s: any) => (
             <label key={s.key} className="perm-row">
-              <input type="checkbox" checked={granted.has(s.key)} onChange={() => toggle(s.key)} />
+              <input type="checkbox" checked={granted.has(s.key)} disabled={!canManage || saving} onChange={() => toggle(s.key)} />
               <span className="grow"><span className="who">{t(`members.scopeLabel.${s.key.replace(/:/g, "_")}`, { defaultValue: s.label })}</span> <code className="perm-key">{s.key}</code><div className="meta">{t(`members.scopeDesc.${s.key.replace(/:/g, "_")}`, { defaultValue: s.description })}</div></span>
             </label>
           ))}
