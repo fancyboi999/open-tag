@@ -7,6 +7,7 @@ import type { Server } from "node:http";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { verifyUser } from "./auth.js";
+import { requireCap } from "./capabilities.js";
 import { createLogger } from "../log.js";
 
 const log = createLogger("server:io");
@@ -67,6 +68,13 @@ async function canReadChannel(uid: string, serverId: string, channelId: string):
   const ch = (await db.select().from(schema.channels).where(eq(schema.channels.id, channelId)))[0];
   if (!ch || ch.serverId !== serverId || ch.deletedAt) return false;
   if (ch.type === "channel") return true;                                  // public: any server member may read realtime events
+  if (ch.type === "dm" && (await requireCap(serverId, uid, "manageAgents"))) {
+    // Audit mirror of channelAccess.canUserReadChannel: managers join the realtime room of
+    // agent-only DMs so the audit view is live. Keep in sync with the REST guard.
+    const humanMembers = await db.select({ memberType: schema.channelMembers.memberType }).from(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, channelId), eq(schema.channelMembers.memberType, "user")));
+    if (humanMembers.length === 0) return true;
+  }
   if (ch.parentMessageId) {                                                 // thread: visibility follows its parent message's channel
     const parent = (await db.select().from(schema.messages).where(eq(schema.messages.id, ch.parentMessageId)))[0];
     if (parent) return canReadChannel(uid, serverId, parent.channelId);     // depth 1 (a parent channel is never itself a thread)

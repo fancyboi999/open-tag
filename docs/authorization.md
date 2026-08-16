@@ -98,6 +98,11 @@ gap: task *ownership* (§6 C5).
    `canAgentReadChannel` enforced in `resolveTarget` / `resolveMessageId` / `findParent` / `channel/join`
    (§6 C1–C3/C6/C7/C8 — fixed). Human REST read/write of messages and tasks is gated by
    `canUserReadChannel` (`channelAccess.ts`) — same logic, human plane (§6 F-REST — fixed).
+   **Audit exemption (agent↔agent DMs only):** a DM with *no human members* is readable by humans holding
+   `manageAgents` (owner/admin oversight of their agents). Enforced in `canUserReadChannel` plus its
+   socketio mirror, and such DMs list in the manager's `/channels/dm` as "A ⇄ B". Human↔agent DMs stay
+   member-private (the owner gets 403 when not a member). The agent plane has **no** exemption — agents
+   remain isolated from each other's DMs. Test: `test/agentDmAudit.integration.ts`.
 
 ## 5. What the hardening PRs enforced
 
