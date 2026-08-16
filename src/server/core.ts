@@ -1,5 +1,7 @@
 // Message core: seq assignment, @mention parsing, DB write, SSE broadcast (human), wake delivery (agent), target resolution.
-import { and, eq, ne, desc, gt, inArray, like, sql, or, isNull, isNotNull } from "drizzle-orm";
+import { and, eq, ne, desc, gt, lte, inArray, like, sql, or, isNull, isNotNull } from "drizzle-orm";
+import { releaseAgentDeliveryAdmission } from "./agentDeliveryAdmission.js";
+import { hasPendingAgentDelivery } from "./agentDeliveryAck.js";
 import { db, schema } from "../db/index.js";
 import { nextSeq, publish } from "./realtime.js";
 import { nextTaskNumber } from "../redis.js";
@@ -763,6 +765,60 @@ async function sysTaskMsg(serverId: string, channelId: string, content: string, 
   await publish(serverId, { type: "message", channelId, message: { ...serializeMsg(m!, [], []), channelType: ch?.type ?? null } });
   await publishThreadUpdated(serverId, ch, actor?.id ?? null, "system");
   return m!;
+}
+
+/** Channel-deletion notice for member agents: a system message inside the (just deleted)
+ *  channel plus assigned attention per agent, so each member is woken and sees it via
+ *  message check — the agent plane surfaces ONLY post-deletion system messages for deleted
+ *  channels (routes-agent check), so members learn the channel is gone without regaining
+ *  history visibility, and sends stay rejected by resolveTarget (live 2026-08-16 #实验频道). */
+export async function notifyChannelDeleted(serverId: string, channelId: string, channelName: string, agentIds: string[]): Promise<void> {
+  if (!agentIds.length) return;
+  const m = await sysTaskMsg(serverId, channelId, `频道 #${channelName} 已被删除 / channel #${channelName} has been deleted`);
+  await ensureReplyRecipients({ serverId, channelId, messageId: m.id, recipients: agentIds.map((agentId) => ({ agentId, attention: "assigned" as const })) });
+}
+
+/** Watchdog sweeper: recover deliveries orphaned by a server restart. The admitted row
+ *  survives in DB while no live process awaits the agent's reply, so every later dispatch
+ *  short-circuits "delivered" (conversationTurnDispatch) and the turn never actually reaches
+ *  the agent (live 2026-08-16 18:20 stall). Release the admission + re-ready the turn; the
+ *  scheduler redelivers on its next tick, and a system notice keeps the recovery visible. */
+const ORPHAN_DELIVERY_GRACE_MS = 60_000;
+export async function sweepOrphanedAgentDeliveries(at = new Date()): Promise<number> {
+  const cutoff = new Date(at.getTime() - ORPHAN_DELIVERY_GRACE_MS);
+  const rows = await db.select({
+    messageId: schema.agentMessageDecisions.messageId,
+    agentId: schema.agentMessageDecisions.agentId,
+    turnId: schema.conversationTurns.id,
+    channelId: schema.conversationTurns.channelId,
+    serverId: schema.conversationTurns.serverId,
+  }).from(schema.agentMessageDecisions)
+    .innerJoin(schema.conversationTurns, eq(schema.conversationTurns.triggerMessageId, schema.agentMessageDecisions.messageId))
+    .where(and(
+      isNotNull(schema.agentMessageDecisions.deliveryAdmittedAt),
+      lte(schema.agentMessageDecisions.deliveryAdmittedAt, cutoff),
+      isNull(schema.agentMessageDecisions.replyMessageId),
+      inArray(schema.conversationTurns.state, ["dispatching", "active", "dispatched"]),
+    ));
+  let recovered = 0;
+  for (const r of rows) {
+    const deliveryId = `${r.turnId}:${r.agentId}`;
+    if (hasPendingAgentDelivery(deliveryId)) continue; // a live process still owns this delivery
+    await releaseAgentDeliveryAdmission({ deliveryId, messageId: r.messageId, agentId: r.agentId, seq: 0 });
+    await db.update(schema.conversationTurns).set({ state: "ready", dispatchAfter: at, dispatchLeaseUntil: null, updatedAt: at })
+      .where(and(eq(schema.conversationTurns.id, r.turnId), inArray(schema.conversationTurns.state, ["dispatching", "active", "dispatched"])));
+    await sysTaskMsg(r.serverId, r.channelId, `🛠 监工:投递许可超时已自动恢复(supervisor: orphaned delivery admission released, turn ${r.turnId.slice(0, 8)})`);
+    recovered++;
+  }
+  return recovered;
+}
+
+export function startStuckTurnSweeper(): void {
+  const tick = () => sweepOrphanedAgentDeliveries()
+    .then((n) => { if (n > 0) log.info("stuck-turn sweeper recovered orphaned deliveries", { n }); })
+    .catch((e) => log.warn("stuck-turn sweeper failed (continuing)", { detail: String((e as Error)?.message ?? e) }));
+  setInterval(tick, 60_000);
+  void tick();
 }
 
 export async function convertMessageToTask(serverId: string, messageId: string, by?: { type: "user" | "agent"; id: string }) {

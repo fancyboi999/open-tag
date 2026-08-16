@@ -16,7 +16,7 @@ import { reconcileMachinesOnBoot, startMachineSweeper } from "./machineLiveness.
 import { sendJson, sendErr } from "./util.js";
 import { createLogger } from "../log.js";
 import { shouldServeAppShell } from "./staticRoutes.js";
-import { dispatchConversationTurn } from "./core.js";
+import { dispatchConversationTurn, startStuckTurnSweeper } from "./core.js";
 import { startConversationTurnScheduler } from "./conversationTurns.js";
 
 // ── Security headers (helmet) ────────────────────────────────────────────────
@@ -146,6 +146,7 @@ const server = http.createServer(async (req, res) => {
 attachSocketIO(server); // human-side realtime (socket.io, /socket.io/)
 attachWs(server);       // daemon control plane (raw ws, /daemon/connect)
 startReminderScheduler(); // reminder scheduler: fires at due time, wakes the author
+startStuckTurnSweeper(); // watchdog: releases restart-orphaned delivery admissions, re-readies turns
 
 // Durability guard: before accepting traffic, advance Redis seq/tasknum counters to match the current Postgres maximum.
 // Prevents seq collisions and silent message drops in /messages/sync if Redis loses data (flush/instance swap/eviction) and INCR restarts from a lower value.
