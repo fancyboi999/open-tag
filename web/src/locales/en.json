@@ -582,6 +582,7 @@
     "joinBtn": "Join",
     "newDmTitle": "New direct message",
     "dmPickEmpty": "Create an agent in Members first",
+    "agentMutualDms": "Agent-to-agent DMs",
     "unknownUser": "Unknown user",
     "createChannelHeading": "Create Channel",
     "fieldName": "Name *",

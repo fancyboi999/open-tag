@@ -145,16 +145,22 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     const usersAll = await db.select().from(schema.users);
     const out = dms.map((c) => {
       const audit = auditIds.has(c.id);
+      const auditPeers = audit
+        ? dmMembers.filter((m) => m.channelId === c.id && m.memberType === "agent").map((m) => agentsAll.find((a) => a.id === m.memberId))
+        : [];
       const peer = audit
         ? dmMembers.find((m) => m.channelId === c.id && m.memberType === "agent")
         : dmMembers.find((m) => m.channelId === c.id && !(m.memberType === "user" && m.memberId === userId));
       const src = peer ? (peer.memberType === "agent" ? agentsAll.find((a) => a.id === peer.memberId) : usersAll.find((u) => u.id === peer.memberId)) : null;
+      const p2 = auditPeers[1] ?? null;
       const auditName = audit
         ? dmMembers.filter((m) => m.channelId === c.id).map((m) => agentsAll.find((a) => a.id === m.memberId)?.name ?? "?").join(" ⇄ ")
         : (src?.name ?? c.name);
       return {
         id: c.id, name: auditName, type: "dm", description: c.description, createdAt: c.createdAt, lastMessageAt: c.lastMessageAt,
+        audit,
         peerId: peer?.memberId ?? null, peerName: src?.name ?? null, peerDisplayName: src?.displayName ?? null, peerType: peer?.memberType ?? null, peerAvatarUrl: (src as any)?.avatarUrl ?? null,
+        peer2Name: p2?.name ?? null, peer2DisplayName: p2?.displayName ?? null,
       };
     }).filter((o) => o.peerId); // deleted agents leave DM (channelMembers removed) → no peer → exclude from list (do not show DMs with deleted agents, no more "unknown user")
     return (sendJson(res, 200, out), true);

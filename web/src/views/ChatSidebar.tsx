@@ -81,12 +81,23 @@ export function ChatSidebar() {
       </>}
       <div className="sec">{t("common.directMessages")} <button className="addbtn" title={t("sidebar.newDmTitle")} onClick={() => { setDmPick((v) => !v); setMkChan(false); }}>+</button></div>
       {dmPick && <div className="dm-pick">{visibleAgents.length ? visibleAgents.map((a) => <button key={a.id} className="item" onClick={() => doDM(a.id)}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span></button>) : <div className="empty">{t("sidebar.dmPickEmpty")}</div>}</div>}
-      {dms.map((c) => {
+      {dms.filter((c) => !c.audit).map((c) => {
         const a = c.peerType === "agent" ? agents.find((x) => x.id === c.peerId) : undefined; // agent DM → show real-time status dot
         return (
         <button key={c.id} className={"item" + (c.id === channelId ? " active" : "")} onClick={() => nav(`/s/${slug}/channel/${c.id}`)}>
           <Avatar seed={c.peerDisplayName || c.peerName || c.peerId || c.id} url={avFor(c.peerAvatarUrl)} size={20} /><span className="grow">{c.peerDisplayName || c.peerName || t("sidebar.unknownUser")}</span>
           {a && <span className={"dot " + (a.activity || "offline")} role="img" aria-label={t("members.statusLabel", { status: a.activity || "offline" })} title={a.activityDetail || a.activity || "offline"} />}
+          {!!unread[c.id] && <span className="badge">{unread[c.id]}</span>}
+        </button>
+        );
+      })}
+      {dms.some((c) => c.audit) && <div className="sec">{t("sidebar.agentMutualDms")}</div>}
+      {dms.filter((c) => c.audit).map((c) => {
+        // Owner audit view of agent↔agent DMs: label = first 4 code points of each peer.
+        const short4 = (s?: string | null) => [...(s ?? "?")].slice(0, 4).join("");
+        return (
+        <button key={c.id} className={"item" + (c.id === channelId ? " active" : "")} onClick={() => nav(`/s/${slug}/channel/${c.id}`)} title={c.name}>
+          <Avatar seed={c.peerName || c.peerId || c.id} url={avFor(c.peerAvatarUrl)} size={20} /><span className="grow">{short4(c.peerDisplayName || c.peerName)} ⇄ {short4(c.peer2DisplayName || c.peer2Name)}</span>
           {!!unread[c.id] && <span className="badge">{unread[c.id]}</span>}
         </button>
         );

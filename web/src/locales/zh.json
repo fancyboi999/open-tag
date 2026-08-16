@@ -582,6 +582,7 @@
     "joinBtn": "加入",
     "newDmTitle": "发起私聊",
     "dmPickEmpty": "先在 Members 创建 agent",
+    "agentMutualDms": "Agent 相互对话",
     "unknownUser": "未知用户",
     "createChannelHeading": "创建频道",
     "fieldName": "名称 *",
