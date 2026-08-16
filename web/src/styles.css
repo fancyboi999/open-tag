@@ -605,6 +605,11 @@ main.content-col>.scroll .msg-head>.msg-agent-state{padding-right:76px}
 .msg-role{font-size:13px;color:var(--muted-soft);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto}
 .msg-head + .mbody{margin-top:8px} /* keeps body breathing room when no subhead follows (the common case now that activity moved into msg-head) */
 .msg-act{margin:7px 0 8px;border-left:1px solid var(--hair-strong);min-width:0}
+/* one-click stop sits beside the toggle (buttons can't nest, so the toggle lives in a flex head) */
+.msg-act-head{display:flex;align-items:stretch}
+.msg-act-head .msg-act-toggle{flex:1;min-width:0}
+.msg-act-stop{flex:none;display:grid;place-items:center;width:28px;margin:3px 6px 3px 0;border:1px solid var(--hair-strong);border-radius:6px;background:var(--surface);color:var(--muted);cursor:pointer}
+.msg-act-stop:hover{color:var(--status-red);border-color:var(--status-red)}
 .msg-act.is-live{border-left-color:var(--status-blue)}
 .msg-act.is-error{border-left-color:var(--status-red)}
 .msg-act-toggle{display:grid;grid-template-columns:16px max-content minmax(0,1fr) max-content 14px;align-items:center;gap:7px;width:100%;min-height:32px;padding:5px 7px 5px 10px;border:0;border-radius:0 6px 6px 0;background:transparent;color:var(--muted);text-align:left;cursor:pointer}
@@ -927,6 +932,10 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
 .live-bar__backdrop{position:fixed;inset:0;z-index:40}
 .live-bar__pop{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);z-index:41;background:var(--canvas);border:1px solid var(--hair-strong);border-radius:8px;box-shadow:0 8px 28px var(--shadow-3);padding:6px;max-height:280px;overflow:auto}
 .live-bar__pop-title{font-size:10px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:4px 8px 6px}
+.live-bar__stop{flex:none;display:grid;place-items:center;width:26px;height:26px;border:1px solid var(--hair-strong);border-radius:6px;background:var(--surface);color:var(--muted);cursor:pointer}
+.live-bar__stop:hover{color:var(--status-red);border-color:var(--status-red)}
+.live-bar__pop-row{display:flex;align-items:center;gap:4px}
+.live-bar__pop-row .live-bar__pop-item{flex:1;width:auto}
 .live-bar__pop-item{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;cursor:pointer;padding:7px 8px;border-radius:8px;text-align:left;font:inherit;color:var(--body)}
 .live-bar__pop-item:hover{background:var(--surface-strong)}
 .live-bar__pop-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}

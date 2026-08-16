@@ -144,7 +144,7 @@ function ActionCardMsg({ m }: { m: Msg }) {
             ? <div className="ac-done"><CheckCircle2 size={13} /> {t("chat.executedBy", { name: meta.executedByUserName || t("chat.someone") })}</div>
             : <button className="ac-btn" onClick={() => setOpen(true)}>{isChan ? t("chat.createChannel") : t("chat.createAgentBtn")}</button>}
         </div>
-        <AgentActivityDisclosure items={m.agentActivity} state={m.agentActivityState} />
+        <AgentActivityDisclosure items={m.agentActivity} state={m.agentActivityState} agentId={m.senderType === "agent" ? m.senderId : undefined} />
       </div>
       {open && isChan && (
         <CreateChannelModal
@@ -494,7 +494,7 @@ export function Chat() {
                         </div>
                         {isAgentReplyPreview
                           ? <AgentReplyPreviewBody m={m} />
-                          : <AgentActivityDisclosure items={m.agentActivity} state={m.agentActivityState} receipt />}
+                          : <AgentActivityDisclosure items={m.agentActivity} state={m.agentActivityState} receipt agentId={m.senderType === "agent" ? m.senderId : undefined} />}
                       </div>
                     </div>
                   </Fragment>
@@ -533,7 +533,7 @@ export function Chat() {
                     </div> : null}
                     {isMember ? <div className="msg-subhead"><span className="member-badge">{t("chat.memberBadge")}</span></div> : null}
                     {!!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
-                    <AgentActivityDisclosure items={m.agentActivity} state={m.agentActivityState} />
+                    <AgentActivityDisclosure items={m.agentActivity} state={m.agentActivityState} agentId={m.senderType === "agent" ? m.senderId : undefined} />
                     {!!m.attachments?.length && <div className="msg-atts">{m.attachments.map((a) => <AttCard key={a.id} a={a} url={attachmentUrl(a.id)} />)}</div>}
                     {/* persistent meta row: task badge + thread button + reactions all on the same line (reactions no longer occupy a separate row) */}
                     <div className="msg-meta">
@@ -744,7 +744,7 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
             <div className="agent-run-head"><span className="who">{m.senderName}</span><span className="ts">{fmtDateTime(m.createdAt)}</span><MessageActivityState items={m.agentActivity} state={m.agentActivityState} /></div>
             {isAgentReplyPreview
               ? <AgentReplyPreviewBody m={m} />
-              : <AgentActivityDisclosure items={m.agentActivity} state={m.agentActivityState} receipt />}
+              : <AgentActivityDisclosure items={m.agentActivity} state={m.agentActivityState} receipt agentId={m.senderType === "agent" ? m.senderId : undefined} />}
           </div>
         </div>
       </Fragment>
@@ -762,7 +762,7 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
           : m.senderId ? <span className="who clickable" onClick={() => onOpenProfile("human", m.senderId!)}>{m.senderName}</span>
           : <span className="who">{m.senderName}</span>}<span className="ts">{fmtDateTime(m.createdAt)}</span><MessageActivityState items={m.agentActivity} state={m.agentActivityState} /></div>
         {!!m.content && <div className="mbody"><MessageContent content={m.content} mentions={m.mentions || []} channels={channels} nav={navToken} /></div>}
-        <AgentActivityDisclosure items={m.agentActivity} state={m.agentActivityState} />
+        <AgentActivityDisclosure items={m.agentActivity} state={m.agentActivityState} agentId={m.senderType === "agent" ? m.senderId : undefined} />
         {!!m.attachments?.length && <div className="msg-atts">{m.attachments.map((a) => <AttCard key={a.id} a={a} url={attachmentUrl(a.id)} />)}</div>}
         {/* same guard as the channel feed: the preview's synthetic id must never be POSTed to /reactions */}
         <Reactions m={m} mine={me?.id ?? ""} onReact={(emoji, remove) => react(m.id, emoji, remove)} />

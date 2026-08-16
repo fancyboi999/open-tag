@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { Square } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore, type Agent } from "../store.tsx";
+import { useToast } from "../toast.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 
 // Live agent activity bar pinned to the bottom of the sidebar: an at-a-glance, workspace-wide
@@ -14,7 +16,11 @@ const rank = (a: Agent) => (a.activity === "working" ? 0 : 1); // working surfac
 
 export function LiveAgentBar() {
   const { t } = useTranslation();
-  const { agents, channels, slug, attachmentUrl, openAgentPanel } = useStore();
+  const { agents, channels, slug, attachmentUrl, openAgentPanel, api, capabilities } = useStore();
+  const toast = useToast();
+  const canManage = !!capabilities.manageAgents;
+  // One-click interrupt for a runaway run right where the live pulse is watched.
+  const stop = (id: string) => { api("POST", `/api/agents/${id}/stop`).catch((e: unknown) => toast.error(String((e as { message?: string })?.message || e))); };
   const nav = useNavigate();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
@@ -67,6 +73,11 @@ export function LiveAgentBar() {
           <span className="live-bar__detail">{labelOf(primary)}</span>
         </span>
       </button>
+      {canManage && (
+        <button type="button" className="live-bar__stop" title={t("members.stop")} aria-label={t("members.stop")} onClick={() => stop(primary.id)}>
+          <Square size={12} />
+        </button>
+      )}
       {extra > 0 && (
         <button
           type="button"
@@ -85,14 +96,21 @@ export function LiveAgentBar() {
           <div className="live-bar__pop">
             <div className="live-bar__pop-title">{t("liveBar.activeTitle")}</div>
             {live.map((a) => (
-              <button key={a.id} type="button" className="live-bar__pop-item" onClick={() => goActivity(a.id)}>
-                <Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} />
-                <span className="live-bar__pop-text">
-                  <span className="live-bar__pop-name">{a.displayName || a.name}</span>
-                  <span className="live-bar__pop-detail">{labelOf(a)}</span>
-                </span>
-                <span className={"dot " + a.activity} aria-hidden="true" />
-              </button>
+              <div key={a.id} className="live-bar__pop-row">
+                <button type="button" className="live-bar__pop-item" onClick={() => goActivity(a.id)}>
+                  <Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} />
+                  <span className="live-bar__pop-text">
+                    <span className="live-bar__pop-name">{a.displayName || a.name}</span>
+                    <span className="live-bar__pop-detail">{labelOf(a)}</span>
+                  </span>
+                  <span className={"dot " + a.activity} aria-hidden="true" />
+                </button>
+                {canManage && (
+                  <button type="button" className="live-bar__stop" title={t("members.stop")} aria-label={t("members.stop")} onClick={() => stop(a.id)}>
+                    <Square size={12} />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </>
