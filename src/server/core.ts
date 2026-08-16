@@ -639,6 +639,17 @@ async function sysTaskMsg(serverId: string, channelId: string, content: string, 
   return m!;
 }
 
+/** Channel-deletion notice for member agents: a system message inside the (just deleted)
+ *  channel plus assigned attention per agent, so each member is woken and sees it via
+ *  message check — the agent plane surfaces ONLY post-deletion system messages for deleted
+ *  channels (routes-agent check), so members learn the channel is gone without regaining
+ *  history visibility, and sends stay rejected by resolveTarget (live 2026-08-16 #实验频道). */
+export async function notifyChannelDeleted(serverId: string, channelId: string, channelName: string, agentIds: string[]): Promise<void> {
+  if (!agentIds.length) return;
+  const m = await sysTaskMsg(serverId, channelId, `频道 #${channelName} 已被删除 / channel #${channelName} has been deleted`);
+  await ensureReplyRecipients({ serverId, channelId, messageId: m.id, recipients: agentIds.map((agentId) => ({ agentId, attention: "assigned" as const })) });
+}
+
 export async function convertMessageToTask(serverId: string, messageId: string, by?: { type: "user" | "agent"; id: string }) {
   const m = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, messageId), eq(schema.messages.serverId, serverId))))[0];
   if (!m) return null;

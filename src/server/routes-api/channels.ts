@@ -3,7 +3,7 @@ import type { ServerCtx } from "./ctx.js";
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { requireCap } from "../capabilities.js";
-import { addChannelMembers, getOrCreateDM, getOrCreateThread } from "../core.js";
+import { addChannelMembers, getOrCreateDM, getOrCreateThread, notifyChannelDeleted } from "../core.js";
 import { publish } from "../realtime.js";
 import { isUuid, readJson, sendErr, sendJson } from "../util.js";
 import { canUserReadChannel } from "../channelAccess.js";
@@ -337,7 +337,15 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
       .where(and(eq(schema.channels.id, cone[1]!), eq(schema.channels.serverId, serverId))))[0];
     if (targetCh?.type === "thread") return (sendErr(res, 403, "thread channels cannot be modified directly"), true);
     if (method === "DELETE") {
+      const victim = (await db.select().from(schema.channels).where(and(eq(schema.channels.id, cone[1]!), eq(schema.channels.serverId, serverId))))[0];
       await db.update(schema.channels).set({ deletedAt: new Date() }).where(and(eq(schema.channels.id, cone[1]!), eq(schema.channels.serverId, serverId))); // soft delete
+      if (victim && !victim.deletedAt) {
+        // Tell member agents the channel is gone (system notice + assigned wake); they keep
+        // no history visibility — the agent plane only surfaces this notice for deleted channels.
+        const memberAgents = await db.select({ memberId: schema.channelMembers.memberId }).from(schema.channelMembers)
+          .where(and(eq(schema.channelMembers.channelId, cone[1]!), eq(schema.channelMembers.memberType, "agent")));
+        await notifyChannelDeleted(serverId, cone[1]!, victim.name, memberAgents.map((m) => m.memberId));
+      }
       await publish(serverId, { type: "channel:deleted", channelId: cone[1]! });
       return (sendJson(res, 200, { ok: true }), true);
     }
