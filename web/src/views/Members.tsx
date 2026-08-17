@@ -234,6 +234,14 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   };
   const live = statusOf(a);
   const msgAgent = async () => { const cid = await openDM("agent", id); if (cid) nav(`/s/${slug}/channel/${cid}`); };
+  // Visible "clear session" (was only reachable inside the restart dialog — users couldn't find it,
+  // live 2026-08-17). Clears the conversation session only; workspace files and MEMORY stay.
+  const clearSession = async () => {
+    if (!(await confirm({ title: t("members.clearSessionTitle", { name: a.displayName || a.name }), message: t("members.clearSessionMessage"), confirmLabel: t("members.clearSession"), danger: true }))) return;
+    const r = await api("POST", `/api/agents/${id}/reset`, { restart: true });
+    if (r?.error) startFail(r);
+    setTimeout(refetch, 500);
+  };
   // Header action bar: Message available to everyone; start/stop/restart/delete gated by manageAgents capability
   const acts = (
     <div className="agent-acts">
