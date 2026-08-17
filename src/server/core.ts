@@ -810,7 +810,16 @@ export async function sweepOrphanedAgentDeliveries(at = new Date()): Promise<num
     // wedged agent, not a lost delivery). Re-releasing would loop forever and flood the
     // channel (live 2026-08-17: 482 notices for one turn). Escalate to a human instead.
     const prior = await db.select({ id: schema.messages.id }).from(schema.messages)
-      .where(and(eq(schema.messages.channelId, r.channelId), eq(schema.messages.messageType, "system"), like(schema.messages.content, `%turn ${short}%`))).limit(1);
+      .where(and(eq(schema.messages.channelId, r.channelId), eq(schema.messages.messageType, "system"), like(schema.messages.content, `%turn ${short}%`)));
+    // Auto-clean stale supervisor notices for this turn (live 2026-08-17: old 🛠 rows accumulated
+    // and flooded the channel/context). Only the notice we post below may survive.
+    for (const o of prior) {
+      await db.delete(schema.agentMessageObservations).where(eq(schema.agentMessageObservations.messageId, o.id));
+      await db.delete(schema.agentMessageDecisions).where(eq(schema.agentMessageDecisions.messageId, o.id));
+      await db.delete(schema.messageMentions).where(eq(schema.messageMentions.messageId, o.id));
+      await db.delete(schema.conversationTurns).where(eq(schema.conversationTurns.triggerMessageId, o.id));
+      await db.delete(schema.messages).where(eq(schema.messages.id, o.id));
+    }
     if (prior.length) {
       const esc = await db.update(schema.conversationTurns).set({ state: "blocked", dispatchLeaseUntil: null, updatedAt: at })
         .where(and(eq(schema.conversationTurns.id, r.turnId), inArray(schema.conversationTurns.state, ["ready", "dispatching", "active", "dispatched"])))

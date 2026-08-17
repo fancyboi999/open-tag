@@ -90,7 +90,7 @@ async function main() {
   const [ot2] = await db.select().from(schema.conversationTurns).where(eq(schema.conversationTurns.id, orphanTurn));
   check("re-stalled turn escalates to blocked instead of looping", ot2!.state === "blocked");
   const sys = await db.select().from(schema.messages).where(and(eq(schema.messages.channelId, chId), eq(schema.messages.messageType, "system")));
-  check("exactly one 🛠 and one ⛔ notice (no flood)", sys.filter((s) => s.content.includes("🛠")).length === 1 && sys.filter((s) => s.content.includes("⛔")).length === 1);
+  check("stale 🛠 auto-cleaned, single ⛔ remains", sys.filter((s) => s.content.includes("🛠")).length === 0 && sys.filter((s) => s.content.includes("⛔")).length === 1);
 
   // A blocked turn is never swept again.
   const n2 = await sweepOrphanedAgentDeliveries();
