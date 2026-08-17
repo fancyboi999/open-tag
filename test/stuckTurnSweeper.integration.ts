@@ -79,7 +79,23 @@ async function main() {
   check("fresh turn state untouched", ft!.state === "dispatched");
 
   const notice = await db.select().from(schema.messages).where(and(eq(schema.messages.channelId, chId), eq(schema.messages.messageType, "system")));
-  check("recovery posts a visible supervisor notice", notice.length === 1 && notice[0]!.content.includes("监工"));
+  check("recovery posts a visible supervisor notice", notice.length === 1 && notice[0]!.content.includes("🛠"));
+
+  // Second stall of the SAME turn (delivered but agent never answered): the sweeper must NOT
+  // recover/notify again — it escalates once to blocked + ⛔ and stops (live 2026-08-17 flood).
+  await db.update(schema.agentMessageDecisions).set({ deliveryAdmittedAt: new Date(Date.now() - 5 * 60_000) })
+    .where(and(eq(schema.agentMessageDecisions.messageId, orphanMsg), eq(schema.agentMessageDecisions.agentId, agentId)));
+  await db.update(schema.conversationTurns).set({ state: "dispatched" }).where(eq(schema.conversationTurns.id, orphanTurn));
+  await sweepOrphanedAgentDeliveries();
+  const [ot2] = await db.select().from(schema.conversationTurns).where(eq(schema.conversationTurns.id, orphanTurn));
+  check("re-stalled turn escalates to blocked instead of looping", ot2!.state === "blocked");
+  const sys = await db.select().from(schema.messages).where(and(eq(schema.messages.channelId, chId), eq(schema.messages.messageType, "system")));
+  check("exactly one 🛠 and one ⛔ notice (no flood)", sys.filter((s) => s.content.includes("🛠")).length === 1 && sys.filter((s) => s.content.includes("⛔")).length === 1);
+
+  // A blocked turn is never swept again.
+  const n2 = await sweepOrphanedAgentDeliveries();
+  const sys2 = await db.select().from(schema.messages).where(and(eq(schema.messages.channelId, chId), eq(schema.messages.messageType, "system")));
+  check("blocked turn stays silent on later sweeps", sys2.length === sys.length && n2 >= 0);
 }
 
 main()

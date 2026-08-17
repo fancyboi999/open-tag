@@ -804,10 +804,25 @@ export async function sweepOrphanedAgentDeliveries(at = new Date()): Promise<num
   for (const r of rows) {
     const deliveryId = `${r.turnId}:${r.agentId}`;
     if (hasPendingAgentDelivery(deliveryId)) continue; // a live process still owns this delivery
+    const short = r.turnId.slice(0, 8);
+    // At most ONE auto-recovery per turn: a prior 🛠/⛔ notice for this turn means we already
+    // recovered it and it stalled AGAIN (delivered but the agent never answered — a slow or
+    // wedged agent, not a lost delivery). Re-releasing would loop forever and flood the
+    // channel (live 2026-08-17: 482 notices for one turn). Escalate to a human instead.
+    const prior = await db.select({ id: schema.messages.id }).from(schema.messages)
+      .where(and(eq(schema.messages.channelId, r.channelId), eq(schema.messages.messageType, "system"), like(schema.messages.content, `%turn ${short}%`))).limit(1);
+    if (prior.length) {
+      const esc = await db.update(schema.conversationTurns).set({ state: "blocked", dispatchLeaseUntil: null, updatedAt: at })
+        .where(and(eq(schema.conversationTurns.id, r.turnId), inArray(schema.conversationTurns.state, ["ready", "dispatching", "active", "dispatched"])))
+        .returning({ id: schema.conversationTurns.id });
+      if (esc.length) await sysTaskMsg(r.serverId, r.channelId, `⛔ 监工:turn ${short} 恢复后仍无活动,已停止自动恢复,需人工处理(supervisor: repeated delivery stall escalated to human)`);
+      recovered++;
+      continue;
+    }
     await releaseAgentDeliveryAdmission({ deliveryId, messageId: r.messageId, agentId: r.agentId, seq: 0 });
     await db.update(schema.conversationTurns).set({ state: "ready", dispatchAfter: at, dispatchLeaseUntil: null, updatedAt: at })
       .where(and(eq(schema.conversationTurns.id, r.turnId), inArray(schema.conversationTurns.state, ["dispatching", "active", "dispatched"])));
-    await sysTaskMsg(r.serverId, r.channelId, `🛠 监工:投递许可超时已自动恢复(supervisor: orphaned delivery admission released, turn ${r.turnId.slice(0, 8)})`);
+    await sysTaskMsg(r.serverId, r.channelId, `🛠 监工:投递许可超时已自动恢复(supervisor: orphaned delivery admission released, turn ${short})`);
     recovered++;
   }
   return recovered;
