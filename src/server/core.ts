@@ -794,6 +794,9 @@ export async function sweepOrphanedAgentDeliveries(at = new Date()): Promise<num
     serverId: schema.conversationTurns.serverId,
   }).from(schema.agentMessageDecisions)
     .innerJoin(schema.conversationTurns, eq(schema.conversationTurns.triggerMessageId, schema.agentMessageDecisions.messageId))
+    // Watchdog is opt-in per channel (supervised checkbox, default off): unsupervised channels
+    // get neither auto-recovery nor supervisor notices (live 2026-08-17 requirement).
+    .innerJoin(schema.channels, and(eq(schema.channels.id, schema.conversationTurns.channelId), eq(schema.channels.supervised, true)))
     .where(and(
       isNotNull(schema.agentMessageDecisions.deliveryAdmittedAt),
       lte(schema.agentMessageDecisions.deliveryAdmittedAt, cutoff),

@@ -121,6 +121,7 @@ export async function handleAgents(ctx: ServerCtx): Promise<boolean> {
     Object.assign(patch, policy.patch);
     for (const k of ["displayName", "description", "model", "runtime", "avatarUrl"]) if (b[k] !== undefined) patch[k] = b[k];
     if (b.envVars !== undefined) patch.envVars = b.envVars;
+    if (b.supervised !== undefined) patch.supervised = b.supervised === true; // watchdog opt-in checkbox
     let projectPathChanged = false;
     if (b.projectPath !== undefined) {
       if (current.status !== "inactive") return (sendErr(res, 409, "stop the agent before changing its project directory"), true);

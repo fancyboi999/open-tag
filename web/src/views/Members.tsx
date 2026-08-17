@@ -251,6 +251,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
         {a.status === "queued" && <button className="joinbtn" style={{ color: "var(--status-orange)" }} onClick={() => api("POST", `/api/agents/${id}/dequeue`).then(() => setTimeout(refetch, 300)).catch(() => {})}>✕</button>}
         <button className="joinbtn" onClick={() => setShowRestart(true)}>{t("members.restart")}</button>
         <button className="joinbtn" onClick={clearSession}>{t("members.clearSession")}</button>
+        <label className="ck-row" title={t("members.superviseHint")}><input type="checkbox" checked={!!a.supervised} onChange={async (e) => { await api("PATCH", `/api/agents/${id}`, { supervised: e.target.checked }); setTimeout(refetch, 300); }} /><span>{t("members.supervise")}</span></label>
         <button className="joinbtn" style={{ color: "var(--error)" }} onClick={del}>{t("members.delete")}</button>
       </>}
     </div>

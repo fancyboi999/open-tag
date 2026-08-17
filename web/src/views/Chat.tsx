@@ -690,6 +690,11 @@ function EditChannelModal({ channel, onClose, onDone, onDeleted }: { channel: an
         <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("sidebar.namePlaceholder")} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && name.trim()) save(); }} />
         <label>{t("sidebar.descLabel")}</label>
         <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={t("sidebar.descPlaceholder")} />
+        {/* Watchdog opt-in (default off): only supervised channels get sweeper recovery + 🛠/ notices */}
+        <label className="ck-row" title={t("chat.superviseHint")}>
+          <input type="checkbox" checked={!!channel.supervised} onChange={async (e) => { await api("PATCH", `/api/channels/${channel.id}`, { supervised: e.target.checked }); onDone(); }} />
+          <span>{t("chat.supervise")}</span>
+        </label>
         <div className="acts">
           <button className="cancel" onClick={onClose}>{t("sidebar.cancelBtn")}</button>
           <button className="ok" onClick={save} disabled={!name.trim() || saving}>{t("chat.saveChanges")}</button>

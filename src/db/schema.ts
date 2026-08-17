@@ -75,6 +75,8 @@ export const agents = pgTable("agents", {
   executionMode: text("execution_mode").default("auto").notNull(),
   incomingMode: text("incoming_mode").default("open").notNull(), // open | sealed
   commandWhitelist: jsonb("command_whitelist").$type<string[]>().default([]).notNull(),
+  supervised: boolean("supervised").default(false).notNull(), // watchdog opt-in marker; default off (live 2026-08-17)
+  supervised: boolean("supervised").default(false).notNull(), // watchdog opt-in marker; default off (live 2026-08-17)
 
   envVars: jsonb("env_vars").$type<Record<string, string>>().default({}).notNull(),
   agentTokenHash: text("agent_token_hash"),       // hash of sk_agent_* token (used for CLI auth)
@@ -101,6 +103,7 @@ export const channels = pgTable("channels", {
   parentMessageId: uuid("parent_message_id"),     // thread = a channel derived from a specific message
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
+  supervised: boolean("supervised").default(false).notNull(), // watchdog opt-in: sweeper recovers+notifies only supervised channels; default off (live 2026-08-17)
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({

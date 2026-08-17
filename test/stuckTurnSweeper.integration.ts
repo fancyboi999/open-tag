@@ -12,23 +12,24 @@ import { sweepOrphanedAgentDeliveries } from "../src/server/core.ts";
 const ts = Date.now();
 let serverId = "", ownerId = "", agentId = "", chId = "";
 let orphanMsg = "", orphanTurn = "", freshMsg = "", freshTurn = "";
+let unsupCh = "", unsupMsg = "", unsupTurn = "";
 let failures = 0;
 const check = (label: string, cond: boolean) => { console.log(`  ${cond ? "✔" : "✗ FAIL"} ${label}`); if (!cond) failures++; };
 
-async function seedTurn(tag: string, admittedAt: Date | null): Promise<{ msg: string; turn: string }> {
+async function seedTurn(tag: string, admittedAt: Date | null, channel: string = chId): Promise<{ msg: string; turn: string }> {
   const [m] = await db.insert(schema.messages).values({
-    seq: 1, serverId, channelId: chId, senderType: "user", senderId: ownerId, senderName: "owner",
+    seq: 1, serverId, channelId: channel, senderType: "user", senderId: ownerId, senderName: "owner",
     content: `trigger ${tag}`, searchText: `trigger ${tag}`,
   }).returning();
   const rootId = crypto.randomUUID();
   const [t] = await db.insert(schema.conversationTurns).values({
     id: rootId, causalRootId: rootId,
-    serverId, channelId: chId, senderType: "user", senderId: ownerId,
+    serverId, channelId: channel, senderType: "user", senderId: ownerId,
     anchorMessageId: m!.id, triggerMessageId: m!.id, latestMessageId: m!.id,
     firstSeq: 1, lastSeq: 1, state: "dispatched", dispatchAfter: new Date(Date.now() - 60_000),
   }).returning();
   await db.insert(schema.agentMessageDecisions).values({
-    serverId, channelId: chId, messageId: m!.id, agentId, attention: "dm",
+    serverId, channelId: channel, messageId: m!.id, agentId, attention: "dm",
     ...(admittedAt ? { deliveryAdmittedAt: admittedAt } : {}),
   });
   return { msg: m!.id, turn: t!.id };
@@ -42,12 +43,17 @@ async function setup() {
   await db.insert(schema.serverMembers).values({ serverId, userId: ownerId, role: "owner" });
   const [ag] = await db.insert(schema.agents).values({ serverId, name: `stuck_${ts}`, displayName: "Stuck" }).returning();
   agentId = ag!.id;
-  const [c] = await db.insert(schema.channels).values({ serverId, name: `stuck_${ts}`, type: "channel" }).returning();
+  const [c] = await db.insert(schema.channels).values({ serverId, name: `stuck_${ts}`, type: "channel", supervised: true }).returning();
   chId = c!.id;
   const o = await seedTurn("orphan", new Date(Date.now() - 5 * 60_000));
   orphanMsg = o.msg; orphanTurn = o.turn;
   const f = await seedTurn("fresh", new Date());
   freshMsg = f.msg; freshTurn = f.turn;
+  // Watchdog is opt-in: an identical orphan in an UNSUPERVISED channel must stay untouched.
+  const [uc] = await db.insert(schema.channels).values({ serverId, name: `unsup_${ts}`, type: "channel" }).returning();
+  unsupCh = uc!.id;
+  const so = await seedTurn("unsupervised-orphan", new Date(Date.now() - 5 * 60_000), unsupCh);
+  unsupMsg = so.msg; unsupTurn = so.turn;
 }
 
 async function cleanup() {
@@ -80,6 +86,11 @@ async function main() {
 
   const notice = await db.select().from(schema.messages).where(and(eq(schema.messages.channelId, chId), eq(schema.messages.messageType, "system")));
   check("recovery posts a visible supervisor notice", notice.length === 1 && notice[0]!.content.includes("🛠"));
+
+  const [ud] = await db.select().from(schema.agentMessageDecisions).where(and(eq(schema.agentMessageDecisions.messageId, unsupMsg), eq(schema.agentMessageDecisions.agentId, agentId)));
+  check("unsupervised channel orphan left untouched (opt-in)", ud!.deliveryAdmittedAt !== null);
+  const [ut] = await db.select().from(schema.conversationTurns).where(eq(schema.conversationTurns.id, unsupTurn));
+  check("unsupervised turn still dispatched", ut!.state === "dispatched");
 
   // Second stall of the SAME turn (delivered but agent never answered): the sweeper must NOT
   // recover/notify again — it escalates once to blocked + ⛔ and stops (live 2026-08-17 flood).

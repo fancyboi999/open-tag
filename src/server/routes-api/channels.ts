@@ -396,6 +396,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     if (b.name) patch.name = String(b.name).trim().replace(/^#/, "").toLowerCase().replace(/\s+/g, "-");
     if (b.description !== undefined) patch.description = b.description;
     if (b.visibility) patch.type = b.visibility === "private" ? "private" : "channel";
+    if (b.supervised !== undefined) patch.supervised = b.supervised === true; // watchdog opt-in checkbox
     if (Object.keys(patch).length) await db.update(schema.channels).set(patch).where(and(eq(schema.channels.id, cone[1]!), eq(schema.channels.serverId, serverId)));
     await publish(serverId, { type: "channel:updated", channelId: cone[1]! });
     return (sendJson(res, 200, { ok: true }), true);
