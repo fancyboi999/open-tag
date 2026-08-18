@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
 import { drainMessageSyncPages } from "./messageSync";
-import { acceptLatestReadResponse } from "./readResponse";
+import { applyUnreadDelta, applyUnreadSnapshot, applyUnreadValue, createUnreadState, type UnreadToken } from "./readResponse";
 import { messageUnreadDelta, threadUnreadDelta } from "./threadUnread";
 import { initialAuthState, TOKEN_KEY, type AuthState } from "./routing.ts";
 
@@ -77,7 +77,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [myRole, setMyRole] = useState(""); // current workspace role (owner/admin/member) — used for manageServer permission check on task board
   const [channels, setChannels] = useState<Channel[]>([]);
   const [dms, setDms] = useState<Dm[]>([]);
-  const [unread, setUnread] = useState<Record<string, number>>({});
+  const [unreadState, setUnreadState] = useState(() => createUnreadState(0));
+  const unread = unreadState.values;
   const [agents, setAgents] = useState<Agent[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [latestDaemonVersion, setLatestDaemonVersion] = useState(""); // newest published daemon version from the machines endpoint; "" until first load (→ raises no outdated alert)
@@ -91,9 +92,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const meIdRef = useRef<string | undefined>(undefined); // current user id; read by socket handlers (own-message unread suppression) and stable across workspace switches
   const sockRef = useRef<Socket | null>(null); // active socket connection; emits join:channel when joining/creating a channel mid-session for room isolation
   const subscribedRef = useRef<Set<string>>(new Set()); // channels/threads explicitly subscribed by the active view; re-emitted on every (re)connect so a reconnect re-joins them
-  const readRequestOrderRef = useRef(0);
-  const appliedReadResponsesRef = useRef(new Map<string, number>());
+  const unreadOwnerRef = useRef(0);
+  const unreadOrderRef = useRef(0);
   const listeners = useRef(new Set<(e: Ev) => void>());
+
+  const unreadToken = (owner = unreadOwnerRef.current): UnreadToken => ({ owner, order: ++unreadOrderRef.current });
 
   const api = async (method: string, path: string, body?: unknown) => {
     // Race condition on first render: views may call api before dev-login completes; wait until both token and serverId are ready.
@@ -107,10 +110,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // turns false, so this (now-stale) reload's results are dropped instead of landing mixed with the new
     // workspace's data — guards rapid A→B→C switches (the sequential awaits below each read the shared sidRef).
     const sid = sidRef.current;
+    const unreadOwner = unreadOwnerRef.current;
     const fresh = () => sidRef.current === sid;
     const ch = await api("GET", "/api/channels"); if (fresh()) setChannels(ch);
     try { const dm = await api("GET", "/api/channels/dm"); if (fresh()) setDms(dm); } catch { if (fresh()) setDms([]); }
-    try { const un = (await api("GET", "/api/channels/unread")) || {}; if (fresh()) setUnread(un); } catch { if (fresh()) setUnread({}); }
+    const unreadRequest = unreadToken(unreadOwner);
+    try { const un = (await api("GET", "/api/channels/unread")) || {}; setUnreadState((state) => applyUnreadSnapshot(state, unreadRequest, un)); }
+    catch { setUnreadState((state) => applyUnreadSnapshot(state, unreadRequest, {})); }
     const ag = await api("GET", "/api/agents"); if (fresh()) setAgents(ag);
     try { const mc = await api("GET", `/api/servers/${sid}/machines`); if (fresh()) { setMachines(mc.machines || []); setLatestDaemonVersion(mc.latestDaemonVersion || ""); } } catch { if (fresh()) setMachines([]); }
     try { const hm = await api("GET", `/api/servers/${sid}/members`); if (fresh()) setHumans(hm); } catch { if (fresh()) setHumans([]); }
@@ -149,16 +155,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // it. Channel and thread requests can converge on the same parent key, so only the newest response for that key
   // may commit; blind-zeroing or a late older aggregate would both make the badge lie.
   const markRead = (id: string) => {
-    const order = ++readRequestOrderRef.current;
-    const ownerServerId = sidRef.current;
+    const request = unreadToken();
     api("POST", `/api/channels/${id}/read`, {}).then((r) => {
       const key = r?.channelId; if (!key) return;
-      if (sidRef.current !== ownerServerId) return;
-      if (!acceptLatestReadResponse(appliedReadResponsesRef.current, key, order)) return;
-      setUnread((u) => {
-        if (sidRef.current !== ownerServerId) return u;
-        const n = { ...u }; if (Number(r.unread) > 0) n[key] = Number(r.unread); else delete n[key]; return n;
-      });
+      const applied = unreadToken(request.owner);
+      setUnreadState((state) => applyUnreadValue(state, request, applied, key, Number(r.unread)));
     }).catch(() => {});
   };
   const uploadFiles = async (channelId: string, files: FileList | File[]) => {
@@ -263,18 +264,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // switch) before the socket connects, the flag ensures the late connection is closed immediately.
     let cancelled = false;
     const dispatch = (d: Ev) => listeners.current.forEach((cb) => cb(d));
+    const unreadOwner = ++unreadOwnerRef.current;
     // Unread badge correction: optimistic ++ gives instant feedback; after each incoming message a debounced
-    // re-fetch of /channels/unread overwrites store.unread with the DB truth, fixing badge drift caused by
+    // re-fetch of /channels/unread merges DB truth around newer per-key mutations, fixing badge drift caused by
     // cross-view messages or reconnect catch-up double-counting.
     let unreadTimer: ReturnType<typeof setTimeout> | null = null;
-    const syncUnread = () => { if (unreadTimer) clearTimeout(unreadTimer); unreadTimer = setTimeout(async () => { try { setUnread((await api("GET", "/api/channels/unread")) || {}); } catch { /* keep stale value on error */ } }, 400); };
+    const syncUnread = () => { if (unreadTimer) clearTimeout(unreadTimer); unreadTimer = setTimeout(async () => {
+      const token = unreadToken(unreadOwner);
+      try { const next = (await api("GET", "/api/channels/unread")) || {}; setUnreadState((state) => applyUnreadSnapshot(state, token, next)); }
+      catch { /* keep stale value on error */ }
+    }, 400); };
     const myId = meIdRef.current;
     // Point at the active workspace + clear the previous one's state so a switch starts from a clean slate; the
     // ready=false → workspace skeleton shows while it reloads.
     setReady(false);
     sidRef.current = cur.id; setServerId(cur.id); setSlug(cur.slug || "open-tag"); setMyRole(cur.role || "member"); setCapabilities(cur.capabilities || {});
     setServerAvatar(cur.avatarUrl ? `${cur.avatarUrl}?token=${encodeURIComponent(tokenRef.current)}` : null);
-    setChannels([]); setDms([]); setUnread({}); setAgents([]); setMachines([]); setHumans([]); setSavedIds(new Set()); setAgentPanelReq(null);
+    setChannels([]); setDms([]); setUnreadState(createUnreadState(unreadOwner)); setAgents([]); setMachines([]); setHumans([]); setSavedIds(new Set()); setAgentPanelReq(null);
     subscribedRef.current = new Set(); // the previous workspace's view-subscriptions don't carry over
     sockRef.current = null; // the previous socket is closed by this effect's cleanup; drop the stale ref until the new one connects
     let lastSeq = 0;
@@ -312,7 +318,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (msg?.channelId) {
           // Own messages don't increment unread; thread-channel messages are aggregated by thread:updated onto their parent channel.
           const delta = messageUnreadDelta(msg.senderId, myId, msg.channelType);
-          if (delta > 0) { setUnread((u) => ({ ...u, [msg.channelId]: (u[msg.channelId] || 0) + delta })); syncUnread(); } // optimistic ++ for instant feedback; debounced re-fetch corrects stale counts
+          if (delta > 0) { const token = unreadToken(unreadOwner); setUnreadState((state) => applyUnreadDelta(state, token, msg.channelId, delta)); syncUnread(); } // optimistic ++ for instant feedback; debounced re-fetch corrects stale counts
           setChannels((cs) => cs.map((c) => (c.id === msg.channelId ? { ...c, lastMessageAt: msg.createdAt } : c)));
           setDms((ds) => ds.map((d) => (d.id === msg.channelId ? { ...d, lastMessageAt: msg.createdAt } : d)));
         }
@@ -346,7 +352,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sock.on("message:updated", (m: any) => dispatch({ type: "message:updated", message: m }));
       sock.on("thread:updated", (p: any) => {
         const delta = threadUnreadDelta(1, p?.senderId, myId);
-        if (p?.parentChannelId && delta > 0) { setUnread((u) => ({ ...u, [p.parentChannelId]: (u[p.parentChannelId] || 0) + delta })); syncUnread(); }
+        if (p?.parentChannelId && delta > 0) { const token = unreadToken(unreadOwner); setUnreadState((state) => applyUnreadDelta(state, token, p.parentChannelId, delta)); syncUnread(); }
         dispatch({ type: "thread:updated", ...p });
       });
     })();
