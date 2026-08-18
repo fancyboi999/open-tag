@@ -87,7 +87,7 @@
     "superviseHint": "When checked, the watchdog (auto-recovery + notices) covers this agent. Off by default",
     "incomingLabel": "Trigger source policy",
     "incomingOpen": "Open (accept commands from anyone)",
-    "incomingSanitized": "Sanitized (gateway pending; fails closed)",
+    "incomingSanitized": "Sanitized (stateless one-shot gateway; fails closed)",
     "incomingSealed": "Whitelist-only commands",
     "whitelistLabel": "Who may assign it work",
     "clearSession": "Clear session",

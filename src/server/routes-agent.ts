@@ -6,7 +6,8 @@ import { sendJson, sendErr, readJson, bearer, agentIdHeader } from "./util.js";
 import { resolveAgent } from "./auth.js";
 import { createMessage, resolveTarget, channelMembers, addChannelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG, assignTask, resolveIdOrPrefix, wakeAgentForReplyCoordination } from "./core.js";
 import { agentHasScope } from "./scopes.js";
-import { filterByTriggerPolicy, senderAllowedByPolicy } from "./triggerPolicy.js";
+import { senderAllowedByPolicy } from "./triggerPolicy.js";
+import { applyPolicyView } from "./sanitizedView.js";
 import { parseUpload } from "./attachments.js";
 import { readObject } from "./storage.js";
 import { authorizePendingDmGrants, canAgentManageCoordinatedTask, checkReplyGrant, claimReplyCoordination, coordinationHeader, decideReply, ensureReplyRecipients, finishReplyPublication, hasOutstandingReplyDecision, markReplyMessagesObserved, releaseReplyReservation, reserveReplyGrant } from "./replyCoordination.js";
@@ -306,7 +307,11 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
       const visibility = await classifyInboxVisibility({ agentId: agent.id, messages: unread, durableDeliveryBlock, purpose: "inbox" });
       capabilityPaused ||= visibility.capabilityPaused;
       topologyBlocked ||= visibility.topologyBlocked;
-      const stable = filterByTriggerPolicy(agent, await filterAgentInputView(agent, visibility.visible));
+      // Trigger-source policy: sealed drops non-whitelisted agent text; sanitized replaces it
+      // with the stateless gateway's disinfected output (fail closed when gateway unavailable).
+      const pol = await applyPolicyView(serverId, agent.machineId, agent, visibility.visible);
+      const stable = pol.view;
+      const sanitizedIds = pol.replaced;
       const stableForeign = stable.filter((message) => message.senderType !== "agent" || message.senderId !== agent.id);
       const observedRows = stableForeign.length
         ? await db.select({ messageId: schema.agentMessageObservations.messageId }).from(schema.agentMessageObservations).where(and(
@@ -329,7 +334,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
         const mentionedIds = new Set(ownMentions.map((m) => m.messageId));
         for (const message of fresh) await ensureReplyRecipients({
           serverId, channelId: cm.channelId, messageId: message.id,
-          recipients: [{ agentId: agent.id, attention: ch.type === "dm" ? "dm" : mentionedIds.has(message.id) ? "direct" : "ambient" }],
+          recipients: [{ agentId: agent.id, attention: sanitizedIds.has(message.id) ? "ambient" : ch.type === "dm" ? "dm" : mentionedIds.has(message.id) ? "direct" : "ambient" }],
         });
         const coordination = await markReplyMessagesObserved(agent.id, fresh.map((m) => m.id));
         await db.insert(schema.agentMessageObservations).values(fresh.map((message) => ({
@@ -570,7 +575,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     } else {
       rows = (await db.select().from(schema.messages).where(cid).orderBy(desc(schema.messages.seq)).limit(limit)).reverse();
     }
-    rows = filterByTriggerPolicy(agent, await filterAgentInputView(agent, rows)); // trigger-source policy: no raw non-whitelisted agent text
+    rows = (await applyPolicyView(serverId, agent.machineId, agent, rows)).view; // trigger-source policy: sealed drops, sanitized disinfects
     return (sendJson(res, 200, { messages: rows.map((m) => ({ ...serialize(m), text: fmt(m, tstr) })) }), true);
   }
 

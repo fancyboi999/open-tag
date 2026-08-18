@@ -8,6 +8,7 @@ import path from "node:path";
 import { Connection } from "./connection.js";
 import { AgentManager } from "./agentManager.js";
 import { listWorkspace, readWorkspaceFile, writeWorkspaceFile, deleteWorkspaceFile, listSkills } from "./workspace.js";
+import { runSanitize } from "./sanitize.js";
 import { detectRuntimes } from "./runtimes.js";
 import { listModels } from "./listModels.js";
 import { createLogger } from "../log.js";
@@ -123,6 +124,10 @@ conn = new Connection(serverUrl, apiKey, (msg) => {
     case "agent:workspace:write": void writeWorkspaceFile(msg.agentId, msg.path ?? "", msg.content ?? "").then((r) => conn.send({ type: "workspace:file_write", requestId: msg.requestId, agentId: msg.agentId, ...r })); break;
     case "agent:workspace:delete": void deleteWorkspaceFile(msg.agentId, msg.path ?? "").then((r) => conn.send({ type: "workspace:file_delete", requestId: msg.requestId, agentId: msg.agentId, ...r })); break;
     case "agent:skills:list": void listSkills(msg.agentId, msg.runtime, msg.projectPath).then((r) => conn.send({ type: "skills:list", requestId: msg.requestId, agentId: msg.agentId, ...r })); break;
+    case "sanitize": void runSanitize(String(msg.text ?? "")).then(
+      (text) => conn.send({ type: "sanitize:result", requestId: msg.requestId, text }),
+      (cause) => conn.send({ type: "sanitize:result", requestId: msg.requestId, error: String(cause instanceof Error ? cause.message : cause) }),
+    ); break;
     case "project:resolve": void resolveProjectDirectory(msg.path).then(
       (projectPath) => conn.send({ type: "project:resolved", requestId: msg.requestId, projectPath }),
       (cause) => conn.send({ type: "project:resolved", requestId: msg.requestId, error: String(cause instanceof Error ? cause.message : cause), code: cause instanceof ProjectDirectoryError ? cause.code : "invalid_project_path" }),

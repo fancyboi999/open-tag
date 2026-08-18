@@ -88,7 +88,7 @@
     "superviseHint": "勾选后监工（自动恢复与通知）才覆盖此 agent，默认不勾选",
     "incomingLabel": "触发来源策略",
     "incomingOpen": "开放（接受任何人派活）",
-    "incomingSanitized": "消毒网关（未上线，暂等同封锁）",
+    "incomingSanitized": "消毒网关（无状态一次性，失败即封锁）",
     "incomingSealed": "只听白名单",
     "whitelistLabel": "谁可以给它派活",
     "clearSessionTitle": "清空 {{name}} 的会话",

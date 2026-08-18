@@ -107,6 +107,12 @@ async function main() {
   check("message check hides non-whitelisted agent text", !shown.includes("do extra work"));
   check("message check still shows human task", shown.includes("your real task") || true); // human msg may be consumed by responsibility; not asserted hard
 
+  // 4b) sanitized mode without an online gateway fails closed (text hidden)
+  await db.update(schema.agents).set({ incomingMode: "sanitized" }).where(eq(schema.agents.id, workerId));
+  const r4b = await api(handleAgentApi, { method: "GET", path: "/agent-api/message/check", token: workerToken, agentId: workerId });
+  check("sanitized without gateway fails closed", !JSON.stringify(r4b.body ?? {}).includes("do extra work"));
+  await db.update(schema.agents).set({ incomingMode: "sealed" }).where(eq(schema.agents.id, workerId));
+
   // 5) whitelist grants boss command back
   await db.update(schema.agents).set({ commandWhitelist: [bossId] }).where(eq(schema.agents.id, workerId));
   const m5 = await createMessage({ serverId, channelId: chId, senderType: "agent", senderId: bossId, senderName: `boss_${ts}`, content: `@worker_${ts} whitelisted work` });
