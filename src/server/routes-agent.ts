@@ -6,6 +6,7 @@ import { sendJson, sendErr, readJson, bearer, agentIdHeader } from "./util.js";
 import { resolveAgent } from "./auth.js";
 import { createMessage, resolveTarget, channelMembers, addChannelMembers, addReaction, removeReaction, getOrCreateThread, unclaimTask, claimTask, setTaskStatus, convertMessageToTask, TASK_STATUSES, resolveMessageId, canAgentReadChannel, descTooLong, DESC_TOO_LONG, assignTask, resolveIdOrPrefix, wakeAgentForReplyCoordination } from "./core.js";
 import { agentHasScope } from "./scopes.js";
+import { filterByTriggerPolicy, senderAllowedByPolicy } from "./triggerPolicy.js";
 import { parseUpload } from "./attachments.js";
 import { readObject } from "./storage.js";
 import { authorizePendingDmGrants, canAgentManageCoordinatedTask, checkReplyGrant, claimReplyCoordination, coordinationHeader, decideReply, ensureReplyRecipients, finishReplyPublication, hasOutstandingReplyDecision, markReplyMessagesObserved, releaseReplyReservation, reserveReplyGrant } from "./replyCoordination.js";
@@ -305,7 +306,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
       const visibility = await classifyInboxVisibility({ agentId: agent.id, messages: unread, durableDeliveryBlock, purpose: "inbox" });
       capabilityPaused ||= visibility.capabilityPaused;
       topologyBlocked ||= visibility.topologyBlocked;
-      const stable = await filterAgentInputView(agent, visibility.visible);
+      const stable = filterByTriggerPolicy(agent, await filterAgentInputView(agent, visibility.visible));
       const stableForeign = stable.filter((message) => message.senderType !== "agent" || message.senderId !== agent.id);
       const observedRows = stableForeign.length
         ? await db.select({ messageId: schema.agentMessageObservations.messageId }).from(schema.agentMessageObservations).where(and(
@@ -569,7 +570,7 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
     } else {
       rows = (await db.select().from(schema.messages).where(cid).orderBy(desc(schema.messages.seq)).limit(limit)).reverse();
     }
-    rows = await filterAgentInputView(agent, rows);
+    rows = filterByTriggerPolicy(agent, await filterAgentInputView(agent, rows)); // trigger-source policy: no raw non-whitelisted agent text
     return (sendJson(res, 200, { messages: rows.map((m) => ({ ...serialize(m), text: fmt(m, tstr) })) }), true);
   }
 
@@ -690,8 +691,8 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
       isNull(schema.agents.deletedAt),
     )))[0];
     if (!targetAgent) return (sendErr(res, 404, "target agent not found"), true);
-    if (!inputSenderAllowed(targetAgent, "agent", agent.id)) {
-      return (sendErr(res, 403, "target agent does not accept commands from this agent"), true);
+    if (!senderAllowedByPolicy(targetAgent, "agent", agent.id)) {
+      return (sendErr(res, 403, "assignee does not accept commands from this agent"), true);
     }
 
     let mid: string | null = null;

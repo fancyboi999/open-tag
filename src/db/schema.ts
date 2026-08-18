@@ -77,6 +77,8 @@ export const agents = pgTable("agents", {
   commandWhitelist: jsonb("command_whitelist").$type<string[]>().default([]).notNull(),
   supervised: boolean("supervised").default(false).notNull(), // watchdog opt-in marker; default off (live 2026-08-17)
   supervised: boolean("supervised").default(false).notNull(), // watchdog opt-in marker; default off (live 2026-08-17)
+  incomingMode: text("incoming_mode").default("open").notNull(), // trigger policy: open | sanitized | sealed (sanitized behaves sealed until gateway RPC lands)
+  commandWhitelist: jsonb("command_whitelist").$type<string[]>().default([]).notNull(), // agent ids allowed to command when mode != open; humans always allowed
 
   envVars: jsonb("env_vars").$type<Record<string, string>>().default({}).notNull(),
   agentTokenHash: text("agent_token_hash"),       // hash of sk_agent_* token (used for CLI auth)

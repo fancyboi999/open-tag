@@ -158,7 +158,7 @@ function Roster({ agents, humans, onCreate, canCreate }: { agents: any[]; humans
 
 export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string; onDeleted: () => void; onClose?: () => void; onMessage?: () => void }) {
   const { t } = useTranslation();
-  const { api, machines, visibleAgents, reload, onEvent, capabilities, openDM, slug, uploadAgentAvatar, attachmentUrl } = useStore();
+  const { api, machines, reload, onEvent, capabilities, openDM, slug, uploadAgentAvatar, attachmentUrl, visibleAgents } = useStore();
   const confirm = useConfirm();
   const toast = useToast();
   const nav = useNavigate();
@@ -266,6 +266,30 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
           {acts}
         </div>
       ) : <div className="head head-agent"><AvatarPicker name={a.name} url={signedAvatar} size={48} editable={!!capabilities.manageAgents} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div className="head-id"><h1>{a.displayName || a.name}</h1><small>@{a.name} <span className={"dot " + live} />{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div>{acts}</div>}
+      {capabilities.manageAgents && (
+        <div className="task-acts" style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 12, opacity: 0.75 }}>{t("members.incomingLabel")}</span>
+          <select value={a.incomingMode ?? "open"} onChange={async (e) => { await api("PATCH", `/api/agents/${id}`, { incomingMode: e.target.value }); setTimeout(refetch, 300); }}>
+            <option value="open">{t("members.incomingOpen")}</option>
+            <option value="sanitized">{t("members.incomingSanitized")}</option>
+            <option value="sealed">{t("members.incomingSealed")}</option>
+          </select>
+          {(a.incomingMode === "sealed" || a.incomingMode === "sanitized") && (
+            <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, opacity: 0.75 }}>{t("members.whitelistLabel")}</span>
+              {visibleAgents.filter((v) => v.id !== id).map((v) => (
+                <label key={v.id} className="ck-row" style={{ gap: 4 }}>
+                  <input type="checkbox" checked={(a.commandWhitelist ?? []).includes(v.id)} onChange={async (e) => {
+                    const cur: string[] = a.commandWhitelist ?? [];
+                    const next = e.target.checked ? [...cur, v.id] : cur.filter((x) => x !== v.id);
+                    await api("PATCH", `/api/agents/${id}`, { commandWhitelist: next }); setTimeout(refetch, 300);
+                  }} /><span>{v.displayName || v.name}</span>
+                </label>
+              ))}
+            </span>
+          )}
+        </div>
+      )}
       <div className="ptabs">
         {/* Tab order follows AgentDetailPanel spec: integrations (not apps) */}
         {([

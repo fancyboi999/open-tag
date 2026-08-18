@@ -75,11 +75,22 @@ export async function prepareConversationTurnResponsibility(
 ): Promise<void> {
   if (!channel) return;
   const agentMembers = members.filter((member) => member.type === "agent" && member.id !== turn.senderId);
+  // Trigger-source policy: an agent-sender may only command (wake/assign) recipients whose
+  // incoming_mode allows it. Humans are always allowed (senderAllowedByPolicy).
+  const policyRows = turn.senderType === "agent" && agentMembers.length
+    ? await db.select({ id: schema.agents.id, incomingMode: schema.agents.incomingMode, commandWhitelist: schema.agents.commandWhitelist })
+      .from(schema.agents).where(inArray(schema.agents.id, agentMembers.map((member) => member.id)))
+    : [];
+  const policyById = new Map(policyRows.map((row) => [row.id, row]));
+  const allowed = (member: DispatchMember) => {
+    const row = policyById.get(member.id);
+    return !row || inputSenderAllowed(row, turn.senderType, turn.senderId);
+  };
   let recipients: ReplyRecipient[] = [];
   if (channel.type === "dm") {
-    recipients = agentMembers.map((member) => ({ agentId: member.id, attention: "dm" }));
+    recipients = agentMembers.filter(allowed).map((member) => ({ agentId: member.id, attention: "dm" }));
   } else {
-    const directed = mentions.filter((member) => member.type === "agent" && member.id !== turn.senderId);
+    const directed = mentions.filter((member) => member.type === "agent" && member.id !== turn.senderId && allowed(member));
     if (directed.length) {
       recipients = directed.map((member) => ({ agentId: member.id, attention: "direct" }));
     } else if (turn.senderType === "user") {
