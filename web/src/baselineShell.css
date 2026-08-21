@@ -1,6 +1,6 @@
 /* Preview-only Raft measurement baseline. Every selector is gated by .shell-baseline so Classic
    remains the production/default rollback surface. The 768px seam is locked by ticket #304. */
-.mobile-detail-back{display:none}
+.mobile-detail-back,.mobile-primary-nav{display:none}
 @media (min-width:768px){
   .shell-baseline{
     --baseline-yellow:#ffd440;
@@ -13,6 +13,52 @@
   }
   .shell-baseline.has-panel{grid-template-columns:64px 240px minmax(0,1fr) var(--traj-w,320px)}
   .shell-baseline .resizer-sb{left:301px}
+  .shell-baseline .tasks-sidebar{display:none}
+  .shell-baseline .tasks-page{grid-column:2/-1;grid-row:1}
+  .shell-baseline .tasks-page-head{height:62px;min-height:62px;padding:8px 68px;border-bottom:2px solid var(--baseline-line);display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:0;background:#fff}
+  .shell-baseline .tasks-page-head h1{font-family:var(--sans);font-size:16px;font-weight:700;line-height:20px;letter-spacing:0}
+  .shell-baseline .tasks-page-head small{font-size:12px;line-height:16px;color:rgba(0,0,0,.5)}
+  .shell-baseline main.tasks-page>.board-scroll{padding:12px 16px 20px;background:#fff}
+  .shell-baseline .tasks-page .task-toolbar{gap:8px;margin:0 0 16px;flex-wrap:nowrap}
+  .shell-baseline .tasks-page .task-toolbar>.sel:nth-of-type(1){width:94px}
+  .shell-baseline .tasks-page .task-toolbar>.sel:nth-of-type(2),.shell-baseline .tasks-page .task-toolbar>.sel:nth-of-type(3){width:106px}
+  .shell-baseline .task-toolbar .sel-trigger{height:32px;min-height:32px;padding:0 10px;border:2px solid rgba(0,0,0,.3);border-radius:0;background:#fff;font-size:12px;font-weight:700;color:var(--baseline-line)}
+  .shell-baseline .task-toolbar .sel-trigger:hover{border-color:var(--baseline-line);background:#fff3ce}
+  .shell-baseline .task-toolbar .sel-trigger:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:1px}
+  .shell-baseline .task-toolbar .seg{height:32px;border:2px solid var(--baseline-line);border-radius:0;background:#fff}
+  .shell-baseline .task-toolbar .seg button{min-width:62px;height:28px;padding:0 10px;border-radius:0;color:var(--baseline-line);font-size:12px;font-weight:600}
+  .shell-baseline .task-toolbar .seg button+button{box-shadow:-2px 0 0 var(--baseline-line)}
+  .shell-baseline .task-toolbar .seg button:hover{background:#fff3ce}
+  .shell-baseline .task-toolbar .seg button.on{background:var(--baseline-yellow);font-weight:700}
+  .shell-baseline .task-toolbar .seg button:focus-visible{outline:3px solid var(--baseline-pink);outline-offset:-4px}
+  .shell-baseline .tasks-page .seg-icon{display:none}
+  .shell-baseline .task-action-error{border:2px solid var(--baseline-line);border-radius:0;background:#fff3ce;color:var(--baseline-line)}
+  .shell-baseline .task-action-error button{border:2px solid var(--baseline-line);border-radius:0;background:#fff;box-shadow:2px 2px 0 #d4d0c8}
+  .shell-baseline .task-loading{gap:8px}
+  .shell-baseline .task-loading-lane{border:2px solid #d4d0c8;border-radius:0;background:linear-gradient(100deg,#fffaf0 25%,#fff 45%,#fffaf0 65%);background-size:240% 100%}
+  .shell-baseline .task-board.columns{gap:8px;padding:0}
+  .shell-baseline .task-board.columns .task-col{flex-basis:260px;min-width:240px;padding:0 8px 8px;border:2px solid var(--baseline-line);border-radius:0;background:var(--baseline-paper)}
+  .shell-baseline .task-board.columns .task-col .sec{min-height:36px;margin:0 -8px 8px;padding:0 8px;border-bottom:2px solid var(--baseline-line);font-size:12px;color:var(--baseline-line)}
+  .shell-baseline .card.task{padding:10px 12px;border:2px solid var(--baseline-line);border-radius:0;box-shadow:2px 2px 0 #d4d0c8;background:#fff}
+  .shell-baseline .card.task:hover{transform:none;background:#fff3ce;border-color:var(--baseline-line)}
+  .shell-baseline .st-pill,.shell-baseline .claim-pill{border-width:2px;border-radius:0}
+  .shell-baseline .claim-pill{border:2px solid var(--baseline-line);background:var(--baseline-pink);color:var(--baseline-line);box-shadow:2px 2px 0 #d4d0c8}
+  .shell-baseline .st-menu{border:2px solid var(--baseline-line);border-radius:0;box-shadow:4px 4px 0 #d4d0c8}
+  .shell-baseline .st-menu button{min-height:36px;border-radius:0}
+  .shell-baseline .st-menu button:hover,.shell-baseline .st-menu button:focus-visible{outline:0;background:#fff3ce}
+  .shell-baseline .list-row{min-height:44px;border:2px solid var(--baseline-line);border-radius:0;background:#fff}
+  .shell-baseline .list-row:hover{background:#fff3ce;border-color:var(--baseline-line)}
+  .shell-baseline main.content-col>.channel-files{padding:12px 12px 20px}
+  .shell-baseline .channel-files .file-row{height:84px;min-height:84px;margin:0;padding:12px 16px;gap:12px;border:2px solid rgba(0,0,0,.3);border-radius:0;background:#fff}
+  .shell-baseline .channel-files .file-row+.file-row{margin-top:8px}
+  .shell-baseline .channel-files .file-row:hover{background:#fffaf0}
+  .shell-baseline .channel-files .file-main{height:56px;gap:8px}
+  .shell-baseline .channel-files .file-icon{width:56px;height:56px;display:flex;align-items:center;justify-content:center;flex:none;border:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline .channel-files .file-thumb{width:52px;height:52px;border-radius:0;object-fit:cover}
+  .shell-baseline .channel-files .file-uploader{display:none}
+  .shell-baseline .channel-files .file-acts{gap:6px}
+  .shell-baseline .channel-files .file-acts button,.shell-baseline .channel-files .file-acts a{position:relative;width:28px;height:28px;border:2px solid var(--baseline-line);border-radius:0;background:transparent;box-shadow:none;color:var(--baseline-line)}
+  .shell-baseline .files-loading-row{border:2px solid #d4d0c8;border-radius:0}
   .shell-baseline .rail{
     grid-row:auto;
     flex-direction:column;
@@ -148,6 +194,34 @@
   .shell-baseline .tp-link:focus-visible,.shell-baseline .tp-close:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:1px}
   .shell-baseline .resizer{display:block}
   .shell-baseline .mobile-burger,.shell-baseline .mobile-scrim{display:none}
+  .shell-baseline main.tasks-page{grid-column:2/-1;grid-row:1}
+  .shell-baseline main.tasks-page>.board-scroll{padding:12px 16px 20px}
+  .shell-baseline main.content-col>.channel-files{padding:12px 12px 20px}
+  .shell-baseline main.content-col>.board-scroll{padding:12px 16px 20px}
+  .shell-baseline .task-toolbar{gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .shell-baseline .task-toolbar>.sel{flex:0 0 106px;width:106px}
+  .shell-baseline .task-toolbar>.newtask{order:3;width:84px;height:28px;padding:0;border:2px solid var(--baseline-line);border-radius:0;background:var(--baseline-pink);box-shadow:none;color:var(--baseline-line);font-size:12px;font-weight:700}
+  .shell-baseline .task-toolbar>.grow{order:4}
+  .shell-baseline .task-toolbar>.seg:not(.seg-icon){order:5;margin-left:auto}
+  .shell-baseline .task-toolbar>.seg-icon{display:none}
+  .shell-baseline .task-list .list-sec{min-height:21px;margin:14px 0 0;font-size:16px;line-height:21px;color:var(--baseline-line)}
+  .shell-baseline .task-list .list-row{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;align-content:start;gap:0 10px;min-height:96px;margin-top:13px;padding:12px 14px 0;border:0;border-radius:0;background:#fff}
+  .shell-baseline .task-list .list-row:hover{background:#fffaf0}
+  .shell-baseline .task-list .list-row .lnum{grid-column:1;grid-row:1;font-family:var(--mono);font-size:12px}
+  .shell-baseline .task-list .list-row .grow{grid-column:2/-1;grid-row:1;font-size:14px;line-height:21px}
+  .shell-baseline .task-list .list-row .meta{display:none}
+  .shell-baseline .task-list .list-row>.st-pill-btn,.shell-baseline .task-list .list-row>.st-pill,.shell-baseline .task-list .list-row>.claim-pill{grid-column:3;grid-row:2;justify-self:end;margin-top:10px}
+  .shell-baseline .task-list .list-row .st-pill{min-height:24px;padding-top:0;padding-bottom:0}
+  .shell-baseline .task-list .tk-del-row{position:absolute;right:14px;top:10px;opacity:0}
+  .shell-baseline .task-list .list-row:hover .tk-del-row,.shell-baseline .task-list .tk-del-row:focus-visible{opacity:1}
+  .shell-baseline .task-board.columns{gap:16px;align-items:flex-start;margin-top:14px}
+  .shell-baseline .task-board.columns .task-col{flex:0 0 320px;min-width:320px;min-height:206px;padding:12px;border:2px solid rgba(0,0,0,.3);border-radius:0;background:var(--baseline-paper)}
+  .shell-baseline .task-board.columns .task-col .sec{min-height:21px;margin:0 0 15px;padding:0;border:0;font-size:12px;line-height:21px;color:var(--baseline-line)}
+  .shell-baseline .task-board.columns .task-col-body{overflow:visible}
+  .shell-baseline .task-board.columns .card.task{margin:0;padding:12px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;box-shadow:3px 3px 0 var(--baseline-line)}
+  .shell-baseline .task-board.columns .st-pill{min-height:24px;padding-top:0;padding-bottom:0}
+  .shell-baseline .st-pill{border:2px solid var(--baseline-line);color:var(--baseline-line)}
+  .shell-baseline .st-pill.st-todo{background:#f8a16f}.shell-baseline .st-pill.st-in_progress{background:#36c5e8}.shell-baseline .st-pill.st-in_review{background:#bbafe6}.shell-baseline .st-pill.st-done{background:#88dca0}.shell-baseline .st-pill.st-closed{background:#d4d0c8}
 }
 
 @media (max-width:767px){
@@ -198,6 +272,40 @@
   .shell-baseline.is-workspace-detail .chtabs button{min-width:76px;padding:4px 14px;border:0;border-right:2px solid var(--baseline-line);border-radius:0;background:#fff;color:var(--baseline-line);font-size:13px}
   .shell-baseline.is-workspace-detail .chtabs button.on{background:var(--baseline-yellow);font-weight:800}
   .shell-baseline.is-workspace-detail .chtabs button:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:-4px}
+  .shell-baseline .tasks-page-head{height:62px;min-height:62px;padding:8px 16px;border-bottom:2px solid var(--baseline-line);display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:0;background:#fff}
+  .shell-baseline .tasks-page-head h1{font-family:var(--sans);font-size:16px;font-weight:700;line-height:20px;letter-spacing:0}
+  .shell-baseline .tasks-page-head small{display:block;font-size:12px;line-height:16px;color:rgba(0,0,0,.5)}
+  .shell-baseline main.tasks-page>.board-scroll{padding:12px 16px 20px;background:#fff;overflow-x:hidden}
+  .shell-baseline .tasks-page .task-toolbar{gap:8px;margin:0 0 16px;align-items:center}
+  .shell-baseline .tasks-page .task-toolbar>.sel:nth-of-type(1){width:94px}
+  .shell-baseline .tasks-page .task-toolbar>.sel:nth-of-type(2),.shell-baseline .tasks-page .task-toolbar>.sel:nth-of-type(3){width:106px}
+  .shell-baseline .tasks-page .task-toolbar>.grow{flex:0 0 100%;height:0}
+  .shell-baseline .tasks-page .task-toolbar>.seg:not(.seg-icon){margin-left:auto}
+  .shell-baseline .tasks-page .seg-icon{display:none}
+  .shell-baseline .task-toolbar .sel-trigger{height:32px;min-height:32px;padding:0 10px;border:2px solid rgba(0,0,0,.3);border-radius:0;background:#fff;font-size:12px;font-weight:700;color:var(--baseline-line)}
+  .shell-baseline .task-toolbar .seg{height:32px;border:2px solid var(--baseline-line);border-radius:0;background:#fff}
+  .shell-baseline .task-toolbar .seg button{min-width:62px;height:28px;padding:0 10px;border-radius:0;color:var(--baseline-line);font-size:12px;font-weight:600}
+  .shell-baseline .task-toolbar .seg button+button{box-shadow:-2px 0 0 var(--baseline-line)}
+  .shell-baseline .task-toolbar .seg button.on{background:var(--baseline-yellow);font-weight:700}
+  .shell-baseline .task-toolbar .seg button:focus-visible{outline:3px solid var(--baseline-pink);outline-offset:-4px}
+  .shell-baseline .task-board.columns{gap:8px;min-height:260px;padding:0;scroll-snap-type:x proximity}
+  .shell-baseline .task-board.columns .task-col{flex:0 0 calc(100vw - 48px);min-width:calc(100vw - 48px);padding:0 8px 8px;border:2px solid var(--baseline-line);border-radius:0;background:var(--baseline-paper);scroll-snap-align:start}
+  .shell-baseline .task-board.columns .task-col .sec{min-height:40px;margin:0 -8px 8px;padding:0 8px;border-bottom:2px solid var(--baseline-line);color:var(--baseline-line)}
+  .shell-baseline .card.task{padding:10px 12px;border:2px solid var(--baseline-line);border-radius:0;box-shadow:2px 2px 0 #d4d0c8;background:#fff}
+  .shell-baseline .st-pill,.shell-baseline .claim-pill{min-height:28px;display:inline-flex;align-items:center;border-width:2px;border-radius:0}
+  .shell-baseline .claim-pill{border:2px solid var(--baseline-line);background:var(--baseline-pink);color:var(--baseline-line);box-shadow:2px 2px 0 #d4d0c8}
+  .shell-baseline .list-row{min-height:52px;padding:8px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;gap:8px}
+  .shell-baseline .list-row .meta{display:none}
+  .shell-baseline main.content-col>.channel-files{padding:12px 12px 20px}
+  .shell-baseline .channel-files .file-row{height:84px;min-height:84px;margin:0;padding:12px 16px;gap:12px;border:2px solid rgba(0,0,0,.3);border-radius:0;background:#fff}
+  .shell-baseline .channel-files .file-row+.file-row{margin-top:8px}
+  .shell-baseline .channel-files .file-main{height:56px;gap:8px}
+  .shell-baseline .channel-files .file-icon{width:56px;height:56px;display:flex;align-items:center;justify-content:center;flex:none;border:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline .channel-files .file-thumb{width:52px;height:52px;border-radius:0;object-fit:cover}
+  .shell-baseline .channel-files .file-uploader{display:none}
+  .shell-baseline .channel-files .file-acts{gap:6px}
+  .shell-baseline .channel-files .file-acts button,.shell-baseline .channel-files .file-acts a{position:relative;width:28px;height:28px;border:2px solid var(--baseline-line);border-radius:0;background:transparent;color:var(--baseline-line)}
+  .shell-baseline .channel-files .file-acts button::before,.shell-baseline .channel-files .file-acts a::before{content:"";position:absolute;inset:-8px}
   .shell-baseline main.content-col>.scroll{padding:12px 12px 150px;background:#fff}
   .shell-baseline .msg{margin-bottom:6px;padding:8px 6px 6px;border-radius:0;background:#fff;box-shadow:none}
   .shell-baseline .msg:hover{background:#fffaf0;box-shadow:none}
@@ -366,4 +474,31 @@
   .shell-baseline .workspace-home-section-actions>button:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:-4px}
   .shell-baseline .workspace-home-hint{margin:0;padding:0 3px 12px;color:#999;font-size:12px;line-height:18px}
   .shell-baseline .mobile-home-dm .avatar{border-radius:0}
+  .shell-baseline main.tasks-page>.board-scroll{padding:12px 16px 20px}
+  .shell-baseline main.content-col>.channel-files{padding:12px 12px 20px}
+  .shell-baseline main.content-col>.board-scroll{padding:12px 16px 20px}
+  .shell-baseline .task-toolbar{gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .shell-baseline .task-toolbar>.sel{flex:0 0 106px;width:106px}
+  .shell-baseline .task-toolbar>.newtask{order:3;width:84px;height:28px;padding:0;border:2px solid var(--baseline-line);border-radius:0;background:var(--baseline-pink);box-shadow:none;color:var(--baseline-line);font-size:12px;font-weight:700}
+  .shell-baseline .task-toolbar>.grow{order:4}
+  .shell-baseline .task-toolbar>.seg:not(.seg-icon){order:5;margin-left:auto}
+  .shell-baseline .task-toolbar>.seg-icon{display:none}
+  .shell-baseline .task-list .list-sec{min-height:21px;margin:14px 0 0;font-size:16px;line-height:21px;color:var(--baseline-line)}
+  .shell-baseline .task-list .list-row{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;align-content:start;gap:0 10px;min-height:96px;margin-top:13px;padding:12px 14px 0;border:0;border-radius:0;background:#fff}
+  .shell-baseline .task-list .list-row:hover{background:#fffaf0}
+  .shell-baseline .task-list .list-row .lnum{grid-column:1;grid-row:1;font-family:var(--mono);font-size:12px}
+  .shell-baseline .task-list .list-row .grow{grid-column:2/-1;grid-row:1;font-size:14px;line-height:21px}
+  .shell-baseline .task-list .list-row .meta{display:none}
+  .shell-baseline .task-list .list-row>.st-pill-btn,.shell-baseline .task-list .list-row>.st-pill,.shell-baseline .task-list .list-row>.claim-pill{grid-column:3;grid-row:2;justify-self:end;margin-top:10px}
+  .shell-baseline .task-list .list-row .st-pill{min-height:24px;padding-top:0;padding-bottom:0}
+  .shell-baseline .task-list .tk-del-row{position:absolute;right:14px;top:10px;opacity:0}
+  .shell-baseline .task-list .list-row:hover .tk-del-row,.shell-baseline .task-list .tk-del-row:focus-visible{opacity:1}
+  .shell-baseline .task-board.columns{gap:16px;align-items:flex-start;margin-top:14px}
+  .shell-baseline .task-board.columns .task-col{flex:0 0 320px;min-width:320px;min-height:206px;padding:12px;border:2px solid rgba(0,0,0,.3);border-radius:0;background:var(--baseline-paper);scroll-snap-align:start}
+  .shell-baseline .task-board.columns .task-col .sec{min-height:21px;margin:0 0 15px;padding:0;border:0;font-size:12px;line-height:21px;color:var(--baseline-line)}
+  .shell-baseline .task-board.columns .task-col-body{overflow:visible}
+  .shell-baseline .task-board.columns .card.task{margin:0;padding:12px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;box-shadow:3px 3px 0 var(--baseline-line)}
+  .shell-baseline .task-board.columns .st-pill{min-height:24px;padding-top:0;padding-bottom:0}
+  .shell-baseline .st-pill{border:2px solid var(--baseline-line);color:var(--baseline-line)}
+  .shell-baseline .st-pill.st-todo{background:#f8a16f}.shell-baseline .st-pill.st-in_progress{background:#36c5e8}.shell-baseline .st-pill.st-in_review{background:#bbafe6}.shell-baseline .st-pill.st-done{background:#88dca0}.shell-baseline .st-pill.st-closed{background:#d4d0c8}
 }

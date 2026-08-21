@@ -31,6 +31,7 @@ import type { LayoutOutletContext } from "../Layout.tsx";
 const fmtSize = (n?: number) => (!n ? "" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB");
 const isImage = (m?: string) => !!m && m.startsWith("image/");
 const isVideo = (m?: string) => !!m && m.startsWith("video/");
+export const channelFilesSucceeded = (response: unknown): response is { files: unknown[] } => !!response && typeof response === "object" && Array.isArray((response as { files?: unknown }).files);
 export const BACK_TO_BOTTOM_SCROLL_MS = 800;
 export const MESSAGE_ENTER_PIN_MS = 1000;
 export const backToBottomEase = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -896,15 +897,30 @@ function ChannelFiles({ channelId }: { channelId: string }) {
   const { api, attachmentUrl, slug } = useStore();
   const nav = useNavigate();
   const [files, setFiles] = useState<any[]>([]);
-  useEffect(() => { (async () => { const d = await api("GET", `/api/channels/${channelId}/files`); setFiles(d?.files || []); })(); }, [channelId]);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const requestRef = useRef(0);
+  const load = async () => {
+    const request = ++requestRef.current;
+    setState("loading");
+    try {
+      const response = await api("GET", `/api/channels/${channelId}/files`);
+      if (request !== requestRef.current) return;
+      if (!channelFilesSucceeded(response)) throw new Error("file load failed");
+      setFiles(response.files);
+      setState("ready");
+    } catch { if (request === requestRef.current) { setFiles([]); setState("error"); } }
+  };
+  useEffect(() => { void load(); return () => { requestRef.current += 1; }; /* eslint-disable-next-line */ }, [channelId]);
   return (
-    <div className="scroll ch-view-enter">
-      {files.length === 0 ? <div className="empty">{t("chat.noFiles")}</div>
+    <div className="scroll ch-view-enter channel-files" aria-busy={state === "loading"}>
+      {state === "loading" ? <div className="files-loading" role="status" aria-live="polite"><span>{t("chat.filesLoading")}</span>{[0, 1, 2].map((index) => <span key={index} className="files-loading-row" />)}</div>
+        : state === "error" ? <PaneEmpty icon={<IconFile size={30} />} title={t("chat.filesLoadFailed")} sub={<button className="joinbtn" onClick={() => void load()}>{t("chat.retryLoad")}</button>} />
+        : files.length === 0 ? <PaneEmpty icon={<IconFile size={30} />} title={t("chat.noFiles")} />
         : files.map((f) => (
           <div key={f.id} className="card file-row">
             <a className="file-main" href={attachmentUrl(f.id)} target="_blank" rel="noreferrer">
-              {isImage(f.mimeType) ? <img className="file-thumb" src={attachmentUrl(f.id)} alt={f.filename} loading="lazy" /> : <IconFile size={22} />}
-              <div className="grow"><div className="who">{f.filename}</div><div className="meta">{fmtSize(f.sizeBytes)} · {f.uploader?.displayName || f.uploader?.name || (f.uploader?.type === "agent" ? t("chat.agentKind") : t("chat.memberKind"))} · {fmtDateTime(f.createdAt)}</div></div>
+              <span className="file-icon">{isImage(f.mimeType) ? <img className="file-thumb" src={attachmentUrl(f.id)} alt={f.filename} loading="lazy" /> : <IconFile size={22} />}</span>
+              <div className="grow"><div className="who">{f.filename}</div><div className="meta"><span>{fmtSize(f.sizeBytes)}</span><span className="file-uploader"> · {f.uploader?.displayName || f.uploader?.name || (f.uploader?.type === "agent" ? t("chat.agentKind") : t("chat.memberKind"))}</span><span> · {fmtDateTime(f.createdAt)}</span></div></div>
             </a>
             <div className="file-acts">
               {f.messageId && <button className="im" title={t("chat.jumpToMessage")} onClick={() => nav(`/s/${slug}/channel/${f.channelId}?msg=${f.messageId}`)}><IconExternalLink size={14} className="im-nudge-up" /></button>}

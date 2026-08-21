@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "ticket": 310,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "scope": "global and channel Tasks Board/List, filters, task mutations and source return, plus channel Files loading, failure, entry, source, and download contracts",
+  "locale": "zh",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "horizontalOverflowCssPx": 0,
+      "verticalPageOverflowCssPx": 0,
+      "geometry": {
+        "globalTasksMain": [64, 0, 1376, 900],
+        "globalTaskFilters": [[80, 74, 94, 32], [182, 74, 106, 32], [296, 74, 106, 32]],
+        "globalViewToggle": [1296, 74, 128, 32],
+        "channelTaskFilters": [[320, 104, 106, 32], [434, 104, 106, 32]],
+        "channelNewTask": [548, 106, 84, 28],
+        "channelViewToggle": [1296, 104, 128, 32],
+        "fileCard": [316, 104, 1112, 84],
+        "fileEntry": [334, 118, 1002, 56],
+        "fileActions": [[1348, 132, 28, 28], [1382, 132, 28, 28]]
+      }
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "horizontalOverflowCssPx": 0,
+      "verticalPageOverflowCssPx": 0,
+      "geometry": {
+        "fileCard": [12, 104, 366, 84],
+        "fileEntry": [30, 118, 256, 56],
+        "fileActions": [[298, 132, 28, 28], [332, 132, 28, 28]]
+      },
+      "states": ["global Tasks", "channel Tasks", "channel Files"]
+    },
+    {
+      "width": 375,
+      "height": 812,
+      "horizontalOverflowCssPx": 0,
+      "verticalPageOverflowCssPx": 0,
+      "geometry": {
+        "globalTasksHeader": [0, 0, 375, 62],
+        "globalTaskFilters": [[16, 74, 94, 32], [118, 74, 106, 32], [232, 74, 106, 32]],
+        "globalViewToggle": [231, 114, 128, 32],
+        "primaryNavigation": [0, 759, 375, 53],
+        "channelTaskFilters": [[16, 104, 106, 32], [130, 104, 106, 32]],
+        "channelNewTask": [244, 106, 84, 28],
+        "channelViewToggle": [231, 144, 128, 32],
+        "boardLane": [16, 206, 320, 206],
+        "boardLaneStepCssPx": 336,
+        "fileCard": [12, 104, 351, 84],
+        "fileIcon": [30, 118, 56, 56],
+        "fileEntry": [30, 118, 241, 56],
+        "fileActions": [[283, 132, 28, 28], [317, 132, 28, 28]]
+      }
+    }
+  ],
+  "interactionEvidence": {
+    "taskCreateFailure": "a forced local 503 kept the typed title in the modal, announced the error, changed the primary action to Retry, and persisted exactly one task after retry",
+    "taskClaim": "the real claim API changed the QA task from todo to in_progress and cleared aria-busy after completion",
+    "taskStatusFailure": "a forced status 503 restored only the affected task's prior status, exposed a retry alert, and retry persisted done without overwriting unrelated task updates",
+    "statusMenuKeyboard": "focus entered the first menu item, ArrowDown moved to the next item, and Escape closed the menu and restored focus to the remounted task trigger",
+    "taskSourceReturn": "global List opened the real source message with from=tasks; mobile removed primary navigation, exposed a 44px Back control in history mode, and returned to the preserved List view",
+    "taskLoadStates": "two forced development-mode GET failures produced a stable retryable error; a 900ms response exposed three role=status lanes before the real task count returned",
+    "fileUpload": "a 37-byte ignored QA text fixture uploaded through the real Composer, sent as a real message attachment, and appeared in Files with source and signed download links",
+    "fileLoadStates": "two forced development-mode GET failures produced a stable retryable error; retry restored the real file row; a 900ms response exposed three aria-busy skeleton rows",
+    "fileMobileReturn": "Files removed primary navigation, used deterministic replace-parent Back to the channel, and retained zero page-level overflow"
+  },
+  "permissionEvidence": {
+    "tasks": "channelAccess B1 and B4 prove private-channel list/create/convert/claim/status/unclaim/delete rejection while public-channel and owner paths remain operable",
+    "files": "channelAccess B2 and B3 prove private and DM file-list/download rejection while public-channel, channel-member, and server-avatar paths remain operable",
+    "agentHandoff": "human and Agent task-assignment integrations prove id, number, private-thread, and DM-thread handoff contracts"
+  },
+  "contractRegression": {
+    "unit": { "passed": 312, "failed": 0 },
+    "integrationScripts": [
+      "taskAssign",
+      "taskAssignAgent",
+      "attachmentShortId",
+      "channelAccess",
+      "channelAccessB2",
+      "channelAccessB3",
+      "channelAccessB4",
+      "channelAccessB5",
+      "channelAccessB6"
+    ],
+    "integrationResult": "all pass",
+    "typecheck": "pass",
+    "previewBuild": "2557 modules transformed",
+    "referenceCheck": "29 pages, 3 required viewports, 11 representative states"
+  },
+  "artifacts": {
+    "reference": [
+      { "name": "310-reference-tasks-1440.png", "sha256": "8919b05a7ef5d5c1f6041da777cec4c7341caaf0add70d6bc68327f90cff22ae", "committed": false },
+      { "name": "310-reference-tasks-375.png", "sha256": "a9122e5674b80bb479e72ae6e14461c1e029f1e7a7c759675ed82b54fa6394e8", "committed": false },
+      { "name": "310-reference-files-1440.png", "sha256": "e6037ce5f4d23c29ba4334b1d76963f4b49f9c2a7a5b764a488bfec11023db74", "committed": false },
+      { "name": "310-reference-files-375.png", "sha256": "808a60c2430e957d341c450e593e7d3909eae420c6ab8aed9074ae8fc1b00669", "committed": false },
+      { "name": "310-reference-channel-board-375.png", "sha256": "3c99f5d9b075f7dd801dbba335f3d47ff46d7ad60b9022298ad37a4755f8139a", "committed": false }
+    ],
+    "local": [
+      { "name": "310-local-tasks-1440.png", "sha256": "d55f47202d36fb1dbad3b0d6a20c7caf0393316c630d5a01c21d5c6c358f35f0", "committed": false },
+      { "name": "310-local-tasks-375.png", "sha256": "26aeb7c6474bf82bb06e7a80496de9673d091fe892cfee14e94f34c91bc02c61", "committed": false },
+      { "name": "310-local-files-1440.png", "sha256": "df454058dca3cd497d8e23234149f338904b3576ac119e6f168d9ddefe44a63b", "committed": false },
+      { "name": "310-local-files-375.png", "sha256": "7b2053483bedeedff04487024e241cbf7526d8e2978ba86ca1aeca1e4cbcdd00", "committed": false },
+      { "name": "310-local-channel-board-375.png", "sha256": "c4c22bc3361bd541cd192be4e27cd4379fb4fe8be6dca2242f0f79b210d677c8", "committed": false }
+    ]
+  },
+  "thresholdResults": {
+    "criticalEdgeMaximumCssPx": { "limit": 2, "actual": 0, "result": "pass" },
+    "horizontalOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" },
+    "verticalPageOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" }
+  },
+  "intentionalDifferences": [
+    "OpenTag keeps its truthful local task, user, channel, attachment, and permission data rather than copying private Raft content.",
+    "OpenTag keeps signed attachment anchors and source-message navigation semantics even where Raft renders button-shaped controls.",
+    "Baseline hides the legacy board-layout toggle to match Raft while Classic retains the existing columns/stack preference as the rollback surface."
+  ]
+}

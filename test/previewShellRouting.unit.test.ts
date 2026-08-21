@@ -157,6 +157,20 @@ test("channel thread and tab details preserve unrelated query/hash state in thei
   );
 });
 
+test("a task source deep-link returns to the Tasks root", () => {
+  assert.deepEqual(
+    describeAppPage({ pathname: "/s/acme/channel/c1", search: "?msg=m1&from=tasks", hash: "" }),
+    {
+      id: "task-source",
+      kind: "workspace-detail",
+      workspaceSlug: "acme",
+      currentHref: "/s/acme/channel/c1?msg=m1&from=tasks",
+      parentHref: "/s/acme/tasks",
+    },
+  );
+  assert.equal(resolveParentBackMode("/s/acme/tasks?ui=baseline", "/s/acme/tasks", true), "history");
+});
+
 test("every implemented workspace matrix route has an explicit root/detail class and parent", () => {
   const cases: Array<[string, string, "workspace-root" | "workspace-detail" | "unknown", string | null]> = [
     ["/s/acme", "workspace-home", "workspace-root", null],

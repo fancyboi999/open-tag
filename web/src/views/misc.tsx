@@ -19,12 +19,13 @@ export function Tasks() {
   const { channelId } = useParams(); // "server" = all channels; otherwise a specific channelId
   const nav = useNavigate();
   const { t } = useTranslation();
+  const [taskCount, setTaskCount] = useState(0);
   const scope = channelId || "server";
   const cur = scope === "server" ? null : channels.find((c) => c.id === scope);
 
   return (
     <>
-      <aside className="sidebar">
+      <aside className="sidebar tasks-sidebar">
         <div className="sb-scroll">
         <div className="sb-title">{t("nav.tasks")}</div>
         <div className="sec">{t("misc.tasksScope")}</div>
@@ -33,9 +34,9 @@ export function Tasks() {
         {channels.filter((c) => c.type !== "dm").map((c) => <button key={c.id} className={"item" + (c.id === scope ? " active" : "")} onClick={() => nav(`/s/${slug}/tasks/${c.id}`)}># {c.name}</button>)}
         </div>
       </aside>
-      <main className="content-col">
-        <div className="head"><h1>{t("nav.tasks")}</h1><small>{scope === "server" ? t("misc.tasksAllCross") : cur ? "# " + cur.name : ""}</small></div>
-        <TaskBoard channelId={scope === "server" ? null : scope} />
+      <main className="content-col tasks-page">
+        <div className="head tasks-page-head"><h1>{t("nav.tasks")}</h1><small>{scope === "server" ? t("tasks.serverCount", { count: taskCount }) : cur ? "# " + cur.name : ""}</small></div>
+        <TaskBoard channelId={scope === "server" ? null : scope} onCountChange={setTaskCount} />
       </main>
     </>
   );

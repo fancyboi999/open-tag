@@ -8,7 +8,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../src/db/index.ts";
 import { handleAgentApi } from "../src/server/routes-agent.ts";
-import { agentConfig, createMessage, createServer, convertMessageToTask } from "../src/server/core.ts";
+import { agentConfig } from "../src/server/agentConfig.ts";
+import { createMessage, createServer, convertMessageToTask } from "../src/server/core.ts";
 
 const ts = Date.now();
 let failures = 0;
@@ -116,7 +117,6 @@ async function setup() {
   const cfg = await agentConfig(assignerId);
   if (!cfg?.agentToken) throw new Error("assigner token was not minted");
   assignerToken = cfg.agentToken;
-  const fresh = (await db.select().from(schema.agents).where(eq(schema.agents.id, assignerId)))[0]!;
 }
 
 async function cleanup() {

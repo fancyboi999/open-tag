@@ -5,6 +5,7 @@
 // Run: npx tsx --test --test-force-exit test/skillRoots.unit.test.ts
 import test from "node:test";
 import assert from "node:assert/strict";
+import { homedir } from "node:os";
 import { skillRootsFor } from "../src/daemon/workspace.ts";
 
 // Resolved dirs use the platform separator; normalize so suffix checks hold on Windows too.
@@ -17,7 +18,8 @@ test("claude resolves ~/.claude/skills (default, unchanged behavior)", () => {
 
 test("codex resolves ~/.codex/skills and not Claude's dir", () => {
   const r = skillRootsFor("codex", "agent-1");
-  assert.ok(r.global.some((g) => posix(g.dir).endsWith("/.codex/skills")), JSON.stringify(r.global));
+  const expected = posix(process.env.CODEX_HOME ? `${process.env.CODEX_HOME}/skills` : `${homedir()}/.codex/skills`);
+  assert.ok(r.global.some((g) => posix(g.dir) === expected), JSON.stringify(r.global));
   assert.ok(!r.global.some((g) => posix(g.dir).endsWith("/.claude/skills")), "codex must not read ~/.claude/skills");
 });
 

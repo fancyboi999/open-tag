@@ -135,7 +135,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const switchServer = (targetSlug: string) => { const cur = serversRef.current.find((s) => s.slug === targetSlug); if (cur && cur.id !== sidRef.current) setActiveId(cur.id); };
   const logout = () => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem("open-tag.devuser"); window.location.assign("/login"); }; // clear token + dev user → redirect to login (JWT is short-lived; client-side removal is sufficient)
   const markActionExecuted = async (messageId: string, result?: { kind: string; id: string; name: string }) => { await api("POST", `/api/actions/${messageId}/mark-executed`, { result: result ?? null }); };
-  const createTasks = async (channelId: string, titles: string[]) => { const r = await api("POST", `/api/tasks/channel/${channelId}`, { tasks: titles.map((title) => ({ title })) }); return r?.tasks || []; };
+  const createTasks = async (channelId: string, titles: string[]) => { const r = await api("POST", `/api/tasks/channel/${channelId}`, { tasks: titles.map((title) => ({ title })) }); if (!Array.isArray(r?.tasks)) throw new Error(r?.error || "task creation failed"); return r.tasks; };
   const openDM = async (memberType: string, memberId: string) => { const body = memberType === "user" ? { userId: memberId } : { agentId: memberId }; const r = await api("POST", "/api/channels/dm", body); if (r?.id) { await reload(); sockRef.current?.emit("join:channel", r.id); } return r?.id ?? null; };
   const joinChannel = async (id: string) => { await api("POST", `/api/channels/${id}/join`); await reload(); sockRef.current?.emit("join:channel", id); };
   const leaveChannel = async (id: string) => { await api("POST", `/api/channels/${id}/leave`); await reload(); };

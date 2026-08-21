@@ -378,6 +378,10 @@ main.content-col > .composer{position:absolute;left:0;right:var(--scrollbar-gutt
 .file-acts{display:flex;gap:4px;flex:none}
 .file-acts button,.file-acts a{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--hair-strong);border-radius:8px;background:var(--surface);color:var(--muted);cursor:pointer;text-decoration:none}
 .file-acts button:hover,.file-acts a:hover{color:var(--ink);background:var(--surface-strong)}
+.files-loading{display:flex;flex-direction:column;gap:8px;min-height:220px;color:var(--muted);font-size:13px}
+.files-loading>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.files-loading-row{display:block;height:58px;border:1px solid var(--hair);border-radius:12px;background:linear-gradient(100deg,var(--surface-strong) 25%,var(--surface) 45%,var(--surface-strong) 65%);background-size:240% 100%;animation:skel-shimmer 1.5s var(--ease-decel) infinite}
+@media (prefers-reduced-motion:reduce){.files-loading-row{animation:none}}
 /* --md-* token overrides keep nested MessageContent markdown on the banner's 12px scale instead of the body's 14.5px */
 .msg-sys{text-align:center;font-size:12px;color:var(--muted);padding:6px 12px;line-height:1.4;--md-text-size:12px;--md-line-height:1.4}
 .msg.msg-hl{background:var(--g-peach);border-radius:12px;transition:background .4s}
@@ -539,6 +543,13 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 /* Task board toolbar: Board/List toggle + Creator/Assignee filter + New Task */
 .task-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
 .task-toolbar .grow{flex:1}
+.task-action-error{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:8px 10px;border:1px solid var(--error);border-radius:8px;background:var(--error-soft);color:var(--error);font-size:13px}
+.task-action-error span{min-width:0;flex:1}
+.task-action-error button{min-height:30px;padding:3px 9px;border:1px solid currentColor;border-radius:6px;background:var(--surface);color:inherit;font:inherit;font-weight:600;cursor:pointer}
+.task-loading{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:14px;min-height:240px;color:var(--muted);font-size:13px}
+.task-loading>span:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.task-loading-lane{display:block;min-height:240px;border:1px solid var(--hair);border-radius:14px;background:linear-gradient(100deg,var(--surface-strong) 25%,var(--surface) 45%,var(--surface-strong) 65%);background-size:240% 100%;animation:skel-shimmer 1.5s var(--ease-decel) infinite}
+@media (prefers-reduced-motion:reduce){.task-loading-lane{animation:none}}
 .seg{display:inline-flex;border:1px solid var(--hair-strong);border-radius:8px;overflow:hidden;background:var(--surface)}
 .seg button{background:none;border:0;padding:6px 14px;font-size:13px;color:var(--muted);cursor:pointer}
 .seg button+button{box-shadow:-1px 0 0 var(--hair-strong)}
@@ -547,6 +558,7 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .tfilter{font-family:var(--sans);font-size:13px;color:var(--body);background:var(--surface);border:1px solid var(--hair-strong);border-radius:8px;padding:6px 10px;outline:none;cursor:pointer;max-width:180px}
 .newtask{font-size:14px;font-weight:500;color:var(--on-ink);background:var(--ink-2);border:0;padding:7px 16px;border-radius:9999px;cursor:pointer}
 .newtask:hover{background:var(--ink)}
+.claim-pill:disabled,.st-pill-btn:disabled,.tk-del:disabled,.tk-del-row:disabled{cursor:wait;opacity:.5}
 /* List view */
 .task-list{display:flex;flex-direction:column;gap:2px}
 .list-sec{margin:14px 0 4px}
