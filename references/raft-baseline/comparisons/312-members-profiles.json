@@ -66,8 +66,8 @@
     "invite": "the trigger requires manageMembers, the endpoint independently requires manageMembers, and a rejected GET or POST remains a retryable dialog error"
   },
   "contractRegression": {
-    "unit": { "passed": 155, "failed": 0 },
-    "ticketUnit": { "passed": 6, "failed": 0 },
+    "unit": { "passed": 156, "failed": 0 },
+    "ticketUnit": { "passed": 7, "failed": 0 },
     "integrationScripts": ["agentCreateRequiresMachine", "machineOfflineAgents"],
     "integrationResult": "all pass",
     "typecheck": "pass",

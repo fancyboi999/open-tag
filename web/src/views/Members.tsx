@@ -79,7 +79,7 @@ export function Members() {
         {userId ? <HumanProfile uid={userId} /> : agentId ? <AgentProfile id={agentId} onDeleted={() => nav(`/s/${slug}/agent`)} /> : <Roster
           agents={agents} humans={humans} state={membersState} onRetry={reloadMembers}
           onCreate={() => setModal(true)} canCreate={!!capabilities.manageAgents}
-          readOnly={!capabilities.manageAgents && !capabilities.manageMembers}
+          readOnly={!capabilities.manageAgents && !capabilities.manageMembers && !capabilities.changeMemberRoles}
           query={memberQ} kind={memberKind} status={memberStatus} role={memberRole}
           onQuery={(value) => setDirectoryParam("memberQ", value, "")}
           onKind={(value) => setDirectoryParam("memberKind", value)}
@@ -437,22 +437,31 @@ function SkillsSection({ id, projectBound }: { id: string; projectBound: boolean
 // Permissions tab (GET/PUT /api/agents/:id/scopes — grouped scope checkboxes with enforcement)
 function PermissionsTab({ id }: { id: string }) {
   const { t } = useTranslation();
-  const { api } = useStore();
+  const { api, capabilities } = useStore();
+  const toast = useToast();
   const [data, setData] = useState<any>(null);
   const [granted, setGranted] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState(false);
-  useEffect(() => { (async () => { const d = await api("GET", `/api/agents/${id}/scopes`); setData(d); setGranted(new Set(d.granted || [])); })(); }, [id]);
-  if (!data) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [busy, setBusy] = useState(false);
+  const permissionRequest = useRef(0);
+  const canEdit = !!capabilities.manageAgents;
+  const load = async () => { const request = ++permissionRequest.current; setState("loading"); try { const d = await api("GET", `/api/agents/${id}/scopes`); if (d?.error || !Array.isArray(d?.catalog) || !Array.isArray(d?.granted)) throw new Error(d?.error || "invalid permissions response"); if (request !== permissionRequest.current) return; setData(d); setGranted(new Set(d.granted)); setState("ready"); } catch { if (request === permissionRequest.current) setState("error"); } };
+  useEffect(() => { void load(); return () => { permissionRequest.current += 1; }; }, [id]);
+  if (state === "loading") return <div className="scroll"><div className="page-loading" role="status" aria-label={t("members.loading")}><span /><span /><span /></div></div>;
+  if (state === "error" || !data) return <div className="scroll"><div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{t("members.permissionsLoadFailed")}</span><button onClick={() => void load()}>{t("members.retry")}</button></div></div>;
   const toggle = (k: string) => setGranted((g) => { const n = new Set(g); n.has(k) ? n.delete(k) : n.add(k); return n; });
-  const save = async (scopes: string[]) => { const d = await api("PUT", `/api/agents/${id}/scopes`, { scopes }); setData({ ...data, ...d }); setGranted(new Set(d.granted || [])); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  const save = async (scopes: string[]) => { if (!canEdit) return; setBusy(true); try { const d = await api("PUT", `/api/agents/${id}/scopes`, { scopes }); if (d?.error || !Array.isArray(d?.granted)) { toast.error(d?.error || t("members.permissionsSaveFailed")); return; } setData({ ...data, ...d }); setGranted(new Set(d.granted)); setSaved(true); setTimeout(() => setSaved(false), 1500); } catch (error: any) { toast.error(String(error?.message || error)); } finally { setBusy(false); } };
   const groups: Record<string, any[]> = {};
   for (const s of data.catalog || []) (groups[s.group] ||= []).push(s);
   return (
     <div className="scroll">
       <div className="perm-head">
         <span className="meta">{data.mode === "custom" ? t("members.permCustom") : t("members.permDefault")} · rev {data.revision}</span>
-        <button className="joinbtn" onClick={() => save((data.catalog || []).map((s: any) => s.key))}>{t("members.grantAll")}</button>
-        <button className="ok" style={{ marginLeft: "auto" }} onClick={() => save([...granted])}>{t("members.save")}</button>
+        {canEdit ? <>
+          <button className="joinbtn" disabled={busy} onClick={() => void save((data.catalog || []).map((s: any) => s.key))}>{t("members.grantAll")}</button>
+          <button className="ok" disabled={busy} style={{ marginLeft: "auto" }} onClick={() => void save([...granted])}>{t("members.save")}</button>
+        </> : <span className="meta" style={{ marginLeft: "auto" }}>{t("members.permissionsReadOnly")}</span>}
         {saved && <span className="saved">{t("members.savedConfirm")}</span>}
       </div>
       {/* Scope group/label/description come from the server catalog (src/server/scopes.ts, English). Translate
@@ -463,7 +472,7 @@ function PermissionsTab({ id }: { id: string }) {
           <div className="sec sec-sub">{t(`members.scopeGroup.${g}`, { defaultValue: g })}</div>
           {list.map((s: any) => (
             <label key={s.key} className="perm-row">
-              <input type="checkbox" checked={granted.has(s.key)} onChange={() => toggle(s.key)} />
+              <input type="checkbox" checked={granted.has(s.key)} disabled={!canEdit || busy} onChange={() => toggle(s.key)} />
               <span className="grow"><span className="who">{t(`members.scopeLabel.${s.key.replace(/:/g, "_")}`, { defaultValue: s.label })}</span> <code className="perm-key">{s.key}</code><div className="meta">{t(`members.scopeDesc.${s.key.replace(/:/g, "_")}`, { defaultValue: s.description })}</div></span>
             </label>
           ))}

@@ -25,6 +25,13 @@ test("member dialogs trap focus and expose named dialog semantics", () => {
   }
 });
 
+test("Agent permission editing follows manageAgents and never paints rejection as saved", () => {
+  assert.match(members, /const canEdit = !!capabilities\.manageAgents/);
+  assert.match(members, /disabled=\{!canEdit \|\| busy\}/);
+  assert.match(members, /if \(d\?\.error \|\| !Array\.isArray\(d\?\.granted\)\)/);
+  assert.match(members, /permissionsReadOnly/);
+});
+
 test("mobile member controls meet the 44px touch target contract", () => {
   assert.match(css, /\.addbtn\{width:44px;height:44px\}/);
   assert.match(css, /\.ptabs button\{flex:none;min-height:44px/);
