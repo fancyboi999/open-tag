@@ -18,10 +18,14 @@ assert.deepEqual(
 );
 
 const requiredKinds = new Set(['public', 'auth', 'workspace-root', 'detail']);
+const catalogStates = new Set(matrix.stateCatalog);
 for (const page of matrix.pages) {
   requiredKinds.delete(page.kind);
   assert.ok(page.id && page.route && page.precondition, `incomplete page ${page.id}`);
   assert.ok(page.states.length > 0, `page ${page.id} has no states`);
+  for (const state of page.states) {
+    assert.ok(catalogStates.has(state), `${page.id} uses uncatalogued state ${state}`);
+  }
   const coverage = new Set([...page.observed, ...page.gaps]);
   assert.equal(
     page.observed.length + page.gaps.length,
@@ -33,6 +37,11 @@ for (const page of matrix.pages) {
   }
 }
 assert.equal(requiredKinds.size, 0, `missing page kinds: ${[...requiredKinds]}`);
+assert.deepEqual(
+  new Set(schema.properties.state.enum),
+  catalogStates,
+  'evidence schema and matrix state catalogs differ',
+);
 
 const representedStates = new Set(Object.keys(evidence.stateEvidence));
 for (const state of matrix.stateCatalog) {

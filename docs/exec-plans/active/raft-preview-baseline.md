@@ -54,6 +54,13 @@ not permission to copy third-party source or assets.
   submission is single-flight and preserves the entire draft for focused retry after API/network
   failure. Menu/Dialog/thread initial focus, arrow keys, Tab containment, Escape, and exact trigger
   return pass in ego-browser at `1440×900`, `390×844`, and `375×812`.
+- 2026-08-21: reconciled the final matrix against real reference and OpenTag routes, added the
+  previously omitted `error`, `empty`, and `no-results` state contracts to the locked evidence
+  schema, and closed every viewport gap with same-task-space captures. The final gap pass covered
+  desktop/mobile Workspace root resolution, `375px` channel detail, human/Agent DM, mobile thread,
+  and the explicit unsupported-capability results for Raft-only Apps/MCP settings. Every added
+  capture records a screenshot hash, semantic hash, geometry, computed styles, and zero horizontal
+  overflow under `.shots/raft-baseline/final/`.
 
 ## Decision log
 
@@ -86,3 +93,8 @@ not permission to copy third-party source or assets.
   reference workspace text is not copied: raw full-page image similarity remains a disclosed
   diagnostic, while the unmasked channel header/tab critical dividers are byte-identical and all
   owned control edges stay inside the locked `2 CSS px` budget.
+- Ticket #315 treats Raft Apps and hosted MCP settings as observed product differences, not missing
+  coverage and not permission to invent OpenTag backend contracts. The reference pages and
+  OpenTag's explicit unsupported state are captured at all three viewports; their content is not a
+  visual-parity claim. Desktop `/s/:workspace` resolving to the current channel is likewise a
+  measured responsive route outcome, while the same URL remains the discovery root on mobile.
