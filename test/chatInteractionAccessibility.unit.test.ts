@@ -28,6 +28,12 @@ test("an opened thread receives deterministic focus on its close control", () =>
   assert.match(chat, /const closeThread = \(\) => \{ setThread\(null\); restoreContextTrigger\(\); \}/);
 });
 
+test("the create-channel Dialog restores focus to its exact trigger", () => {
+  assert.match(sidebar, /const channelTriggerRef = useRef<HTMLButtonElement>\(null\)/);
+  assert.match(sidebar, /ref=\{channelTriggerRef\}[\s\S]*?setMkChan\(true\)/);
+  assert.match(sidebar, /setMkChan\(false\); requestAnimationFrame\(\(\) => channelTriggerRef\.current\?\.focus\(\)\)/);
+});
+
 test("the direct-message menu exposes both real humans and agents with keyboard navigation", () => {
   assert.match(sidebar, /visibleAgents\.map\(\(a\).*doDM\("agent", a\.id\)/s);
   assert.match(sidebar, /dmHumans\.map\(\(u\).*doDM\("user", u\.userId\)/s);

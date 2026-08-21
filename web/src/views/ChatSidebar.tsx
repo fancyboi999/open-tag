@@ -27,6 +27,7 @@ export function ChatSidebar() {
   const [pinned, setPinned] = useState<string[]>([]);
   const [mkChan, setMkChan] = useState(false);
   const [dmPick, setDmPick] = useState(false);
+  const channelTriggerRef = useRef<HTMLButtonElement>(null);
   const dmTriggerRef = useRef<HTMLButtonElement>(null);
   const dmMenuRef = useRef<HTMLDivElement>(null);
   const onSaved = pathname.endsWith("/saved");
@@ -98,7 +99,7 @@ export function ChatSidebar() {
         <Eye size={13} style={{ flexShrink: 0, opacity: 0.7 }} /><span className="grow">{t("sidebar.showcaseItem")}</span>
       </button>
       {pinnedChans.length > 0 && <><div className="sec">{t("sidebar.pinnedSection")}</div>{pinnedChans.map(chanRow)}</>}
-      <div className="sec">{t("common.channels")} {capabilities.manageChannels && <button className="addbtn" title={t("sidebar.createChannelTitle")} onClick={() => { setMkChan(true); setDmPick(false); }}>+</button>}</div>
+      <div className="sec">{t("common.channels")} {capabilities.manageChannels && <button ref={channelTriggerRef} className="addbtn" title={t("sidebar.createChannelTitle")} onClick={() => { setMkChan(true); setDmPick(false); }}>+</button>}</div>
       {joinedChans.map(chanRow)}
       {otherChans.length > 0 && <>
         <div className="sec sec-sub">{t("sidebar.joinableSection")}</div>
@@ -124,7 +125,7 @@ export function ChatSidebar() {
         </button>
         );
       })}
-      {mkChan && <CreateChannelModal onCreate={doCreate} onClose={() => setMkChan(false)} />}
+      {mkChan && <CreateChannelModal onCreate={doCreate} onClose={() => { setMkChan(false); requestAnimationFrame(() => channelTriggerRef.current?.focus()); }} />}
       </div>
       <LiveAgentBar />
     </aside>
