@@ -48,7 +48,15 @@ export function ChatSidebar() {
   const doDM = async (agentId: string) => { const id = await openDM("agent", agentId); setDmPick(false); if (id) nav(`/s/${slug}/channel/${id}`); };
 
   const chanRow = (c: any) => (
-    <div key={c.id} className={"item chan-row" + (c.id === channelId ? " active" : "")} onClick={() => nav(`/s/${slug}/channel/${c.id}`)}>
+    <div
+      key={c.id}
+      className={"item chan-row" + (c.id === channelId ? " active" : "")}
+      role="link"
+      tabIndex={0}
+      aria-current={c.id === channelId ? "page" : undefined}
+      onClick={() => nav(`/s/${slug}/channel/${c.id}`)}
+      onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) { e.preventDefault(); nav(`/s/${slug}/channel/${c.id}`); } }}
+    >
       <span className="grow"># {c.name}</span>
       <button className={"pinbtn" + (pinned.includes(c.id) ? " on" : "")} title={pinned.includes(c.id) ? t("sidebar.unpinChannel") : t("sidebar.pinChannel")} onClick={(e) => { e.stopPropagation(); togglePin(c.id); }}><Pin size={12} /></button>
       {!!unread[c.id] && <span className="badge">{unread[c.id]}</span>}
@@ -59,17 +67,17 @@ export function ChatSidebar() {
     <aside className="sidebar">
       <div className="sb-scroll">
       <div className="sb-title">{t("nav.channel")}</div>
-      <div className={"item nav-row" + (onSaved ? " active" : "")} onClick={() => nav(`/s/${slug}/saved`)}>
+      <button type="button" className={"item nav-row" + (onSaved ? " active" : "")} aria-current={onSaved ? "page" : undefined} onClick={() => nav(`/s/${slug}/saved`)}>
         <span className="grow"><Bookmark size={14} style={{ verticalAlign: "-2px" }} /> {t("common.saved")}</span>
         {savedIds.size > 0 && <span className="badge">{savedIds.size}</span>}
-      </div>
+      </button>
       {/* Showcase pinned to the very top: a static, read-only demo page (no DB channel, no API) — browsed a few
           times, then ignored. Kept above Channels/DMs by product call so the two high-traffic sections stay
           adjacent and uninterrupted. */}
       <div className="sec sec-sub">{t("sidebar.showcaseSection")}</div>
-      <div className={"item" + (onShowcase ? " active" : "")} style={{ cursor: "pointer" }} onClick={() => nav(`/s/${slug}/showcase`)}>
+      <button type="button" className={"item" + (onShowcase ? " active" : "")} aria-current={onShowcase ? "page" : undefined} onClick={() => nav(`/s/${slug}/showcase`)}>
         <Eye size={13} style={{ flexShrink: 0, opacity: 0.7 }} /><span className="grow">{t("sidebar.showcaseItem")}</span>
-      </div>
+      </button>
       {pinnedChans.length > 0 && <><div className="sec">{t("sidebar.pinnedSection")}</div>{pinnedChans.map(chanRow)}</>}
       <div className="sec">{t("common.channels")} {capabilities.manageChannels && <button className="addbtn" title={t("sidebar.createChannelTitle")} onClick={() => { setMkChan(true); setDmPick(false); }}>+</button>}</div>
       {joinedChans.map(chanRow)}

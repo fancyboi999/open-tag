@@ -17,6 +17,7 @@ import { homeRoute } from "./routing.ts";
 import { canonicalWorkspaceHref } from "./shellRouting.ts";
 import "./i18n";
 import "./styles.css";
+import "./baselineShell.css";
 import "./iconMotion.css";
 
 // Public home ("/"). The marketing Landing is for anonymous visitors only; a user who has — or is

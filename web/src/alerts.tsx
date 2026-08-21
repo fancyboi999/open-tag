@@ -8,6 +8,7 @@
 // button only appears when there is something to act on. New signals slot into useSystemAlerts() as more cases.
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useEscClose } from "./ConfirmModal.tsx";
 import { AlertTriangle } from "lucide-react";
 import { useStore } from "./store.tsx";
 import { isDaemonOutdated } from "./machineUi.ts";
@@ -65,6 +66,7 @@ export function NotificationCenter({ alerts, anchor, onView, onDismiss, onClose 
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  useEscClose(onClose);
   return (
     <>
       <div className="alert-backdrop" onClick={onClose} />

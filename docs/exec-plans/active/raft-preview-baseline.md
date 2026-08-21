@@ -33,6 +33,10 @@ not permission to copy third-party source or assets.
   centralized page/parent metadata, and query/hash-preserving workspace canonicalization. Unit tests,
   root/web typecheck, Preview and production builds, and real-browser deep-link/session checks pass;
   the production build rejected a forced Baseline URL and rendered Classic.
+- 2026-08-21: aligned the Baseline desktop shell at `1440×900` and the locked `768px` seam: `64px`
+  global rail, `240px` section sidebar, main content at `x=304`, a separate channel tab row, fixed
+  internal scrolling, and an on-demand `320px` thread/profile column. Real-browser keyboard, hover,
+  selected, menu Escape, panel Escape/focus-return, overflow, and Classic rollback journeys pass.
 
 ## Decision log
 
@@ -45,3 +49,7 @@ not permission to copy third-party source or assets.
 - Ticket #305 establishes only the shell/routing seam. Its browser evidence verifies selection and
   rollback behavior; visual threshold comparisons begin when tickets #306/#307 add visible baseline
   shell geometry.
+- Ticket #306 owns desktop shell geometry and interaction chrome, not the final message/task/member/
+  settings contents; those dynamic regions remain assigned to tickets #309–#313. The committed #306
+  evidence records zero-delta critical shell edges and the corresponding visible content gaps rather
+  than masking downstream module layout.

@@ -65,21 +65,21 @@ export function Layout({ shellMode, page }: { shellMode: ShellMode; page: AppPag
       <div className="rail">
         <ServerSwitcher />
         {SECTIONS.map((s) => (
-          <a key={s.key} className={"t im" + (active(s.key) ? " active" : "")} aria-label={t(s.labelKey)} onClick={() => go(s.key)}>
+          <button key={s.key} type="button" className={"t im" + (active(s.key) ? " active" : "")} aria-label={t(s.labelKey)} aria-current={active(s.key) ? "page" : undefined} onClick={() => go(s.key)}>
             <s.Icon size={19} className="im-pop" />
             <span className="t-label" aria-hidden="true">{t(s.labelKey)}</span>
             {s.key === "inbox" && totalUnread > 0 && <span className="rail-badge" aria-hidden="true">{totalUnread > 99 ? "99+" : totalUnread}</span>}
-          </a>
+          </button>
         ))}
         <div className="spacer" />
         {alerts.length > 0 && (
-          <a className={"t im alert-tab" + (alertAnchor ? " active" : "")} aria-label={t("nav.alerts")} onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setAlertAnchor(alertAnchor ? null : { left: r.right + 8, bottom: window.innerHeight - r.bottom }); }}>
+          <button type="button" className={"t im alert-tab" + (alertAnchor ? " active" : "")} aria-label={t("nav.alerts")} aria-expanded={!!alertAnchor} onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setAlertAnchor(alertAnchor ? null : { left: r.right + 8, bottom: window.innerHeight - r.bottom }); }}>
             <AlertTriangle size={19} className="im-shake" />
             <span className="t-label" aria-hidden="true">{t("nav.alerts")}</span>
             <span className="rail-badge" aria-hidden="true">{alerts.length > 99 ? "99+" : alerts.length}</span>
-          </a>
+          </button>
         )}
-        <a className={"t im" + (active("settings") ? " active" : "")} aria-label={t("nav.settings")} onClick={() => go("settings")}><IconSettings size={19} className="im-rotate" /><span className="t-label" aria-hidden="true">{t("nav.settings")}</span></a>
+        <button type="button" className={"t im" + (active("settings") ? " active" : "")} aria-label={t("nav.settings")} aria-current={active("settings") ? "page" : undefined} onClick={() => go("settings")}><IconSettings size={19} className="im-rotate" /><span className="t-label" aria-hidden="true">{t("nav.settings")}</span></button>
       </div>
       {alertAnchor && alerts.length > 0 && (
         <NotificationCenter alerts={alerts} anchor={alertAnchor}

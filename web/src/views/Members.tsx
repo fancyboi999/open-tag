@@ -164,6 +164,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const [showRestart, setShowRestart] = useState(false);
   const [avBusy, setAvBusy] = useState(false); const [avErr, setAvErr] = useState(""); const [signedAvatar, setSignedAvatar] = useState<string | null>(null);
   const [perContent, setPerContent] = useState<string | null>(null); const [perBusy, setPerBusy] = useState(false);
+  useEscClose(() => { if (onClose) onClose(); });
   const refetch = async () => { const data = await api("GET", "/api/agents/" + id); setA(data); setSignedAvatar(resolveAvatar(data?.avatarUrl, attachmentUrl)); };
   useEffect(() => { refetch(); }, [id]);
   useEffect(() => onEvent((e) => { if (e.type === "agent" && e.id === id) setA((p: any) => (p ? { ...p, status: e.status ?? p.status, activity: e.activity ?? p.activity } : p)); }), [id]);
@@ -628,6 +629,7 @@ export function HumanProfile({ uid, onClose, onMessage }: { uid: string; onClose
   const [p, setP] = useState<any>(null);
   const [edit, setEdit] = useState(false); const [ds, setDs] = useState("");
   const [avBusy, setAvBusy] = useState(false); const [avErr, setAvErr] = useState(""); const [signedAvatar, setSignedAvatar] = useState<string | null>(null);
+  useEscClose(() => { if (onClose) onClose(); });
   const refetch = async () => { const data = await api("GET", `/api/servers/${serverId}/members/${uid}/profile`); setP(data); setSignedAvatar(resolveAvatar(data?.avatarUrl, attachmentUrl)); };
   useEffect(() => { setP(null); setSignedAvatar(null); refetch(); }, [uid, serverId]);
   const onPickAvatar = async (f: File) => { setAvBusy(true); setAvErr(""); try { const url = await uploadUserAvatar(f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };

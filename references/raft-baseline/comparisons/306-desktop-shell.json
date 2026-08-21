@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "ticket": 306,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "scope": "desktop Workspace shell geometry, navigation states, scrolling, and contextual-column lifecycle",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "horizontalOverflowCssPx": 0,
+      "geometry": {
+        "globalRail": { "reference": [0, 0, 64, 900], "local": [0, 0, 64, 900], "maximumEdgeDeltaCssPx": 0 },
+        "sectionSidebar": { "reference": [64, 0, 240, 900], "local": [64, 0, 240, 900], "maximumEdgeDeltaCssPx": 0 },
+        "mainContentX": { "reference": 304, "local": 304, "deltaCssPx": 0 },
+        "globalNavigationButton": { "reference": [40, 40], "local": [40, 40], "maximumEdgeDeltaCssPx": 0 },
+        "contextColumn": { "referenceWidth": 320, "localWidth": 320, "deltaCssPx": 0, "conditional": true }
+      }
+    },
+    {
+      "width": 768,
+      "height": 900,
+      "horizontalOverflowCssPx": 0,
+      "mode": "desktop",
+      "globalRailWidth": 64,
+      "sectionSidebarWidth": 240,
+      "mainContentX": 304,
+      "mobileBurgerVisible": false
+    }
+  ],
+  "interactionEvidence": {
+    "keyboardOrder": ["Switch workspace", "Search", "Inbox", "Chat", "Tasks"],
+    "selected": "Chat exposes aria-current=page",
+    "hover": "Search uses a 2px black border with the measured yellow-rail treatment",
+    "workspaceMenuEscape": "closed and focus returned to Switch workspace",
+    "threadEscape": "conditional column closed and focus returned to the stable More action",
+    "profileEscape": "conditional column closed and focus returned to the member-name trigger",
+    "nestedContextEscape": "profile closed back to the thread trigger, then thread closed back to the main-message More action",
+    "classicRollback": { "shell": "classic", "globalRailWidth": 56, "sectionSidebarWidth": 248, "mainContentX": 304 }
+  },
+  "artifacts": {
+    "reference": {
+      "name": "channel-desktop-1440x900.png",
+      "sha256": "492f3a6d358709305ae4a2adb7e6653b68d1fede96227d3181ae2effc5fcd679",
+      "committed": false
+    },
+    "local": [
+      { "name": "channel-1440x900.png", "sha256": "2d72af7a721d3864c7faf49179cd182e53c4c3e9280cbca0a42e8f2674c6a6eb", "width": 1440, "height": 900, "committed": false },
+      { "name": "thread-open-1440x900.png", "sha256": "192f1f6c3b4cfac1a48c747a5259f1c105be064058345214fb477010312d1ee9", "width": 1440, "height": 900, "committed": false },
+      { "name": "channel-768x900.png", "sha256": "7bf7e1b2daf22feae9bd802a573a886d49a23c2ff7420cd374c98916936985c5", "width": 768, "height": 900, "committed": false }
+    ]
+  },
+  "thresholdResults": {
+    "criticalEdgeMaximumCssPx": { "limit": 2, "actual": 0, "result": "pass" },
+    "horizontalOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" },
+    "shellCriticalRegion": {
+      "method": "luma SSIM on the unmasked vertical shell-edge bands x=61..66 and x=301..306 for y=0..699",
+      "minimumSsim": 0.998,
+      "actualSsim": 0.999529988,
+      "maximumChangedPixelRatio": 0.0025,
+      "actualChangedPixelRatio": 0.000238095,
+      "result": "pass"
+    },
+    "fullPage": {
+      "result": "deferred",
+      "reason": "message, task, file, member, settings, and notification regions are owned and re-captured by tickets #309–#313; #306 does not mask those unaligned module layouts"
+    }
+  },
+  "intentionalDifferences": [
+    "OpenTag retains its licensed Inter/system and Lucide assets instead of copying the reference private font or brand glyphs.",
+    "Dynamic channel messages, replies, reactions, tasks, files, member data, settings data, and notification fixtures are not masked as shell parity; their content/layout comparisons belong to tickets #309–#313."
+  ]
+}
