@@ -64,7 +64,7 @@ not permission to copy third-party source or assets.
 - 2026-08-21: closed the final regression and rollback gate. All 30 pages are observed at all three
   locked viewports with 14 states and no gaps; unified desktop/mobile journeys cover real click,
   keyboard, touch, focus restoration, native/deterministic Back, slow loading, offline/reconnect,
-  and real Agent/machine states. Typecheck, the Production build, and all 341 unit tests pass with
+  and real Agent/machine states. Typecheck, the Production build, and all 350 unit tests pass with
   zero unexpected post-recovery browser errors. Preview returns immediately to Classic, Production
   rejects a forced Baseline query, and the exact-head diff leaves server/runtime/connector surfaces
   and binary/private assets untouched. The executable summary is `npm run reference:gate`.

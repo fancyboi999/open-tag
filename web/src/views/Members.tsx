@@ -670,7 +670,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
   ];
   const modelLoadingOpts = [{ value: "", label: t("members.modelDetecting") }];
   return (
-    <div className="modal-bg" onClick={onClose}>
+    <div className="modal-bg">
       <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="create-agent-title" tabIndex={-1} aria-busy={busy} onClick={(e) => e.stopPropagation()}>
         <h3 id="create-agent-title">{t("members.createAgentTitle")}</h3>
         <label>{t("members.computerLabel")}<span className="req-mark">*</span></label>

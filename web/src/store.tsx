@@ -56,9 +56,23 @@ interface Store {
   agentPanelReq: string | null;                                   // pending open-agent-panel request (agent id); null when none
   clearAgentPanelReq: () => void;                                 // clear the pending request after the Chat view has consumed it
   savedIds: Set<string>;                                          // saved message ids known in this session (bookmark state + Saved count source)
-  saveMsg: (messageId: string) => Promise<void>;
-  unsaveMsg: (messageId: string) => Promise<void>;
+  saveMsg: (messageId: string) => Promise<SavedMutationResult>;
+  unsaveMsg: (messageId: string) => Promise<SavedMutationResult>;
   listSaved: (limit?: number, offset?: number) => Promise<{ saved: any[]; hasMore: boolean }>;
+}
+type SavedMutationResult = "updated" | "failed" | "ignored";
+export function shareSavedMutation(
+  mutations: Map<string, Promise<SavedMutationResult>>,
+  key: string,
+  run: () => Promise<SavedMutationResult>,
+): Promise<SavedMutationResult> {
+  const pending = mutations.get(key);
+  if (pending) return pending;
+  const mutation = run().finally(() => {
+    if (mutations.get(key) === mutation) mutations.delete(key);
+  });
+  mutations.set(key, mutation);
+  return mutation;
 }
 const Ctx = createContext<Store>(null as any);
 export const useStore = () => useContext(Ctx);
@@ -89,6 +103,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [humans, setHumans] = useState<Human[]>([]);
   const [membersState, setMembersState] = useState<"loading" | "refreshing" | "ready" | "error">("loading");
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const savedMutationsRef = useRef(new Map<string, Promise<SavedMutationResult>>());
   const [agentPanelReq, setAgentPanelReq] = useState<string | null>(null); // cross-component signal: LiveAgentBar (sidebar) → Chat view opens the agent profile panel
   const [activeId, setActiveId] = useState(""); // id of the workspace to activate; changing it drives the activation effect (initial pick + every client-side switch)
   const tokenRef = useRef("");
@@ -233,9 +248,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const openThread = async (parentChannelId: string, parentMessageId: string) => { const r = await api("POST", `/api/channels/${parentChannelId}/threads`, { parentMessageId }); return r?.threadChannelId ?? null; };
   const openAgentPanel = (agentId: string) => setAgentPanelReq(agentId); // LiveAgentBar → Chat: open the agent profile panel (Activity tab); Chat consumes & clears
   const clearAgentPanelReq = () => setAgentPanelReq(null);
-  // Saved messages: private bookmarks, optimistically update savedIds.
-  const saveMsg = async (messageId: string) => { setSavedIds((s) => new Set(s).add(messageId)); try { const r = await api("POST", "/api/channels/saved", { messageId }); if (r?.ok !== true) throw new Error(r?.error || "save message failed"); } catch (error) { setSavedIds((s) => { const n = new Set(s); n.delete(messageId); return n; }); throw error; } };
-  const unsaveMsg = async (messageId: string) => { setSavedIds((s) => { const n = new Set(s); n.delete(messageId); return n; }); try { const r = await api("DELETE", `/api/channels/saved/${messageId}`); if (r?.ok !== true) throw new Error(r?.error || "unsave message failed"); } catch (error) { setSavedIds((s) => new Set(s).add(messageId)); throw error; } };
+  // Saved messages: commit confirmed mutations only to the workspace that initiated them.
+  const mutateSaved = (messageId: string, nextSaved: boolean): Promise<SavedMutationResult> => {
+    const sid = sidRef.current;
+    const key = `${sid}:${messageId}`;
+    return shareSavedMutation(savedMutationsRef.current, key, async () => {
+      try {
+        const r = await api(nextSaved ? "POST" : "DELETE", nextSaved ? "/api/channels/saved" : `/api/channels/saved/${messageId}`, nextSaved ? { messageId } : undefined);
+        if (sidRef.current !== sid) return "ignored";
+        if (r?.ok !== true) return "failed";
+        setSavedIds((s) => { const n = new Set(s); if (nextSaved) n.add(messageId); else n.delete(messageId); return n; });
+        return "updated";
+      } catch { return sidRef.current === sid ? "failed" : "ignored"; }
+    });
+  };
+  const saveMsg = (messageId: string) => mutateSaved(messageId, true);
+  const unsaveMsg = (messageId: string) => mutateSaved(messageId, false);
   const listSaved = async (limit = 20, offset = 0) => { const r = await api("GET", `/api/channels/saved?limit=${limit}&offset=${offset}`); if (!Array.isArray(r?.saved)) throw new Error("invalid saved messages response"); return { saved: r.saved, hasMore: !!r.hasMore }; };
   const retryBootstrap = () => { setBootstrapState("loading"); setReady(false); setAuthState(initialAuthState()); setActiveId(""); setBootstrapAttempt((attempt) => attempt + 1); };
 

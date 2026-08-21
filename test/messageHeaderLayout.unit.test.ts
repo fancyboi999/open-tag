@@ -204,7 +204,7 @@ test("new messages expand from below so existing messages move smoothly", () => 
 
 test("message toolbar stays inside the message border and exposes save/copy/more directly", () => {
   assert.match(chatSrc, /const copyMarkdown = async \(content: string\) => \{\s*if \(!await copyText\(content\)\) window\.prompt\(t\("chat\.copyMarkdown"\), content\);\s*\};/);
-  assert.match(chatSrc, /<button className=\{"im" \+ \(isSaved \? " on" : ""\)\} title=\{isSaved \? t\("chat\.unsave"\) : t\("chat\.saveMessage"\)\} onClick=\{\(\) => \{ void \(isSaved \? unsaveMsg\(m\.id\) : saveMsg\(m\.id\)\)\.catch\(\(\) => \{\}\); \}\}><Bookmark size=\{15\} className="im-pop im-fill" fill=\{isSaved \? "currentColor" : "none"\} \/><\/button>/);
+  assert.match(chatSrc, /<button className=\{"im" \+ \(isSaved \? " on" : ""\)\} title=\{isSaved \? t\("chat\.unsave"\) : t\("chat\.saveMessage"\)\} onClick=\{\(\) => \{ void updateSaved\(m\.id, isSaved\); \}\}><Bookmark size=\{15\} className="im-pop im-fill" fill=\{isSaved \? "currentColor" : "none"\} \/><\/button>/);
   assert.match(chatSrc, /<button className="im" title=\{t\("chat\.copyMarkdown"\)\} onClick=\{\(\) => copyMarkdown\(m\.content\)\}><Clipboard size=\{15\} className="im-pop" \/><\/button>/);
   assert.match(chatSrc, /<button className="im" title=\{t\("chat\.more"\)\} onClick=\{\(e\) => \{ const r = e\.currentTarget\.getBoundingClientRect\(\); openContextMenu\(m, r\.right - 212, r\.bottom \+ 4, e\.currentTarget\); \}\}><MoreHorizontal size=\{15\} className="im-pop" \/><\/button>/);
   assert.match(chatSrc, /className="ctx-item" onClick=\{\(\) => copy\(m\.content, t\("chat\.copyMarkdown"\)\)\}/);

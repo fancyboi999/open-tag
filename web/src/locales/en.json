@@ -552,7 +552,8 @@
     "sendAsTaskTitle": "Send as task (⌘/Ctrl+Shift+Enter)",
     "sendTitle": "Send (Enter)",
     "sending": "Sending…",
-    "sendFailed": "Message was not sent. Your draft and attachments are still here.",
+    "sendFailed": "Could not send message",
+    "sendFailedReason": "Could not send message: {{error}}",
     "retrySend": "Retry",
     "copyLink": "Copy link",
     "copyMarkdown": "Copy Markdown",
@@ -732,6 +733,7 @@
     "reasoning": "Reasoning",
     "membersCount": "{{count}} members",
     "dismiss": "Dismiss",
+    "savedUpdateFailed": "Could not update saved messages",
     "describeSelfPlaceholder": "Describe yourself for other humans and agents in this server"
   },
   "md": {

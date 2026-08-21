@@ -63,7 +63,7 @@
   "regression": {
     "typecheck": "pass",
     "productionBuild": { "result": "pass", "modulesTransformed": 2558, "landingPrerender": "injected" },
-    "fullUnit": { "result": "pass", "passed": 341, "failed": 0 },
+    "fullUnit": { "result": "pass", "passed": 350, "failed": 0 },
     "referenceCheck": "30 pages, 3 required viewports, 14 representative states"
   },
   "rollback": {

@@ -12,10 +12,6 @@ export function canSendComposerDraft(text: string, pendingAtts: { status?: strin
   return pendingAtts.every((a) => a.status === "done") && (!!text.trim() || pendingAtts.length > 0);
 }
 
-export function messageSendSucceeded(response: unknown): boolean {
-  return !!response && typeof response === "object" && (response as { ok?: unknown }).ok === true;
-}
-
 // Shared message composer for channels, DMs, and threads. Owns text, attachment upload
 // (button / paste / drag-drop, with per-file progress), @mention autocomplete, and send.
 // The only per-context difference is "As Task" (channels/DMs only), gated by `allowAsTask` —
@@ -38,7 +34,8 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
   const [pendingAtts, setPendingAtts] = useState<any[]>([]); // uploaded attachments queued to send with the next message
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const sendingRef = useRef(false);
   const atPosRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
@@ -78,30 +75,34 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
   ) : null;
   const reachStatusChip = reach?.kind === "off" ? t("chat.machineOfflineComposerPlaceholder", { names: reach.names }) : "";
   const effectivePlaceholder = reachPlaceholder ?? (allowAsTask && asTask ? t("chat.taskPlaceholder") : placeholder);
-  const canSend = !sending && !!channelId && canSendComposerDraft(text, pendingAtts);
+  const canSend = !!channelId && !sending && canSendComposerDraft(text, pendingAtts);
+  const reportSendFailure = (error?: unknown) => {
+    const reason = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+    setSendError(reason);
+    requestAnimationFrame(() => retryRef.current?.focus());
+  };
 
   const send = async (forceTask?: boolean) => {
-    const v = text.trim(); if (!canSend) return;
+    const v = text.trim(); if (!canSend || sendingRef.current) return;
     const asT = allowAsTask && (forceTask ?? asTask); // ⌘/Ctrl+Shift+Enter forces task; threads (allowAsTask=false) never send as task
+    if (asT && !asTask) setAsTask(true); // preserve a shortcut-forced task intent if the request fails
     const ids = pendingAtts.map((a) => a.id); // canSend guarantees the full queue is uploaded
-    setSending(true);
-    setSendError(false);
+    sendingRef.current = true; setSending(true); setAtQuery(null); setSendError(null);
     try {
-      const response = await api("POST", "/api/messages", { channelId, content: v, asTask: asT, attachmentIds: ids });
-      if (!messageSendSucceeded(response)) throw new Error("message send failed");
-      setText(""); setAtQuery(null); setAsTask(false); setPendingAtts([]);
+      const result = await api("POST", "/api/messages", { channelId, content: v, asTask: asT, attachmentIds: ids });
+      if (result?.ok !== true) { reportSendFailure(result?.error); return; }
+      setText(""); setAsTask(false); setPendingAtts([]);
       requestAnimationFrame(() => inputRef.current?.focus());
-    } catch {
-      setSendError(true);
-      requestAnimationFrame(() => retryRef.current?.focus());
+    } catch (error) {
+      reportSendFailure(error);
     } finally {
-      setSending(false);
+      sendingRef.current = false; setSending(false);
     }
   };
   const onPickFiles = (e: ChangeEvent<HTMLInputElement>) => { if (e.target.files?.length) addFiles(Array.from(e.target.files)); e.target.value = ""; };
   // Each file → placeholder (images get a localUrl preview + "uploading") → uploadOne streams progress → replaced with the real attachment on success, "error" on failure. Paste: images only; drag-drop: any type.
   const addFiles = async (files: FileList | File[]) => {
-    const arr = Array.from(files); if (!arr.length || !channelId) return;
+    const arr = Array.from(files); if (!arr.length || !channelId || sendingRef.current) return;
     setUploading(true);
     try {
       for (const f of arr) {
@@ -132,6 +133,7 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
     ...humans.map((h) => ({ name: h.name, label: h.displayName || h.name, kind: "human", avatarUrl: h.avatarUrl })),
   ].filter((c) => c.name && handleKey(c.name).includes(handleKey(atQuery || ""))).slice(0, 8);
   const pick = (c: { name: string }) => {
+    if (sendingRef.current) return;
     const start = atPosRef.current;
     const after = text.slice(start + 1 + (atQuery?.length ?? 0));
     setText(text.slice(0, start) + "@" + c.name + " " + after);
@@ -143,7 +145,7 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
       {atQuery !== null && cands.length > 0 && (
         <div className="mention-menu">
           {cands.map((c, i) => (
-            <button key={c.kind + c.name} className={"mention-opt" + (i === atSel ? " sel" : "")} aria-selected={i === atSel}
+            <button key={c.kind + c.name} className={"mention-opt" + (i === atSel ? " sel" : "")} aria-selected={i === atSel} disabled={sending}
               onMouseEnter={() => setAtSel(i)} onMouseDown={(e) => { e.preventDefault(); pick(c); }}>
               <Avatar seed={c.name} url={avFor(c.avatarUrl)} size={22} />
               <span className="grow">{c.label} <span className="mk-name">@{c.name}</span></span>
@@ -160,19 +162,19 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
           {a.status === "uploading" && <span className="patt-prog" style={{ ["--pct" as string]: (a.progress || 0) + "%" } as CSSProperties}>{a.progress || 0}%</span>}
           {a.status === "done" && <span className="patt-ok"><CheckCircle2 size={13} /></span>}
           {a.status === "error" && <span className="patt-err">!</span>}
-          <button onClick={() => setPendingAtts((p) => p.filter((x) => x.id !== a.id))}>×</button>
+          <button disabled={sending} onClick={() => setPendingAtts((p) => p.filter((x) => x.id !== a.id))}>×</button>
         </span>;
       })}</div>}
       <input type="file" ref={imgRef} accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
       <input type="file" ref={fileRef} multiple style={{ display: "none" }} onChange={onPickFiles} />
       <div className="composer-box" aria-busy={sending} onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
         {reachStatusChip && <div className="composer-status-chip" role="status">{reachStatusChip}</div>}
-        {sendError && <div className="composer-send-error" role="alert">
-          <span>{t("chat.sendFailed")}</span>
+        {sendError !== null && <div className="composer-send-error" role="alert">
+          <span>{sendError ? t("chat.sendFailedReason", { error: sendError }) : t("chat.sendFailed")}</span>
           <button ref={retryRef} type="button" onClick={() => send()}>{t("chat.retrySend")}</button>
         </div>}
-        <textarea className="composer-input" ref={inputRef} rows={1} value={text} onChange={onInput} onPaste={onPaste}
-          placeholder={effectivePlaceholder} disabled={sending}
+        <textarea className="composer-input" ref={inputRef} rows={1} value={text} onChange={onInput} onPaste={onPaste} readOnly={sending}
+          placeholder={effectivePlaceholder}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return; // IME composition (CJK input): Enter selects a candidate, not send
             if (atQuery !== null && cands.length) { // @ menu open: ↑/↓ move highlight, Enter/Tab pick, Esc closes

@@ -26,10 +26,13 @@ test("Search and Activity selections survive refresh and source-detail return th
   assert.match(misc, /queryRef\.current\.trim\(\) !== v/);
 });
 
-test("Saved mutations restore bookmark state and list content when the server rejects the change", () => {
-  assert.match(store, /r\?\.ok !== true[\s\S]*?unsave message failed/);
-  assert.match(store, /setSavedIds\(\(s\) => new Set\(s\)\.add\(messageId\)\)/);
-  assert.match(misc, /catch \{ setItems\([\s\S]*?next\.splice/);
+test("Saved mutations keep bookmark and list state unchanged when the server rejects the change", () => {
+  const mutation = store.slice(store.indexOf("const mutateSaved"), store.indexOf("const listSaved"));
+  const unsave = misc.slice(misc.indexOf("const unsave = async"), misc.indexOf("const source ="));
+  assert.match(mutation, /if \(r\?\.ok !== true\) return "failed";/);
+  assert.ok(mutation.indexOf('return "failed"') < mutation.indexOf("setSavedIds"));
+  assert.match(unsave, /if \(result === "failed"\) \{ toast\.error\(t\("common\.savedUpdateFailed"\)\); return; \}/);
+  assert.ok(unsave.indexOf('result === "failed"') < unsave.indexOf("setItems"));
 });
 
 test("Showcase case selection is URL-backed for deep links and browser history", () => {

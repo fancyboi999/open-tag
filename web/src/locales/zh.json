@@ -552,7 +552,8 @@
     "sendAsTaskTitle": "作为任务发送(⌘/Ctrl+Shift+Enter)",
     "sendTitle": "发送(Enter)",
     "sending": "发送中…",
-    "sendFailed": "消息未发送，草稿和附件仍然保留。",
+    "sendFailed": "消息发送失败",
+    "sendFailedReason": "消息发送失败：{{error}}",
     "retrySend": "重试",
     "copyLink": "复制链接",
     "copyMarkdown": "复制 Markdown",
@@ -732,6 +733,7 @@
     "reasoning": "推理",
     "membersCount": "{{count}} 个成员",
     "dismiss": "关闭",
+    "savedUpdateFailed": "更新收藏失败",
     "describeSelfPlaceholder": "介绍一下你自己,给这个工作区里的其他人和 agent 看"
   },
   "md": {
