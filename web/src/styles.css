@@ -391,8 +391,18 @@ main.content-col > .composer{position:absolute;left:0;right:var(--scrollbar-gutt
 .card h3{margin:0 0 6px;font-size:16px;color:var(--ink)} .card .meta{font-size:13px;color:var(--muted)}
 /* Clickable member card (roster → profile): same hover/focus affordance as .card.task */
 .card.card-link{cursor:pointer;transition:transform .1s,border-color .1s}
+.card.card-link[type="button"]{display:block;width:100%;font:inherit;color:var(--body);text-align:left}
 .card.card-link:hover{transform:translateY(-1px);border-color:var(--hair-strong)}
 .card.card-link:focus-visible{outline:2px solid var(--g-sky);outline-offset:2px}
+.members-toolbar{display:grid;grid-template-columns:minmax(220px,1fr) repeat(3,minmax(132px,180px));gap:8px;padding:12px 28px;border-bottom:1px solid var(--hair);background:var(--surface);flex:none}
+.members-search{height:40px;display:flex;align-items:center;gap:8px;padding:0 11px;border:1px solid var(--hair-strong);border-radius:8px;background:var(--surface);color:var(--muted)}
+.members-search:focus-within{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.members-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;font-size:14px}
+.members-toolbar .sel-trigger{height:40px;padding:0 11px;font-size:14px}
+.members-directory{position:relative}
+.members-limited{margin:0 0 14px;padding:10px 12px;border:1px solid var(--hair);border-radius:8px;background:var(--canvas-soft);color:var(--muted);font-size:13px;line-height:1.45}
+.agent-acts .joinbtn{min-height:32px}
+.agent-acts .joinbtn:disabled{opacity:.5;cursor:default}
 .composer .astask.on{color:var(--ink);font-weight:600}
 /* Board layout: horizontal Kanban (columns side by side, min-width + horizontal scroll so the narrow embedded tasks tab degrades gracefully) vs the legacy vertical stack. Toggle persisted in localStorage. */
 /* The tasks pane is a flex column so the board fills the height left under the toolbar (instead of being only as tall as its cards). */
@@ -1039,6 +1049,14 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
   .head.head-agent h1{font-size:22px;line-height:1.15;letter-spacing:0;overflow-wrap:anywhere}
   .head.head-agent>.agent-acts{grid-column:1/-1;width:100%;justify-content:flex-start;flex-wrap:wrap}
   .head.head-agent>.agent-acts .joinbtn{flex:0 0 auto}
+  .members-toolbar{grid-template-columns:1fr 1fr;padding:10px 16px;gap:8px}
+  .members-search{grid-column:1/-1;height:44px}
+  .members-toolbar .sel-trigger{height:44px;font-size:13px}
+  .members-toolbar>.sel:nth-of-type(3){grid-column:1/-1}
+  .members-directory .card.card-link{min-height:112px;padding:15px}
+  .ptabs{overflow-x:auto;padding:0 12px;scrollbar-width:none}
+  .ptabs::-webkit-scrollbar{display:none}
+  .ptabs button{flex:none;min-height:44px;padding:8px 4px;white-space:nowrap}
   /* thread/profile right panel → fullscreen overlay */
   .thread-panel,.traj-col.profile-mode{position:fixed;inset:0;z-index:70;width:100%}  /* a profile opened in the right column gets the same fullscreen treatment as a thread (otherwise .traj-col is display:none below and the profile would be invisible on mobile) */
   .traj-col.profile-mode{display:block;overflow:auto}
@@ -1055,7 +1073,7 @@ aside.traj-col.profile-mode .scroll{flex:1;min-height:0;overflow:auto;margin:0 -
   .project-picker-crumbs button{max-width:126px}
   /* Enlarge touch targets */
   .joinbtn{padding:6px 11px;font-size:13px}
-  .addbtn{width:30px;height:30px}
+  .addbtn{width:44px;height:44px}
   .msg-act-toggle{grid-template-columns:16px max-content minmax(0,1fr) 14px}
   .msg-act-count{display:none}
   .msg-act-body{padding-left:8px;padding-right:2px}

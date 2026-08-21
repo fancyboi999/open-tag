@@ -130,6 +130,25 @@
   .shell-baseline .item:hover{background:#fff3ce;border-color:var(--baseline-line)}
   .shell-baseline .item.active{background:var(--baseline-pink);border-color:var(--baseline-line);box-shadow:2px 2px 0 var(--baseline-line)}
   .shell-baseline .item:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:1px}
+  .shell-baseline .members-toolbar{height:62px;grid-template-columns:minmax(220px,1fr) repeat(3,132px);padding:10px 16px;border-bottom:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline .members-head{height:62px;min-height:62px;padding:8px 20px;border-bottom:2px solid var(--baseline-line)}
+  .shell-baseline .members-head h1{font-family:var(--sans);font-size:18px;font-weight:800;letter-spacing:0}
+  .shell-baseline .members-search,.shell-baseline .members-toolbar .sel-trigger{height:40px;border:2px solid rgba(0,0,0,.3);border-radius:0;background:#fff;color:var(--baseline-line)}
+  .shell-baseline .members-search:focus-within,.shell-baseline .members-toolbar .sel-trigger:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:1px;border-color:var(--baseline-line);box-shadow:none}
+  .shell-baseline .members-directory{padding:12px 16px 40px;background:#fff}
+  .shell-baseline .members-directory .card.card-link{padding:14px 16px;border:2px solid rgba(0,0,0,.3);border-radius:0;background:#fff;box-shadow:none}
+  .shell-baseline .members-directory .card.card-link:hover{transform:none;border-color:var(--baseline-line);background:#fff3ce}
+  .shell-baseline .members-directory .card.card-link:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:1px}
+  .shell-baseline .members-limited{border:2px solid var(--baseline-line);border-radius:0;background:var(--baseline-paper);color:var(--baseline-line)}
+  .shell-baseline .head.head-agent{height:62px;min-height:62px;padding:7px 20px;border-bottom:2px solid var(--baseline-line)}
+  .shell-baseline .head.head-agent h1{font-family:var(--sans);font-size:16px;font-weight:800;letter-spacing:0}
+  .shell-baseline .head.head-agent .av-editable img{width:40px!important;height:40px!important}
+  .shell-baseline .head.head-agent .agent-acts .joinbtn{min-height:32px;padding:0 9px;border:2px solid var(--baseline-line);background:#fff;box-shadow:2px 2px 0 #d4d0c8;font-size:12px}
+  .shell-baseline .ptabs{height:30px;padding:0 16px;gap:0;border-bottom:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline .ptabs button{height:28px;min-height:28px;margin:0;padding:0 12px;border:0;border-bottom:2px solid transparent;border-radius:0;color:rgba(0,0,0,.55);font-size:12px}
+  .shell-baseline .ptabs button.on{border-bottom-color:var(--baseline-line);background:var(--baseline-yellow);color:var(--baseline-line);font-weight:800}
+  .shell-baseline .head.head-agent~.scroll,.shell-baseline .ptabs~.scroll{padding:20px 20px 40px;background:#fff}
+  .shell-baseline .head.head-agent~.scroll .card,.shell-baseline .ptabs~.scroll .card{border:2px solid rgba(0,0,0,.3);border-radius:0;background:#fff}
   .shell-baseline .addbtn,.shell-baseline .joinbtn{border:0;border-radius:0;background:transparent;color:var(--baseline-line)}
   .shell-baseline .addbtn:focus-visible,.shell-baseline .joinbtn:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:1px}
   .shell-baseline .live-bar{min-height:48px;border-top:2px solid var(--baseline-line);background:var(--baseline-paper)}
@@ -263,6 +282,22 @@
   .shell-baseline.is-workspace-root{grid-template-rows:minmax(0,1fr) calc(53px + env(safe-area-inset-bottom,0px))}
   .shell-baseline>.rail{display:none}
   .shell-baseline .sidebar{display:none}
+  .shell-baseline .members-toolbar{height:auto;grid-template-columns:1fr 1fr;padding:10px 12px;border-bottom:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline .members-head{height:62px;min-height:62px;padding:8px 16px;border-bottom:2px solid var(--baseline-line)}
+  .shell-baseline .members-head h1{font-family:var(--sans);font-size:18px;font-weight:800;letter-spacing:0}
+  .shell-baseline .members-search,.shell-baseline .members-toolbar .sel-trigger{height:44px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;color:var(--baseline-line)}
+  .shell-baseline .members-directory{padding:12px 12px 32px;background:#fff}
+  .shell-baseline .members-directory .card.card-link{min-height:104px;padding:14px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;box-shadow:3px 3px 0 #d4d0c8}
+  .shell-baseline .head.head-agent{display:grid;height:auto;min-height:72px;grid-template-columns:44px minmax(0,1fr);gap:8px;padding:10px 12px 10px 64px;border-bottom:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline .head.head-agent .av-editable{margin-left:-52px}
+  .shell-baseline .head.head-agent .head-id{margin-left:-8px}
+  .shell-baseline .head.head-agent h1{font-family:var(--sans);font-size:17px;font-weight:800;letter-spacing:0}
+  .shell-baseline .head.head-agent>.agent-acts{grid-column:1/-1;margin-left:-52px;overflow-x:auto;flex-wrap:nowrap;justify-content:flex-start}
+  .shell-baseline .head.head-agent .agent-acts .joinbtn{min-width:44px;min-height:44px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;box-shadow:2px 2px 0 #d4d0c8;font-size:12px}
+  .shell-baseline .ptabs{height:46px;padding:0 8px;border-bottom:2px solid var(--baseline-line);background:#fff;overflow-x:auto}
+  .shell-baseline .ptabs button{height:44px;min-height:44px;margin:0;padding:0 12px;border-radius:0;font-size:12px}
+  .shell-baseline .head.head-agent~.scroll,.shell-baseline .ptabs~.scroll{padding:14px 12px 32px;background:#fff}
+  .shell-baseline .head.head-agent~.scroll .card,.shell-baseline .ptabs~.scroll .card{border:2px solid var(--baseline-line);border-radius:0;background:#fff;box-shadow:3px 3px 0 #d4d0c8}
   .shell-baseline .activity-page>.head,.shell-baseline .saved-page>.head{height:62px;min-height:62px;padding:8px 64px;border-bottom:2px solid var(--baseline-line)}
   .shell-baseline .activity-filters{display:flex;flex:none;height:62px;align-items:flex-start;gap:4px;padding:10px 16px;background:#fff}
   .shell-baseline .activity-filters button{min-width:44px;height:32px;padding:0 7px;border:2px solid transparent;border-radius:0;background:#fff;color:var(--baseline-line);font-size:12px}

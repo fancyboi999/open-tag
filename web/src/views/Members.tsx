@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, X, ChevronRight, Check, Copy, Eye, EyeOff } from "lucide-react";
+import { MessageCircle, X, ChevronRight, Check, Copy, Eye, EyeOff, Search, AlertTriangle } from "lucide-react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,13 +12,14 @@ import { IconMonitor } from "../icons.tsx";
 import { Avatar, AvatarPicker, resolveAvatar } from "../Avatar.tsx";
 import { ActivityEventRow } from "../AgentActivity.tsx";
 import { Select } from "../Select.tsx";
-import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
+import { useConfirm, useDialogFocus, useEscClose } from "../ConfirmModal.tsx";
 import { useToast } from "../toast.tsx";
 import { startFailReasonKey } from "../startFailReason.ts";
 import { CodeBlock, ColorSwatch, GithubAlertBlockquote, colorValueFromTag, markdownSchema, markdownUrlTransform, remarkColorSwatches, remarkGithubAlerts, remarkHtmlAsText } from "../messageRender.tsx";
 import i18n from "../i18n";
 import { ProjectDirectoryField } from "./ProjectDirectoryPicker.tsx";
 import { copyText } from "../lib/clipboard.ts";
+import { filterMemberDirectory } from "../memberDirectory.ts";
 
 // Unified agent status label: fine-grained activity (working/thinking/online) takes priority;
 // offline/absent falls back to lifecycle status (active/sleeping/inactive).
@@ -29,12 +30,22 @@ function statusOf(a: { activity?: string | null; status: string }): string {
 
 export function Members() {
   const { t } = useTranslation();
-  const { visibleAgents: agents, humans, machines, slug, capabilities, attachmentUrl } = useStore(); // visibleAgents: showcase demo props are hidden from the roster (they stay in the store for #showcase history)
+  const { visibleAgents: agents, humans, machines, slug, capabilities, attachmentUrl, membersState, reloadMembers } = useStore(); // visibleAgents: showcase demo props are hidden from the roster (they stay in the store for #showcase history)
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const { agentId, userId } = useParams();
   const nav = useNavigate();
   const [modal, setModal] = useState(false);
   const [inviteModal, setInviteModal] = useState(false);
+  const [directoryParams, setDirectoryParams] = useSearchParams();
+  const memberQ = directoryParams.get("memberQ") || "";
+  const memberKind = directoryParams.get("memberKind") || "all";
+  const memberStatus = directoryParams.get("memberStatus") || "all";
+  const memberRole = directoryParams.get("memberRole") || "all";
+  const setDirectoryParam = (key: string, value: string, fallback = "all") => setDirectoryParams((prev) => {
+    const next = new URLSearchParams(prev);
+    if (!value || value === fallback) next.delete(key); else next.set(key, value);
+    return next;
+  }, { replace: true });
 
   const byMachine: Record<string, typeof agents> = {};
   for (const a of agents) { const k = a.machineId || "_none"; (byMachine[k] = byMachine[k] || []).push(a); }
@@ -45,7 +56,7 @@ export function Members() {
       <aside className="sidebar">
         <div className="sb-scroll">
         <div className="sb-title">{t("nav.members")}</div>
-        <div className="sec">{t("common.agents")} <span className="cnt">{agents.length}</span>{capabilities.manageAgents && <button className="addbtn" title={t("members.createAgent")} onClick={() => setModal(true)}>+</button>}</div>
+        <div className="sec">{t("common.agents")} <span className="cnt">{agents.length}</span>{capabilities.manageAgents && <button className="addbtn" title={t("members.createAgent")} aria-label={t("members.createAgent")} onClick={() => setModal(true)}>+</button>}</div>
         {Object.keys(byMachine).map((k) => (
           <div key={k}>
             <div className="machine"><IconMonitor size={13} /> {k === "_none" ? t("members.unassigned") : mName(k)}</div>
@@ -56,7 +67,7 @@ export function Members() {
             ))}
           </div>
         ))}
-        <div className="sec">{t("common.humans")} <span className="cnt">{humans.length}</span>{capabilities.manageMembers && <button className="addbtn" title={t("members.inviteMember")} onClick={() => setInviteModal(true)}>+</button>}</div>
+        <div className="sec">{t("common.humans")} <span className="cnt">{humans.length}</span>{capabilities.manageMembers && <button className="addbtn" title={t("members.inviteMember")} aria-label={t("members.inviteMember")} onClick={() => setInviteModal(true)}>+</button>}</div>
         {humans.map((u) => (
           <button key={u.userId} className={"item" + (u.userId === userId ? " active" : "")} onClick={() => nav(`/s/${slug}/human/${u.userId}`)}>
             <Avatar seed={u.name} url={avFor(u.avatarUrl)} size={20} /><span className="grow">{u.displayName || u.name}</span>
@@ -65,7 +76,16 @@ export function Members() {
         </div>
       </aside>
       <main className="content-col">
-        {userId ? <HumanProfile uid={userId} /> : agentId ? <AgentProfile id={agentId} onDeleted={() => nav(`/s/${slug}/agent`)} /> : <Roster agents={agents} humans={humans} onCreate={() => setModal(true)} canCreate={!!capabilities.manageAgents} />}
+        {userId ? <HumanProfile uid={userId} /> : agentId ? <AgentProfile id={agentId} onDeleted={() => nav(`/s/${slug}/agent`)} /> : <Roster
+          agents={agents} humans={humans} state={membersState} onRetry={reloadMembers}
+          onCreate={() => setModal(true)} canCreate={!!capabilities.manageAgents}
+          readOnly={!capabilities.manageAgents && !capabilities.manageMembers}
+          query={memberQ} kind={memberKind} status={memberStatus} role={memberRole}
+          onQuery={(value) => setDirectoryParam("memberQ", value, "")}
+          onKind={(value) => setDirectoryParam("memberKind", value)}
+          onStatus={(value) => setDirectoryParam("memberStatus", value)}
+          onRole={(value) => setDirectoryParam("memberRole", value)}
+        />}
       </main>
       {modal && <CreateAgentModal onClose={() => setModal(false)} />}
       {inviteModal && <InviteHumanModal onClose={() => setInviteModal(false)} />}
@@ -76,27 +96,35 @@ export function Members() {
 // Invite member entry point: automatically fetches or creates a member join-link for display and copy. Email invitations require a mail service.
 function InviteHumanModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  useEscClose(onClose);
+  const dialogRef = useDialogFocus(onClose);
   const { api, serverId } = useStore();
   const [link, setLink] = useState("");
+  const [linkError, setLinkError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [copied, setCopied] = useState(false);
   useEffect(() => { (async () => {
-    const links = await api("GET", `/api/servers/${serverId}/join-links`).catch(() => []);
-    let l = Array.isArray(links) ? links.find((x: any) => x.role === "member") : null;
-    if (!l) l = await api("POST", `/api/servers/${serverId}/join-links`, { role: "member", maxUses: null });
-    if (l?.token) setLink(`${location.origin}/join/${l.token}`);
-  })(); /* eslint-disable-next-line */ }, [serverId]);
+    setLink(""); setLinkError(false);
+    try {
+      const links = await api("GET", `/api/servers/${serverId}/join-links`);
+      if (!Array.isArray(links)) throw new Error(links?.error || "invalid invite response");
+      let l = links.find((x: any) => x.role === "member");
+      if (!l) l = await api("POST", `/api/servers/${serverId}/join-links`, { role: "member", maxUses: null });
+      if (!l?.token || l.error) throw new Error(l?.error || "invalid invite response");
+      setLink(`${location.origin}/join/${l.token}`);
+    } catch { setLinkError(true); }
+  })(); /* eslint-disable-next-line */ }, [serverId, retry]);
   const copy = async () => {
     if (!await copyText(link)) { window.prompt(t("members.copyLink"), link); return; }
     setCopied(true); setTimeout(() => setCopied(false), 1500);
   };
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{t("members.inviteTitle")}</h3>
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="invite-member-title" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <h3 id="invite-member-title">{t("members.inviteTitle")}</h3>
         <p className="modal-note">{t("members.inviteNote")}</p>
         <label>{t("members.inviteLinkLabel")}</label>
-        <input readOnly value={link || t("members.inviteLinkGenerating")} onFocus={(e) => e.currentTarget.select()} />
+        <input readOnly value={link || (linkError ? "" : t("members.inviteLinkGenerating"))} aria-busy={!link && !linkError} onFocus={(e) => e.currentTarget.select()} />
+        {linkError && <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{t("members.inviteLoadFailed")}</span><button onClick={() => setRetry((value) => value + 1)}>{t("members.retry")}</button></div>}
         <div className="acts">
           <button className="cancel" onClick={onClose}>{t("members.close")}</button>
           <button className="ok" onClick={copy} disabled={!link}>{copied ? t("members.copied") : t("members.copyLink")}</button>
@@ -108,40 +136,64 @@ function InviteHumanModal({ onClose }: { onClose: () => void }) {
 
 // Members roster: agents + humans as two labelled sections (mirrors the left sidebar order),
 // every card a navigable entry into that member's profile (agent → /agent/:id, human → /human/:userId).
-function Roster({ agents, humans, onCreate, canCreate }: { agents: any[]; humans: any[]; onCreate: () => void; canCreate?: boolean }) {
+function Roster({ agents, humans, state, onRetry, onCreate, canCreate, readOnly, query, kind, status, role, onQuery, onKind, onStatus, onRole }: {
+  agents: any[]; humans: any[]; state: "loading" | "refreshing" | "ready" | "error"; onRetry: () => Promise<void>;
+  onCreate: () => void; canCreate?: boolean; readOnly?: boolean;
+  query: string; kind: string; status: string; role: string;
+  onQuery: (value: string) => void; onKind: (value: string) => void; onStatus: (value: string) => void; onRole: (value: string) => void;
+}) {
   const { t } = useTranslation();
   const { attachmentUrl, slug } = useStore();
   const nav = useNavigate();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
+  const filtered = filterMemberDirectory(agents, humans, { query, kind, status, role });
+  const filteredAgents = filtered.agents;
+  const filteredHumans = filtered.humans;
   const total = agents.length + humans.length;
-  const goKey = (e: React.KeyboardEvent, to: string) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nav(to); } };
+  const filteredTotal = filteredAgents.length + filteredHumans.length;
   return (
     <>
-      <div className="head"><h1>{t("nav.members")}</h1><small>{t("common.membersCount", { count: total })}</small></div>
-      <div className="scroll">
-        {total === 0 ? <div className="empty">{t("members.rosterEmpty")}{canCreate && <> {t("members.rosterEmptyCreate")} <button className="addbtn" onClick={onCreate}>+</button></>}</div>
+      <div className="head members-head"><h1>{t("nav.members")}</h1><small>{t("common.membersCount", { count: total })}</small></div>
+      <div className="members-toolbar" aria-label={t("members.directoryFilters")}>
+        <label className="members-search"><Search size={16} aria-hidden="true" /><input type="search" value={query} onChange={(event) => onQuery(event.target.value)} placeholder={t("members.searchPlaceholder")} aria-label={t("members.searchPlaceholder")} /></label>
+        <Select ariaLabel={t("members.kindFilter")} value={kind} onChange={onKind} options={[
+          { value: "all", label: t("members.kindAll") }, { value: "agents", label: t("common.agents") }, { value: "humans", label: t("common.humans") },
+        ]} />
+        <Select ariaLabel={t("members.statusFilter")} value={status} onChange={onStatus} options={[
+          { value: "all", label: t("members.statusAll") }, { value: "active", label: t("members.statusActive") }, { value: "working", label: t("members.statusWorking") }, { value: "sleeping", label: t("members.statusSleeping") }, { value: "offline", label: t("members.statusOffline") }, { value: "failure", label: t("members.statusFailure") },
+        ]} />
+        <Select ariaLabel={t("members.roleFilter")} value={role} onChange={onRole} options={[
+          { value: "all", label: t("members.roleAll") }, ...["owner", "admin", "member"].map((value) => ({ value, label: t(`members.roles.${value}`) })),
+        ]} />
+      </div>
+      <div className="scroll members-directory" aria-busy={state === "loading" || state === "refreshing"}>
+        {readOnly && <div className="members-limited">{t("members.readOnlyDirectory")}</div>}
+        {state === "loading" ? <div className="page-loading" role="status" aria-label={t("members.loading")}><span /><span /><span /></div>
+          : state === "error" ? <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{t("members.loadFailed")}</span><button onClick={() => void onRetry()}>{t("members.retry")}</button></div>
+          : total === 0 ? <div className="empty">{t("members.rosterEmpty")}{canCreate && <> {t("members.rosterEmptyCreate")} <button className="addbtn" aria-label={t("members.createAgent")} onClick={onCreate}>+</button></>}</div>
+          : filteredTotal === 0 ? <div className="empty">{t("members.noMatches")}</div>
           : <>
-            {agents.length > 0 && <div className="sec">{t("common.agents")} <span className="cnt">{agents.length}</span></div>}
-            {agents.map((a) => {
+            {filteredAgents.length > 0 && <div className="sec">{t("common.agents")} <span className="cnt">{filteredAgents.length}</span></div>}
+            {filteredAgents.map((a) => {
               const to = `/s/${slug}/agent/${a.id}`;
               return (
-                <div className="card card-link" key={a.id} role="button" tabIndex={0} onClick={() => nav(to)} onKeyDown={(e) => goKey(e, to)}>
+                <button type="button" className="card card-link" key={a.id} onClick={() => nav(to)} aria-label={t("members.openProfile", { name: a.displayName || a.name })}>
                   <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={24} />{a.displayName || a.name} <small className="meta">@{a.name}</small></h3>
                   <div className="meta">{a.description || t("members.generalAgent")}</div>
                   <div className="kv"><b>{t("common.runtime")}</b> {a.runtime} · {a.model || t("members.useLocalDefault")}</div>
                   <div className="kv"><b>{t("common.status")}</b> {statusOf(a)}</div>
-                </div>
+                </button>
               );
             })}
-            {humans.length > 0 && <div className="sec">{t("common.humans")} <span className="cnt">{humans.length}</span></div>}
-            {humans.map((u) => {
+            {filteredHumans.length > 0 && <div className="sec">{t("common.humans")} <span className="cnt">{filteredHumans.length}</span></div>}
+            {filteredHumans.map((u) => {
               const to = `/s/${slug}/human/${u.userId}`;
               return (
-                <div className="card card-link" key={u.userId} role="button" tabIndex={0} onClick={() => nav(to)} onKeyDown={(e) => goKey(e, to)}>
+                <button type="button" className="card card-link" key={u.userId} onClick={() => nav(to)} aria-label={t("members.openProfile", { name: u.displayName || u.name })}>
                   <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={u.name} url={avFor(u.avatarUrl)} size={24} />{u.displayName || u.name} <small className="meta">@{u.name}</small></h3>
                   <div className="meta">{u.description || t("members.noDescription")}</div>
                   <div className="kv"><b>{t("members.role")}</b> {u.role || "member"}</div>
-                </div>
+                </button>
               );
             })}
           </>}
@@ -159,24 +211,39 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
   const [sp, setSp] = useSearchParams();
   const tab = sp.get("agentTab") || "profile";
   const [a, setA] = useState<any>(null);
+  const [profileState, setProfileState] = useState<"loading" | "ready" | "error">("loading");
+  const [actionBusy, setActionBusy] = useState("");
+  const profileRequest = useRef(0);
   const [edit, setEdit] = useState(false); const [dn, setDn] = useState(""); const [ds, setDs] = useState(""); const [projectPath, setProjectPath] = useState(""); // profile edit state
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [showRestart, setShowRestart] = useState(false);
   const [avBusy, setAvBusy] = useState(false); const [avErr, setAvErr] = useState(""); const [signedAvatar, setSignedAvatar] = useState<string | null>(null);
   const [perContent, setPerContent] = useState<string | null>(null); const [perBusy, setPerBusy] = useState(false);
   useEscClose(() => { if (onClose) onClose(); });
-  const refetch = async () => { const data = await api("GET", "/api/agents/" + id); setA(data); setSignedAvatar(resolveAvatar(data?.avatarUrl, attachmentUrl)); };
-  useEffect(() => { refetch(); }, [id]);
+  const refetch = async () => {
+    const request = ++profileRequest.current;
+    if (!a) setProfileState("loading");
+    try {
+      const data = await api("GET", "/api/agents/" + id);
+      if (!data || data.error || !data.id) throw new Error(data?.error || "invalid agent profile");
+      if (request !== profileRequest.current) return;
+      setA(data); setSignedAvatar(resolveAvatar(data.avatarUrl, attachmentUrl)); setProfileState("ready");
+    } catch {
+      if (request === profileRequest.current) setProfileState("error");
+    }
+  };
+  useEffect(() => { setA(null); setSignedAvatar(null); setProfileState("loading"); void refetch(); return () => { profileRequest.current += 1; }; }, [id]);
   useEffect(() => onEvent((e) => { if (e.type === "agent" && e.id === id) setA((p: any) => (p ? { ...p, status: e.status ?? p.status, activity: e.activity ?? p.activity } : p)); }), [id]);
   const onPickAvatar = async (f: File) => { setAvBusy(true); setAvErr(""); try { const url = await uploadAgentAvatar(id, f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
-  const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { await api("PATCH", "/api/agents/" + id, { avatarUrl: scheme }); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
+  const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { const r = await api("PATCH", "/api/agents/" + id, { avatarUrl: scheme }); if (r?.error) throw new Error(r.error); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   const fetchPersonality = async () => { try { const r = await api("GET", `/api/agents/${id}/personality`); setPerContent(r.content || null); } catch { setPerContent(null); } };
   useEffect(() => { if (tab === "profile") fetchPersonality(); }, [id, tab]);
   // api() resolves error responses as {error} instead of throwing (store.tsx), so success/failure must be
   // branched on the body — the catch only sees network-level failures.
   const uploadPersonality = async (f: File) => { setPerBusy(true); try { const text = await f.text(); const r = await api("PUT", `/api/agents/${id}/personality`, { content: text }); if (r?.error) { toast.error(t("members.personalitySaveFailed", { error: r.error })); return; } toast.info(t("members.personalitySaved")); await fetchPersonality(); } catch (e: any) { toast.error(String(e?.message || e)); } finally { setPerBusy(false); } };
   const deletePersonality = async () => { if (!(await confirm({ title: t("members.personalityDeleteTitle"), message: t("members.personalityDeleteMessage"), confirmLabel: t("members.delete"), danger: true }))) return; setPerBusy(true); try { const r = await api("DELETE", `/api/agents/${id}/personality`); if (r?.error) { toast.error(t("members.personalityDeleteFailed", { error: r.error })); return; } toast.info(t("members.personalityDeleted")); setPerContent(null); } catch (e: any) { toast.error(String(e?.message || e)); } finally { setPerBusy(false); } };
-  if (!a) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
+  if (!a && profileState === "loading") return <div className="scroll"><div className="page-loading" role="status" aria-label={t("members.loading")}><span /><span /><span /></div></div>;
+  if (!a || profileState === "error") return <div className="scroll"><div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{t("members.profileLoadFailed")}</span><button onClick={() => void refetch()}>{t("members.retry")}</button></div></div>;
   // Surface the server's concrete 503 reason ("no daemon online" / "runtime X unavailable on selected machine" …);
   // the generic machine-may-be-offline guess alone made users blind-retry (live 2026-07-05: 3× restart → 503).
   // Known reasons render localized (startFailReasonKey); unknown ones fall back to the raw server string.
@@ -185,37 +252,43 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
     const known = startFailReasonKey(String(r.error));
     toast.error(`${t("members.startFailedWithReason")}: ${known ? t(known.key, known.params) : r.error}`);
   };
-  const ctl = async (action: string) => { const r = await api("POST", `/api/agents/${id}/${action}`); if (r?.error) startFail(r); setTimeout(refetch, 400); }; // start/stop: surface daemon-offline failure (503 → {error}) instead of swallowing it
+  const ctl = async (action: string) => { setActionBusy(action); try { const r = await api("POST", `/api/agents/${id}/${action}`); if (r?.error) { startFail(r); return; } setTimeout(() => void refetch(), 400); } catch (error: any) { toast.error(String(error?.message || error)); } finally { setActionBusy(""); } }; // start/stop: surface daemon-offline failure (503 → {error}) instead of swallowing it
   // Three restart modes: restart=keep session+workspace; reset=clear session, keep workspace; full=clear session+delete workspace. All modes end with a restart.
   const doRestart = async (mode: "restart" | "reset" | "full") => {
     setShowRestart(false);
-    let r: any;
-    if (mode === "restart") r = await api("POST", `/api/agents/${id}/restart`);
-    else if (mode === "reset") r = await api("POST", `/api/agents/${id}/reset`, { restart: true });
-    else r = await api("POST", `/api/agents/${id}/reset`, { wipeWorkspace: true, restart: true });
-    if (r?.error) startFail(r); // lifecycle RPCs settle before return; a failed reset/stop returns 503 and aborts the restart phase
-    setTimeout(refetch, 500);
+    setActionBusy(mode);
+    try {
+      let r: any;
+      if (mode === "restart") r = await api("POST", `/api/agents/${id}/restart`);
+      else if (mode === "reset") r = await api("POST", `/api/agents/${id}/reset`, { restart: true });
+      else r = await api("POST", `/api/agents/${id}/reset`, { wipeWorkspace: true, restart: true });
+      if (r?.error) { startFail(r); return; } // lifecycle RPCs settle before return; a failed reset/stop returns 503 and aborts the restart phase
+      setTimeout(() => void refetch(), 500);
+    } catch (error: any) { toast.error(String(error?.message || error)); } finally { setActionBusy(""); }
   };
-  const del = async () => { if (!(await confirm({ title: t("members.deleteAgentTitle", { name: a.name }), message: t("members.deleteAgentMessage"), confirmLabel: t("members.delete"), danger: true }))) return; await api("DELETE", "/api/agents/" + id); await reload(); onDeleted(); };
+  const del = async () => { if (!(await confirm({ title: t("members.deleteAgentTitle", { name: a.name }), message: t("members.deleteAgentMessage"), confirmLabel: t("members.delete"), danger: true }))) return; setActionBusy("delete"); try { const r = await api("DELETE", "/api/agents/" + id); if (r?.error) { toast.error(r.error); return; } await reload(); onDeleted(); } catch (error: any) { toast.error(String(error?.message || error)); } finally { setActionBusy(""); } };
   const startEdit = () => { setDn(a.displayName || a.name); setDs(a.description || ""); setProjectPath(a.projectPath || ""); setProjectPickerOpen(false); setEdit(true); };
   const saveProfile = async () => {
+    setActionBusy("save");
     const body: Record<string, unknown> = { displayName: dn.trim() || a.name, description: ds.trim() };
     if (projectPath.trim() !== (a.projectPath || "")) body.projectPath = projectPath.trim();
-    const r = await api("PATCH", "/api/agents/" + id, body);
-    if (r?.error) { toast.error(r.error); return; }
-    setEdit(false); await refetch(); await reload();
+    try {
+      const r = await api("PATCH", "/api/agents/" + id, body);
+      if (r?.error) { toast.error(r.error); return; }
+      setEdit(false); await refetch(); await reload();
+    } catch (error: any) { toast.error(String(error?.message || error)); } finally { setActionBusy(""); }
   };
   const live = statusOf(a);
-  const msgAgent = async () => { const cid = await openDM("agent", id); if (cid) nav(`/s/${slug}/channel/${cid}`); };
+  const msgAgent = async () => { const cid = await openDM("agent", id); if (cid) nav(`/s/${slug}/channel/${cid}`); else toast.error(t("members.dmFailed")); };
   // Header action bar: Message available to everyone; start/stop/restart/delete gated by manageAgents capability
   const acts = (
     <div className="agent-acts">
-      <button className="joinbtn" onClick={onMessage ?? msgAgent}><MessageCircle size={13} style={{ verticalAlign: "-2px" }} /> {t("members.dm")}</button>
+      <button className="joinbtn" disabled={!!actionBusy} onClick={onMessage ?? msgAgent}><MessageCircle size={13} style={{ verticalAlign: "-2px" }} /> {t("members.dm")}</button>
       {capabilities.manageAgents && <>
-        <button className="joinbtn" onClick={() => ctl(a.status === "active" ? "stop" : "start")}>{a.status === "active" ? t("members.stop") : t("members.start")}</button>
-        {a.status === "queued" && <button className="joinbtn" style={{ color: "var(--status-orange)" }} onClick={() => api("POST", `/api/agents/${id}/dequeue`).then(() => setTimeout(refetch, 300)).catch(() => {})}>✕</button>}
-        <button className="joinbtn" onClick={() => setShowRestart(true)}>{t("members.restart")}</button>
-        <button className="joinbtn" style={{ color: "var(--error)" }} onClick={del}>{t("members.delete")}</button>
+        <button className="joinbtn" disabled={!!actionBusy} aria-busy={actionBusy === "start" || actionBusy === "stop"} onClick={() => void ctl(a.status === "active" ? "stop" : "start")}>{a.status === "active" ? t("members.stop") : t("members.start")}</button>
+        {a.status === "queued" && <button className="joinbtn" disabled={!!actionBusy} aria-label={t("members.dequeue")} style={{ color: "var(--status-orange)" }} onClick={async () => { setActionBusy("dequeue"); try { const r = await api("POST", `/api/agents/${id}/dequeue`); if (r?.error) { toast.error(r.error); return; } setTimeout(() => void refetch(), 300); } catch (error: any) { toast.error(String(error?.message || error)); } finally { setActionBusy(""); } }}>✕</button>}
+        <button className="joinbtn" disabled={!!actionBusy} onClick={() => setShowRestart(true)}>{t("members.restart")}</button>
+        <button className="joinbtn" disabled={!!actionBusy} style={{ color: "var(--error)" }} onClick={() => void del()}>{t("members.delete")}</button>
       </>}
     </div>
   );
@@ -225,7 +298,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
         <div className="profile-panel-head">
           <Avatar seed={a.name} url={signedAvatar} size={28} />
           <div className="pph-id"><span className="pph-name">{a.displayName || a.name} <span className={"dot " + live} /></span><span className="pph-handle">@{a.name}</span></div>
-          <button className="joinbtn pph-close" title={t("members.close")} onClick={onClose}><X size={14} /></button>
+          <button className="joinbtn pph-close" title={t("members.close")} aria-label={t("members.close")} onClick={onClose}><X size={14} /></button>
           {acts}
         </div>
       ) : <div className="head head-agent"><AvatarPicker name={a.name} url={signedAvatar} size={48} editable={!!capabilities.manageAgents} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div className="head-id"><h1>{a.displayName || a.name}</h1><small>@{a.name} <span className={"dot " + live} />{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div>{acts}</div>}
@@ -259,7 +332,7 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
                   <div className="ta-count">{ds.trim().length}/3000</div>
                   <label>{t("members.projectDirectoryLabel")}</label><ProjectDirectoryField value={projectPath} onChange={setProjectPath} machine={machines.find((machine) => machine.id === a.machineId)} disabled={a.status !== "inactive"} pickerOpen={projectPickerOpen} onPickerOpenChange={setProjectPickerOpen} />
                   <div className="hint">{a.status === "inactive" ? t("members.projectDirectoryHint") : t("members.projectDirectoryStopHint")}</div>
-                  <div className="setrow"><button className="ok" onClick={saveProfile}>{t("members.save")}</button><button className="cancel" onClick={() => { setProjectPickerOpen(false); setEdit(false); }}>{t("members.cancel")}</button></div>
+                  <div className="setrow"><button className="ok" disabled={actionBusy === "save"} onClick={() => void saveProfile()}>{t("members.save")}</button><button className="cancel" disabled={actionBusy === "save"} onClick={() => { setProjectPickerOpen(false); setEdit(false); }}>{t("members.cancel")}</button></div>
                 </div>
               ) : (<>
                 <div className="meta">{a.description || t("members.generalAgent")}</div>
@@ -536,7 +609,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
   const [modelsLoading, setModelsLoading] = useState(false);
   const [reasoning, setReasoning] = useState(""); // reasoning effort (""=Default/no override); shown when selected model has thinking levels
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
-  useEscClose(() => { if (projectPickerOpen) setProjectPickerOpen(false); else onClose(); });
+  const dialogRef = useDialogFocus(() => { if (projectPickerOpen) setProjectPickerOpen(false); else onClose(); });
   // Sentinel + per-runtime capability: claude/codex offer "use local default" (don't pass --model/--effort;
   // the CLI uses ~/.claude / ~/.codex config). Other runtimes keep their original picker behavior.
   const LOCAL_DEFAULT = "__default__";
@@ -589,8 +662,8 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
   const modelLoadingOpts = [{ value: "", label: t("members.modelDetecting") }];
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{t("members.createAgentTitle")}</h3>
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="create-agent-title" tabIndex={-1} aria-busy={busy} onClick={(e) => e.stopPropagation()}>
+        <h3 id="create-agent-title">{t("members.createAgentTitle")}</h3>
         <label>{t("members.computerLabel")}<span className="req-mark">*</span></label>
         <Select ariaLabel={t("members.computerAriaLabel")} value={machineId} options={machineOpts} onChange={(nextMachineId) => { setMachineId(nextMachineId); setProjectPath(""); setProjectPickerOpen(false); }} placeholder={t("members.noMachineOnline")} />
         {machineOpts.length === 0 && <div className="hint">{t("members.noMachineHint")}</div>}
@@ -625,28 +698,44 @@ export function HumanProfile({ uid, onClose, onMessage }: { uid: string; onClose
   const { t } = useTranslation();
   const { api, serverId, me, reload, slug, capabilities, openDM, uploadUserAvatar, attachmentUrl } = useStore();
   const confirm = useConfirm();
+  const toast = useToast();
   const nav = useNavigate();
   const [p, setP] = useState<any>(null);
+  const [profileState, setProfileState] = useState<"loading" | "ready" | "error">("loading");
+  const [busy, setBusy] = useState(false);
+  const profileRequest = useRef(0);
   const [edit, setEdit] = useState(false); const [ds, setDs] = useState("");
   const [avBusy, setAvBusy] = useState(false); const [avErr, setAvErr] = useState(""); const [signedAvatar, setSignedAvatar] = useState<string | null>(null);
   useEscClose(() => { if (onClose) onClose(); });
-  const refetch = async () => { const data = await api("GET", `/api/servers/${serverId}/members/${uid}/profile`); setP(data); setSignedAvatar(resolveAvatar(data?.avatarUrl, attachmentUrl)); };
-  useEffect(() => { setP(null); setSignedAvatar(null); refetch(); }, [uid, serverId]);
+  const refetch = async () => {
+    const request = ++profileRequest.current;
+    if (!p) setProfileState("loading");
+    try {
+      const data = await api("GET", `/api/servers/${serverId}/members/${uid}/profile`);
+      if (!data || data.error || !data.userId) throw new Error(data?.error || "invalid human profile");
+      if (request !== profileRequest.current) return;
+      setP(data); setSignedAvatar(resolveAvatar(data.avatarUrl, attachmentUrl)); setProfileState("ready");
+    } catch {
+      if (request === profileRequest.current) setProfileState("error");
+    }
+  };
+  useEffect(() => { setP(null); setSignedAvatar(null); setProfileState("loading"); void refetch(); return () => { profileRequest.current += 1; }; }, [uid, serverId]);
   const onPickAvatar = async (f: File) => { setAvBusy(true); setAvErr(""); try { const url = await uploadUserAvatar(f); setSignedAvatar(url); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
-  const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { await api("PATCH", "/api/auth/me", { avatarUrl: scheme }); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
-  if (!p) return <div className="scroll"><div className="empty">{t("members.loading")}</div></div>;
+  const onPickSeed = async (scheme: string) => { setAvBusy(true); setAvErr(""); try { const r = await api("PATCH", "/api/auth/me", { avatarUrl: scheme }); if (r?.error) throw new Error(r.error); await refetch(); await reload(); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
+  if (!p && profileState === "loading") return <div className="scroll"><div className="page-loading" role="status" aria-label={t("members.loading")}><span /><span /><span /></div></div>;
+  if (!p || profileState === "error") return <div className="scroll"><div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{t("members.profileLoadFailed")}</span><button onClick={() => void refetch()}>{t("members.retry")}</button></div></div>;
   const isMe = me?.id === uid;
   const roleLabel = (r: string) => t(`members.roles.${r}`, { defaultValue: r }); // unknown role → raw value
-  const save = async () => { await api("PATCH", "/api/auth/me", { description: ds.trim() }); setEdit(false); await refetch(); await reload(); };
-  const dmHuman = async () => { const cid = await openDM("user", uid); if (cid) nav(`/s/${slug}/channel/${cid}`); };
-  const dmBtn = !isMe ? <button className="joinbtn" onClick={onMessage ?? dmHuman}><MessageCircle size={13} style={{ verticalAlign: "-2px" }} /> {t("members.dm")}</button> : null;
+  const save = async () => { setBusy(true); try { const r = await api("PATCH", "/api/auth/me", { description: ds.trim() }); if (r?.error) { toast.error(r.error); return; } setEdit(false); await refetch(); await reload(); } catch (error: any) { toast.error(String(error?.message || error)); } finally { setBusy(false); } };
+  const dmHuman = async () => { const cid = await openDM("user", uid); if (cid) nav(`/s/${slug}/channel/${cid}`); else toast.error(t("members.dmFailed")); };
+  const dmBtn = !isMe ? <button className="joinbtn" disabled={busy} onClick={onMessage ?? dmHuman}><MessageCircle size={13} style={{ verticalAlign: "-2px" }} /> {t("members.dm")}</button> : null;
   return (
     <>
       {onClose ? ( // panel mode (embedded in chat right column: click avatar / name / @mention → profile overlay), mirrors AgentProfile
         <div className="profile-panel-head">
           <Avatar seed={p.name} url={signedAvatar} size={28} />
           <div className="pph-id"><span className="pph-name">{p.displayName || p.name}</span><span className="pph-handle">@{p.name} · {roleLabel(p.role)}</span></div>
-          <button className="joinbtn pph-close" title={t("members.close")} onClick={onClose}><X size={14} /></button>
+          <button className="joinbtn pph-close" title={t("members.close")} aria-label={t("members.close")} onClick={onClose}><X size={14} /></button>
           {dmBtn && <div className="agent-acts">{dmBtn}</div>}
         </div>
       ) : <div className="head head-agent"><AvatarPicker name={p.name} url={signedAvatar} size={48} editable={isMe} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div className="head-id"><h1>{p.displayName || p.name}</h1><small>@{p.name} · {roleLabel(p.role)}{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div><div className="agent-acts">{dmBtn}</div></div>}
@@ -657,7 +746,7 @@ export function HumanProfile({ uid, onClose, onMessage }: { uid: string; onClose
               <label>{t("members.humanDescriptionLabel")}</label>
               <textarea value={ds} maxLength={3000} onChange={(e) => setDs(e.target.value)} placeholder={t("common.describeSelfPlaceholder")} />
               <div className="ta-count">{ds.trim().length}/3000</div>
-              <div className="setrow"><button className="ok" onClick={save}>{t("members.save")}</button><button className="cancel" onClick={() => setEdit(false)}>{t("members.cancel")}</button></div>
+              <div className="setrow"><button className="ok" disabled={busy} onClick={() => void save()}>{t("members.save")}</button><button className="cancel" disabled={busy} onClick={() => setEdit(false)}>{t("members.cancel")}</button></div>
             </div>
           ) : (<>
             <div className="meta">{p.description || t("members.noDescription")}</div>
@@ -671,9 +760,9 @@ export function HumanProfile({ uid, onClose, onMessage }: { uid: string; onClose
           <div className="card">
             <h3>{t("members.memberManagement")}</h3>
             {capabilities.changeMemberRoles && (
-              <div className="kv"><b>{t("members.role")}</b> <Select ariaLabel={t("members.role")} value={p.role} options={["owner", "admin", "member"].map((r) => ({ value: r, label: roleLabel(r) }))} onChange={async (role) => { const r = await api("PATCH", `/api/servers/${serverId}/members/${uid}`, { role }); if (r?.error) { alert(r.error); return; } await refetch(); await reload(); }} /></div>
+              <div className="kv"><b>{t("members.role")}</b> <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0, flex: 1 }}><Select ariaLabel={t("members.role")} value={p.role} options={["owner", "admin", "member"].map((r) => ({ value: r, label: roleLabel(r) }))} onChange={async (role) => { setBusy(true); try { const r = await api("PATCH", `/api/servers/${serverId}/members/${uid}`, { role }); if (r?.error) { toast.error(r.error); return; } await refetch(); await reload(); } catch (error: any) { toast.error(String(error?.message || error)); } finally { setBusy(false); } }} /></fieldset></div>
             )}
-            {capabilities.manageMembers && <button className="joinbtn" style={{ color: "var(--error)", marginTop: 12 }} onClick={async () => { if (!(await confirm({ title: t("members.removeMemberTitle", { name: p.name }), message: t("members.removeMemberMessage"), confirmLabel: t("members.remove"), danger: true }))) return; const r = await api("DELETE", `/api/servers/${serverId}/members/${uid}`); if (r?.error) { alert(r.error); return; } await reload(); if (onClose) onClose(); else nav(`/s/${slug}/agent`); }}>{t("members.removeMember")}</button>}
+            {capabilities.manageMembers && <button className="joinbtn" disabled={busy} style={{ color: "var(--error)", marginTop: 12 }} onClick={async () => { if (!(await confirm({ title: t("members.removeMemberTitle", { name: p.name }), message: t("members.removeMemberMessage"), confirmLabel: t("members.remove"), danger: true }))) return; setBusy(true); try { const r = await api("DELETE", `/api/servers/${serverId}/members/${uid}`); if (r?.error) { toast.error(r.error); return; } await reload(); if (onClose) onClose(); else nav(`/s/${slug}/agent`); } catch (error: any) { toast.error(String(error?.message || error)); } finally { setBusy(false); } }}>{t("members.removeMember")}</button>}
           </div>
         )}
         {p.createdAgents?.length > 0 && (
@@ -694,7 +783,7 @@ export function HumanProfile({ uid, onClose, onMessage }: { uid: string; onClose
 // Three-mode restart modal: Restart / Reset Session & Restart / Full Reset & Restart
 function RestartModal({ name, onClose, onPick }: { name: string; onClose: () => void; onPick: (mode: "restart" | "reset" | "full") => void }) {
   const { t } = useTranslation();
-  useEscClose(onClose);
+  const dialogRef = useDialogFocus(onClose);
   const [mode, setMode] = useState<"restart" | "reset" | "full">("restart");
   const opts: { k: "restart" | "reset" | "full"; title: string; desc: string }[] = [
     { k: "restart", title: t("members.restart"), desc: t("members.restartDesc") },
@@ -703,8 +792,8 @@ function RestartModal({ name, onClose, onPick }: { name: string; onClose: () => 
   ];
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{t("members.restartTitle", { name })}</h3>
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="restart-agent-title" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <h3 id="restart-agent-title">{t("members.restartTitle", { name })}</h3>
         <div className="restart-opts">
           {opts.map((o) => (
             <button key={o.k} type="button" className={"restart-opt" + (mode === o.k ? " on" : "")} onClick={() => setMode(o.k)}>

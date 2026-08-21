@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "ticket": 312,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "scope": "Members directory, human profiles, and Agent profiles across desktop and both locked mobile viewports, including reliability, capability, status, dialog, and deterministic-return states",
+  "locale": "zh",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "horizontalOverflowCssPx": 0,
+      "verticalPageOverflowCssPx": 0,
+      "geometry": {
+        "globalRail": [0, 0, 64, 900],
+        "membersSidebar": [64, 0, 240, 900],
+        "membersHeader": [304, 0, 1136, 62],
+        "membersFilters": [304, 62, 1136, 62],
+        "agentProfileHeader": [304, 0, 1136, 62],
+        "agentProfileTabs": [304, 62, 1136, 30],
+        "humanProfileHeader": [304, 0, 1136, 62]
+      }
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "horizontalOverflowCssPx": 0,
+      "verticalPageOverflowCssPx": 0,
+      "geometry": {
+        "detailBack": [12, 8, 44, 44],
+        "memberRootPrimaryNavTop": 791
+      },
+      "primaryNavigation": "present on Members root and absent on both profile details"
+    },
+    {
+      "width": 375,
+      "height": 812,
+      "horizontalOverflowCssPx": 0,
+      "verticalPageOverflowCssPx": 0,
+      "geometry": {
+        "membersHeader": [0, 0, 375, 62],
+        "membersFilters": [0, 62, 375, 170],
+        "memberRootPrimaryNav": [0, 759, 375, 53],
+        "detailBack": [12, 8, 44, 44],
+        "profileTabMinimumHeight": 44,
+        "profileActionMinimumHeight": 44
+      },
+      "primaryNavigation": "present on Members root and absent on both profile details"
+    }
+  ],
+  "interactionEvidence": {
+    "directoryHistory": "typing qa human wrote memberQ=qa+human to the URL, reduced the directory to QA Human 309, and a real refresh restored both query and result",
+    "directoryReliability": "a browser-only forced 503 on /api/agents produced a retryable alert with zero member cards; retry cleared the alert and restored three real members",
+    "directoryFilters": "native-search plus keyboard-operable type, Agent-status, and human-role selectors compose through one pure filtering contract; working activity overrides an inactive lifecycle and failure remains separately filterable",
+    "profileReliability": "Agent and human responses reject error or malformed envelopes, exit loading into an alert, discard stale async requests, and expose retry",
+    "realtimeStatus": "Agent profile and sidebar use the same activity-first status function; Socket.IO agent events update the open profile in place, while machine-offline reconciliation converts active and sleeping Agents to inactive/offline",
+    "actions": "lifecycle, reset, delete, avatar, human profile, role, removal, and invite operations check server error bodies; busy controls disable repeated submission and rejection never navigates or closes as success",
+    "dialogs": "Create Agent and Invite Member were opened in the real browser; focus entered each named aria-modal dialog, Escape closed it, and focus returned to the exact sidebar trigger",
+    "mobileReturn": "375px Agent and human details exposed a 44x44 Back target, hid primary navigation, and returned deterministically to Members where primary navigation reappeared",
+    "touchAndOverflow": "all mobile profile tabs and visible profile actions measured 44px high; all three pages measured zero horizontal page overflow at 390px and 375px"
+  },
+  "permissionEvidence": {
+    "directory": "read-only members receive truthful directory content plus an explicit limited-permission notice; create and invite triggers remain absent without manageAgents/manageMembers",
+    "agent": "profile editing, personality, skills, lifecycle, restart, and delete operations render only with manageAgents; the server remains authoritative for every attempted mutation",
+    "human": "self-edit is limited to the authenticated identity; role and removal controls render only with changeMemberRoles/manageMembers and still branch on server rejection",
+    "invite": "the trigger requires manageMembers, the endpoint independently requires manageMembers, and a rejected GET or POST remains a retryable dialog error"
+  },
+  "contractRegression": {
+    "unit": { "passed": 155, "failed": 0 },
+    "ticketUnit": { "passed": 6, "failed": 0 },
+    "integrationScripts": ["agentCreateRequiresMachine", "machineOfflineAgents"],
+    "integrationResult": "all pass",
+    "typecheck": "pass",
+    "previewBuild": "2558 modules transformed",
+    "referenceCheck": "29 pages, 3 required viewports, 11 representative states"
+  },
+  "artifacts": {
+    "reference": [
+      { "name": "312-reference-members-1440.png", "sha256": "0ee8d314f648c7b63cae3d0bc0be3b2f9f20311fccd2fbc41593dc5dad6df8f5", "committed": false },
+      { "name": "312-reference-members-390.png", "sha256": "310493b747c761ef3aecf4995b631f6c03e43b852b620059f55040b058a32c91", "committed": false },
+      { "name": "312-reference-members-375.png", "sha256": "b4e8b4c257571decdda06e7c8734e7c4c79ac9343c1a51c5410135463ab58277", "committed": false },
+      { "name": "312-reference-agent-profile-1440.png", "sha256": "1c744b38b44229315c3a2064556ff81166bb31592a7311762a07de734097c9b9", "committed": false },
+      { "name": "312-reference-agent-profile-390.png", "sha256": "51a3dd4c3f8bfd31e1c3b0e5cbfd0cd9429b3e0fa1e59695bb92cc856fd04fed", "committed": false },
+      { "name": "312-reference-agent-profile-375.png", "sha256": "e4375cf45156b40722c1e92e743a7bfae37e92e26fed0504fc47ffb8f0d56de2", "committed": false },
+      { "name": "312-reference-human-profile-1440.png", "sha256": "cba4135ec7da5eb568b369748a59a8661e4d482a864450537f57b3011033a04b", "committed": false },
+      { "name": "312-reference-human-profile-390.png", "sha256": "c16a239337584d281b969540451177bf828fd0c5fcbcaf9713e38be9407b7d1b", "committed": false },
+      { "name": "312-reference-human-profile-375.png", "sha256": "a096157a8e10f2325be9468d035d3a1d3239dcdd59531ead3df754ef0dcea40d", "committed": false }
+    ],
+    "local": [
+      { "name": "312-local-members-1440.png", "sha256": "6258b0717f01267eb539af92b8846071e07d5d8639e643404ed8ce6582d0f927", "committed": false },
+      { "name": "312-local-members-390.png", "sha256": "889c9603889132b4b719afa436381443cb203e6546fe2700a70a9b0f3f626934", "committed": false },
+      { "name": "312-local-members-375.png", "sha256": "27b9011734d02c6887d3bff3bfe28bebe69ec5a4b63f388bbf4177ecda6c02b9", "committed": false },
+      { "name": "312-local-agent-profile-1440.png", "sha256": "062be3afb0e807a7e3327cd61c7b32aaab9ca39874631f7b1293f78911fb0bf6", "committed": false },
+      { "name": "312-local-agent-profile-390.png", "sha256": "4c374b46d97cde5e86a1f1fe8525dd493b2573fa6a50ccdbdd17e200ed71c725", "committed": false },
+      { "name": "312-local-agent-profile-375.png", "sha256": "92454c26022c7c5340beb008ed2b577275c7e3a60ac5691e44bffbe6733f69c5", "committed": false },
+      { "name": "312-local-human-profile-1440.png", "sha256": "0d0a433d186b5ecefae0ff447ec942506f3d62ebe7faeb1af486764b8ec66b72", "committed": false },
+      { "name": "312-local-human-profile-390.png", "sha256": "d1a827c86dfd6a0758fef5086f43f4ab9cdd70d8db9edb7c0128ebf7576dcea2", "committed": false },
+      { "name": "312-local-human-profile-375.png", "sha256": "b64fec9c389c0c2f4654676a38c7854334499f1fbf2b79ac1701778935e08d11", "committed": false }
+    ]
+  },
+  "thresholdResults": {
+    "criticalEdgeMaximumCssPx": { "limit": 2, "actual": 0, "result": "pass" },
+    "horizontalOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" },
+    "verticalPageOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" }
+  },
+  "intentionalDifferences": [
+    "Raft Members root shows only its sidebar plus an empty selection prompt; ticket #312 requires a searchable and filterable directory, so OpenTag keeps its real directory in the main pane instead of copying that functional gap.",
+    "OpenTag keeps its existing runtime, permission, personality, skill, workspace, reminder, integration, and activity contracts instead of inventing Raft-only role, environment, app, or MCP data.",
+    "OpenTag uses its licensed design tokens and real local identities/statuses rather than Raft private fonts, avatars, labels, or workspace data.",
+    "Classic remains unchanged as the immediate rollback surface."
+  ]
+}
