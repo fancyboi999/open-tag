@@ -29,6 +29,10 @@ not permission to copy third-party source or assets.
 - 2026-08-21: measured the `768px`/`767px` responsive seam, representative interaction states,
   light-only theme behavior, and a three-screenshot noise floor; reference artifacts are now
   mechanically checked.
+- 2026-08-21: added a development/Preview-only Baseline shell selector, immediate Classic rollback,
+  centralized page/parent metadata, and query/hash-preserving workspace canonicalization. Unit tests,
+  root/web typecheck, Preview and production builds, and real-browser deep-link/session checks pass;
+  the production build rejected a forced Baseline URL and rendered Classic.
 
 ## Decision log
 
@@ -38,3 +42,6 @@ not permission to copy third-party source or assets.
 - Accessibility and licensing conflicts are explicit intentional differences, never silent parity.
 - No server, database, REST, Socket.IO, daemon, Agent API, runtime adapter, or connector changes are
   allowed by this plan.
+- Ticket #305 establishes only the shell/routing seam. Its browser evidence verifies selection and
+  rollback behavior; visual threshold comparisons begin when tickets #306/#307 add visible baseline
+  shell geometry.

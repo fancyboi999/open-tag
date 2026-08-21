@@ -35,6 +35,7 @@
     "server": "tsx watch src/server/index.ts",
     "start": "tsx src/server/index.ts",
     "web:build": "npm --prefix web run build",
+    "web:build:preview": "npm --prefix web run build:preview",
     "docs:build": "npm --prefix docs-site run build",
     "site:build": "npm run web:build && npm run docs:build",
     "stop": "pkill -f 'src/server/index.ts'; pkill -f 'src/daemon/index.ts'; pkill -f 'bin/vite'; true",

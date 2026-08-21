@@ -166,6 +166,12 @@ For frontend development with Vite HMR:
 npm --prefix web run dev
 ```
 
+The classic workspace shell remains the default. In a development server, append
+`?ui=baseline` once to enter the Preview-only baseline shell for that browser session; append
+`?ui=classic` to roll back immediately. `npm run web:build:preview` creates a Preview-gated build
+for the same explicit switch. The normal `npm run web:build` is a production build and always
+fails closed to Classic, even if a URL or stale session requests Baseline.
+
 ### Object storage (attachments)
 
 Attachments default to **local disk** (`$OPEN_TAG_HOME/uploads/`, overridable with

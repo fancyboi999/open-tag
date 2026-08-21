@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "ticket": 305,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "scope": "structural shell and routing seam; no visual parity claim",
+  "checks": [
+    {
+      "name": "baseline session survives route navigation",
+      "route": "/s/open-tag/channel/<redacted>",
+      "result": "baseline"
+    },
+    {
+      "name": "workspace detail parent metadata",
+      "route": "/s/open-tag/tasks/<redacted>?view=list#todo",
+      "pageId": "channel-tasks",
+      "parentHref": "/s/open-tag/tasks",
+      "result": "pass"
+    },
+    {
+      "name": "classic rollback persists",
+      "route": "/s/open-tag/saved",
+      "result": "classic"
+    },
+    {
+      "name": "stale workspace canonicalization",
+      "route": "/s/open-tag/human/<redacted>?tab=activity#run",
+      "parentHref": "/s/open-tag/agent",
+      "result": "query and hash preserved"
+    },
+    {
+      "name": "production rejects forced baseline",
+      "route": "/login?ui=baseline",
+      "pageId": "login",
+      "result": "classic"
+    }
+  ],
+  "localArtifacts": [
+    {
+      "name": "baseline-channel.png",
+      "sha256": "3b6f800d0d4f0e364873fd35dcd7ffa0f32836b5735cc8275d459c1d8702dd93",
+      "width": 900,
+      "height": 601,
+      "committed": false
+    },
+    {
+      "name": "classic-human-detail.png",
+      "sha256": "e5f61cf1008324763c45368409dece4dff6c074619760cb98bf46d0cbd3cb3c9",
+      "width": 900,
+      "height": 601,
+      "committed": false
+    }
+  ],
+  "visibleGaps": [
+    "Baseline still uses Classic geometry; desktop and mobile visual shell parity belongs to tickets #306 and #307.",
+    "This ticket records no SSIM or critical-edge result because it intentionally introduces no reference-facing geometry."
+  ]
+}

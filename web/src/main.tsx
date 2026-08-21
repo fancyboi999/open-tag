@@ -5,7 +5,7 @@ import { StoreProvider, useStore } from "./store.tsx";
 import { WorkspaceSkeleton } from "./views/Skeleton.tsx";
 import { ConfirmProvider } from "./ConfirmModal.tsx";
 import { ToastProvider } from "./toast.tsx";
-import { Layout } from "./Layout.tsx";
+import { AppShellProvider, WorkspaceShell } from "./AppShell.tsx";
 import { Chat } from "./views/Chat.tsx";
 import { Showcase } from "./views/Showcase.tsx";
 import { Members } from "./views/Members.tsx";
@@ -14,6 +14,7 @@ import { AuthPage, JoinPage } from "./views/Auth.tsx";
 import { Landing } from "./views/Landing.tsx";
 import { Features } from "./views/Features.tsx";
 import { homeRoute } from "./routing.ts";
+import { canonicalWorkspaceHref } from "./shellRouting.ts";
 import "./i18n";
 import "./styles.css";
 import "./iconMotion.css";
@@ -54,10 +55,9 @@ function WorkspaceRoute() {
   if (!ready || (known && server !== slug)) return <WorkspaceSkeleton />; // bootstrap or a switch in flight → skeleton (do NOT bounce the URL while slug catches up)
   if (authState !== "authed") return <Navigate to="/login" replace />; // hard auth gate
   if (server !== slug) { // unknown / stale slug (not a member, typo) → canonicalize to the active workspace
-    const pathname = loc.pathname.replace(/^\/s\/[^/]+/, `/s/${slug}`);
-    return <Navigate to={`${pathname}${loc.search}${loc.hash}`} replace />;
+    return <Navigate to={canonicalWorkspaceHref(loc, slug)} replace />;
   }
-  return <Layout />;
+  return <WorkspaceShell />;
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -66,6 +66,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <ConfirmProvider>
       <ToastProvider>
       <BrowserRouter>
+        <AppShellProvider>
         <Routes>
           <Route path="/" element={<PublicHome />} />
           <Route path="/features" element={<Features />} />
@@ -92,6 +93,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           </Route>
           <Route path="*" element={<RootRedirect />} />
         </Routes>
+        </AppShellProvider>
       </BrowserRouter>
       </ToastProvider>
       </ConfirmProvider>

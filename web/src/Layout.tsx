@@ -7,6 +7,7 @@ import { QuickSwitcher } from "./QuickSwitcher.tsx";
 import { Menu, AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSystemAlerts, NotificationCenter } from "./alerts.tsx";
+import type { AppPageDescriptor, ShellMode } from "./shellRouting.ts";
 
 const SECTIONS = [
   { key: "search", Icon: IconSearch, labelKey: "nav.search" },
@@ -19,7 +20,7 @@ const SECTIONS = [
 
 export interface LayoutOutletContext { setChatPanelOpen: Dispatch<SetStateAction<boolean>> }
 
-export function Layout() {
+export function Layout({ shellMode, page }: { shellMode: ShellMode; page: AppPageDescriptor }) {
   const loc = useLocation();
   const { server } = useParams();
   const nav = useNavigate();
@@ -51,7 +52,13 @@ export function Layout() {
     window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp);
   };
   return (
-    <div className={"app" + (isChat ? " is-chat" : "") + (isChat && chatPanelOpen ? " has-panel" : "")}>
+    <div
+      className={`app shell-${shellMode}` + (isChat ? " is-chat" : "") + (isChat && chatPanelOpen ? " has-panel" : "")}
+      data-shell={shellMode}
+      data-page-id={page.id}
+      data-page-kind={page.kind}
+      data-parent-href={page.parentHref ?? undefined}
+    >
       <button className="mobile-burger" aria-label={t("common.menuToggle")} onClick={() => document.body.classList.toggle("sb-open")}><Menu size={18} /></button>
       <div className="mobile-scrim" onClick={() => document.body.classList.remove("sb-open")} />
       {showQS && <QuickSwitcher onClose={() => setShowQS(false)} />}

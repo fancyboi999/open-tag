@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/prerender.js",
+    "build:preview": "vite build --mode preview && node scripts/prerender.js",
     "preview": "vite preview"
   },
   "dependencies": {

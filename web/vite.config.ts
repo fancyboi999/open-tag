@@ -5,8 +5,15 @@ import react from "@vitejs/plugin-react";
 // Vite runs from web/, and loadEnvFile intentionally preserves values already exported by the shell.
 try { (process as { loadEnvFile?: (p?: string) => void }).loadEnvFile?.("../.env"); } catch { /* use defaults when .env is absent */ }
 const API = `http://localhost:${process.env.PORT ?? 7777}`;
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  // Runtime query/session state alone can never enable Baseline; only development and the explicit
+  // `--mode preview` build receive the capability. Normal production builds fail closed.
+  define: {
+    "import.meta.env.VITE_PREVIEW_SHELL": JSON.stringify(
+      mode === "development" || mode === "preview" ? "enabled" : "disabled",
+    ),
+  },
   server: {
     port: Number(process.env.VITE_PORT ?? 5273),
     proxy: {
@@ -36,4 +43,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
