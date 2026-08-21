@@ -138,6 +138,8 @@
   .shell-baseline main.content-col>.composer{right:0;padding:12px 12px 12px;border-top:2px solid var(--baseline-line);background:#fff}
   .shell-baseline .composer-box{border:2px solid var(--baseline-line);border-radius:0;padding:8px;box-shadow:4px 4px 0 #d4d0c8}
   .shell-baseline .composer-box:hover,.shell-baseline .composer-box:focus-within{box-shadow:4px 4px 0 #d4d0c8}
+  .shell-baseline .composer-send-error{margin:0 0 7px;padding:6px 8px;border:2px solid var(--baseline-line);background:#fff3ce;color:var(--baseline-line)}
+  .shell-baseline .composer-send-error button{min-height:28px;border:2px solid var(--baseline-line);border-radius:0;background:var(--baseline-pink);box-shadow:2px 2px 0 #d4d0c8;color:var(--baseline-line)}
   .shell-baseline .cb-icon,.shell-baseline .send-btn{border:2px solid var(--baseline-line);border-radius:0;background:#fff;color:var(--baseline-line);box-shadow:2px 2px 0 #d4d0c8}
   .shell-baseline .send-btn:disabled{border-color:var(--baseline-line);background:#f8d9e3;color:#777;opacity:.55}
 

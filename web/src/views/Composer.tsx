@@ -12,6 +12,10 @@ export function canSendComposerDraft(text: string, pendingAtts: { status?: strin
   return pendingAtts.every((a) => a.status === "done") && (!!text.trim() || pendingAtts.length > 0);
 }
 
+export function messageSendSucceeded(response: unknown): boolean {
+  return !!response && typeof response === "object" && (response as { ok?: unknown }).ok === true;
+}
+
 // Shared message composer for channels, DMs, and threads. Owns text, attachment upload
 // (button / paste / drag-drop, with per-file progress), @mention autocomplete, and send.
 // The only per-context difference is "As Task" (channels/DMs only), gated by `allowAsTask` —
@@ -33,10 +37,13 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
   const [atSel, setAtSel] = useState(0); // highlighted candidate index for ↑/↓ keyboard nav
   const [pendingAtts, setPendingAtts] = useState<any[]>([]); // uploaded attachments queued to send with the next message
   const [uploading, setUploading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(false);
   const atPosRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { const el = inputRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }, [text]); // textarea auto-grows up to 160px
 
   // Reachability hint as the input placeholder. Targets a message will reach = the DM peer (if any) + agents
@@ -71,14 +78,25 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
   ) : null;
   const reachStatusChip = reach?.kind === "off" ? t("chat.machineOfflineComposerPlaceholder", { names: reach.names }) : "";
   const effectivePlaceholder = reachPlaceholder ?? (allowAsTask && asTask ? t("chat.taskPlaceholder") : placeholder);
-  const canSend = !!channelId && canSendComposerDraft(text, pendingAtts);
+  const canSend = !sending && !!channelId && canSendComposerDraft(text, pendingAtts);
 
   const send = async (forceTask?: boolean) => {
     const v = text.trim(); if (!canSend) return;
     const asT = allowAsTask && (forceTask ?? asTask); // ⌘/Ctrl+Shift+Enter forces task; threads (allowAsTask=false) never send as task
-    setText(""); setAtQuery(null); setAsTask(false);
-    const ids = pendingAtts.map((a) => a.id); setPendingAtts([]); // canSend guarantees the full queue is uploaded
-    await api("POST", "/api/messages", { channelId, content: v, asTask: asT, attachmentIds: ids });
+    const ids = pendingAtts.map((a) => a.id); // canSend guarantees the full queue is uploaded
+    setSending(true);
+    setSendError(false);
+    try {
+      const response = await api("POST", "/api/messages", { channelId, content: v, asTask: asT, attachmentIds: ids });
+      if (!messageSendSucceeded(response)) throw new Error("message send failed");
+      setText(""); setAtQuery(null); setAsTask(false); setPendingAtts([]);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    } catch {
+      setSendError(true);
+      requestAnimationFrame(() => retryRef.current?.focus());
+    } finally {
+      setSending(false);
+    }
   };
   const onPickFiles = (e: ChangeEvent<HTMLInputElement>) => { if (e.target.files?.length) addFiles(Array.from(e.target.files)); e.target.value = ""; };
   // Each file → placeholder (images get a localUrl preview + "uploading") → uploadOne streams progress → replaced with the real attachment on success, "error" on failure. Paste: images only; drag-drop: any type.
@@ -147,10 +165,14 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
       })}</div>}
       <input type="file" ref={imgRef} accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
       <input type="file" ref={fileRef} multiple style={{ display: "none" }} onChange={onPickFiles} />
-      <div className="composer-box" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
+      <div className="composer-box" aria-busy={sending} onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
         {reachStatusChip && <div className="composer-status-chip" role="status">{reachStatusChip}</div>}
+        {sendError && <div className="composer-send-error" role="alert">
+          <span>{t("chat.sendFailed")}</span>
+          <button ref={retryRef} type="button" onClick={() => send()}>{t("chat.retrySend")}</button>
+        </div>}
         <textarea className="composer-input" ref={inputRef} rows={1} value={text} onChange={onInput} onPaste={onPaste}
-          placeholder={effectivePlaceholder}
+          placeholder={effectivePlaceholder} disabled={sending}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return; // IME composition (CJK input): Enter selects a candidate, not send
             if (atQuery !== null && cands.length) { // @ menu open: ↑/↓ move highlight, Enter/Tab pick, Esc closes
@@ -167,12 +189,12 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
           }} />
         <div className="composer-bar">
           <div className="cb-left">
-            <button className="cb-icon im" title={t("chat.uploadImage")} disabled={uploading} onClick={() => imgRef.current?.click()}><ImagePlus size={16} className="im-pop" /></button>
-            <button className="cb-icon im" title={t("chat.uploadFile")} disabled={uploading} onClick={() => fileRef.current?.click()}><Paperclip size={16} className="im-tilt" /></button>
+            <button className="cb-icon im" title={t("chat.uploadImage")} disabled={uploading || sending} onClick={() => imgRef.current?.click()}><ImagePlus size={16} className="im-pop" /></button>
+            <button className="cb-icon im" title={t("chat.uploadFile")} disabled={uploading || sending} onClick={() => fileRef.current?.click()}><Paperclip size={16} className="im-tilt" /></button>
           </div>
           <div className="cb-right">
-            {allowAsTask && <label className={"astask" + (asTask ? " on" : "")} title={t("chat.sendAsTaskTitle")}><input type="checkbox" checked={asTask} onChange={(e) => setAsTask(e.target.checked)} />{t("chat.asTask")}</label>}
-            <button className="send-btn im" title={t("chat.sendTitle")} disabled={!canSend} onClick={() => send()}><Send size={15} className="im-nudge-up" /></button>
+            {allowAsTask && <label className={"astask" + (asTask ? " on" : "")} title={t("chat.sendAsTaskTitle")}><input type="checkbox" checked={asTask} disabled={sending} onChange={(e) => setAsTask(e.target.checked)} />{t("chat.asTask")}</label>}
+            <button className="send-btn im" title={sending ? t("chat.sending") : t("chat.sendTitle")} disabled={!canSend} onClick={() => send()}><Send size={15} className="im-nudge-up" /></button>
           </div>
         </div>
       </div>
