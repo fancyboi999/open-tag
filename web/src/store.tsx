@@ -31,6 +31,8 @@ interface Store {
   agents: Agent[];        // ALL agents incl. system-seeded showcase demo agents — resolve a sender's avatar/name/profile by id (incl. #showcase history)
   visibleAgents: Agent[]; // agents minus system-seeded showcase demo agents — use for member rosters and every agent picker / @mention candidate list
   machines: Machine[]; humans: Human[];
+  machinesState: "loading" | "refreshing" | "ready" | "error";
+  reloadMachines: () => Promise<void>;
   membersState: "loading" | "refreshing" | "ready" | "error";
   reloadMembers: () => Promise<void>;
   latestDaemonVersion: string;                                    // newest published daemon version (packages/daemon); online machines below it are flagged outdated in the system-alert center
@@ -80,6 +82,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [agents, setAgents] = useState<Agent[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
+  const [machinesState, setMachinesState] = useState<"loading" | "refreshing" | "ready" | "error">("loading");
   const [latestDaemonVersion, setLatestDaemonVersion] = useState(""); // newest published daemon version from the machines endpoint; "" until first load (→ raises no outdated alert)
   const [humans, setHumans] = useState<Human[]>([]);
   const [membersState, setMembersState] = useState<"loading" | "refreshing" | "ready" | "error">("loading");
@@ -119,6 +122,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (fresh()) setMembersState("error");
     }
   };
+  const reloadMachines = async () => {
+    const sid = sidRef.current;
+    const fresh = () => sidRef.current === sid;
+    setMachinesState((state) => state === "ready" ? "refreshing" : "loading");
+    try {
+      const mc = await api("GET", `/api/servers/${sid}/machines`);
+      if (!Array.isArray(mc?.machines)) throw new Error(mc?.error || "invalid machines response");
+      if (!fresh()) return;
+      setMachines(mc.machines);
+      setLatestDaemonVersion(mc.latestDaemonVersion || "");
+      setMachinesState("ready");
+    } catch {
+      if (fresh()) setMachinesState("error");
+    }
+  };
   const reload = async () => {
     // Pin the target server at entry. A client-side workspace switch re-points sidRef mid-flight; `fresh()` then
     // turns false, so this (now-stale) reload's results are dropped instead of landing mixed with the new
@@ -129,7 +147,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try { const dm = await api("GET", "/api/channels/dm"); if (fresh()) setDms(dm); } catch { if (fresh()) setDms([]); }
     try { const un = (await api("GET", "/api/channels/unread")) || {}; if (fresh()) setUnread(un); } catch { if (fresh()) setUnread({}); }
     await reloadMembers();
-    try { const mc = await api("GET", `/api/servers/${sid}/machines`); if (fresh()) { setMachines(mc.machines || []); setLatestDaemonVersion(mc.latestDaemonVersion || ""); } } catch { if (fresh()) setMachines([]); }
+    if (fresh()) await reloadMachines();
   };
   const onEvent = (cb: (e: Ev) => void) => { listeners.current.add(cb); return () => { listeners.current.delete(cb); }; };
   // View-driven realtime subscription: opening a channel/thread joins its room so message:new arrives live, regardless of how the
@@ -282,7 +300,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setReady(false);
     sidRef.current = cur.id; setServerId(cur.id); setSlug(cur.slug || "open-tag"); setMyRole(cur.role || "member"); setCapabilities(cur.capabilities || {});
     setServerAvatar(cur.avatarUrl ? `${cur.avatarUrl}?token=${encodeURIComponent(tokenRef.current)}` : null);
-    setChannels([]); setDms([]); setUnread({}); setAgents([]); setMachines([]); setHumans([]); setMembersState("loading"); setSavedIds(new Set()); setAgentPanelReq(null);
+    setChannels([]); setDms([]); setUnread({}); setAgents([]); setMachines([]); setHumans([]); setMachinesState("loading"); setMembersState("loading"); setSavedIds(new Set()); setAgentPanelReq(null);
     subscribedRef.current = new Set(); // the previous workspace's view-subscriptions don't carry over
     sockRef.current = null; // the previous socket is closed by this effect's cleanup; drop the stale ref until the new one connects
     let lastSeq = 0;
@@ -364,5 +382,5 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Showcase demo agents (creatorType="system") stay in `agents` so #showcase history still resolves their
   // avatar/name/profile by id — but they are not real members, so every roster / picker uses `visibleAgents`.
   const visibleAgents = agents.filter((a) => a.creatorType !== "system");
-  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, switchServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, visibleAgents, machines, latestDaemonVersion, humans, membersState, reloadMembers, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, switchServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, visibleAgents, machines, machinesState, reloadMachines, latestDaemonVersion, humans, membersState, reloadMembers, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
 }

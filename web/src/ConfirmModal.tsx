@@ -14,11 +14,12 @@ export function useEscClose(onClose: () => void) {
 
 // Dialog focus contract shared by feature modals: focus enters the dialog, Tab stays inside,
 // Escape closes, and focus returns to the exact trigger after every close path.
-export function useDialogFocus(onClose: () => void) {
+export function useDialogFocus(onClose: () => void, active = true) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
+    if (!active) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusable = () => [...(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])') ?? [])]
       .filter((el) => !el.hidden && el.getClientRects().length > 0);
@@ -39,7 +40,7 @@ export function useDialogFocus(onClose: () => void) {
       document.removeEventListener("keydown", onKey, true);
       requestAnimationFrame(() => previous?.isConnected && previous.focus());
     };
-  }, []);
+  }, [active]);
   return dialogRef;
 }
 
@@ -53,6 +54,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [st, setSt] = useState<(ConfirmOpts & { resolve: (v: boolean) => void }) | null>(null);
   const confirm = useCallback<ConfirmFn>((opts) => new Promise<boolean>((resolve) => setSt({ ...opts, resolve })), []);
   const close = (v: boolean) => setSt((s) => { s?.resolve(v); return null; });
+  const dialogRef = useDialogFocus(() => close(false), !!st);
   useEffect(() => {
     if (!st) return;
     const onKey = (e: KeyboardEvent) => {
@@ -67,7 +69,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       {st && (
         <div className="modal-bg" onClick={() => close(false)}>
-          <div className="modal confirm-modal" role="dialog" aria-modal="true" aria-label={st.title} onClick={(e) => e.stopPropagation()}>
+          <div ref={dialogRef} className="modal confirm-modal" role="dialog" aria-modal="true" aria-label={st.title} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <h3>{st.title}</h3>
             {st.message && <p className="modal-note">{st.message}</p>}
             <div className="acts">

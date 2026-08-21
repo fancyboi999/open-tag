@@ -5,6 +5,7 @@ import { IconMonitor } from "../icons.tsx";
 import { CheckCircle2 } from "lucide-react";
 import { daemonConnectCommand } from "../machineUi.ts";
 import { copyText } from "../lib/clipboard.ts";
+import { useDialogFocus } from "../ConfirmModal.tsx";
 
 // Self-contained onboarding nudge state (reused from the old AddComputerModal): once-per-tab session
 // dismiss + a permanent global opt-out checkbox. Only the "onboard" mode reads/writes these.
@@ -65,14 +66,7 @@ export function ConnectComputerWizard({ mode, machine, onClose }: { mode: Mode; 
     }
     onClose?.();
   }, [mode, res, isOnline, dontRemind, onClose, api, serverId, reload]);
-
-  // Esc-to-dismiss, only while shown.
-  useEffect(() => {
-    if (!shown) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [shown, close]);
+  const dialogRef = useDialogFocus(close, shown);
 
   // Generate (or rotate) the connection key. add/onboard create a new machine; reconnect rotates the existing key.
   const gen = useCallback(async () => {
@@ -124,9 +118,9 @@ export function ConnectComputerWizard({ mode, machine, onClose }: { mode: Mode; 
 
   return (
     <div className="modal-bg" onClick={close}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="connect-computer-title" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
         {step === "intro" && (<>
-          <h3>{t("chat.addComputerTitle")}</h3>
+          <h3 id="connect-computer-title">{t("chat.addComputerTitle")}</h3>
           <div className="onboard-lead"><span className="onboard-ico"><IconMonitor size={22} /></span><p>{t("chat.addComputerBody")}</p></div>
           <p className="modal-note">{t("chat.addComputerRuntimes")}</p>
           <div className="acts">
@@ -137,7 +131,7 @@ export function ConnectComputerWizard({ mode, machine, onClose }: { mode: Mode; 
         </>)}
 
         {step === "connect" && (<>
-          <h3>{mode === "reconnect" && machine ? t("misc.reconnectModalTitle", { name: machine.name }) : t("misc.connectModalTitle")}</h3>
+          <h3 id="connect-computer-title">{mode === "reconnect" && machine ? t("misc.reconnectModalTitle", { name: machine.name }) : t("misc.connectModalTitle")}</h3>
           {mode === "reconnect" ? <p className="modal-note">{t("misc.reconnectModalNote")}</p> : null}
           {genErr ? (<>
             <p className="form-err">{genErr}</p>
@@ -153,7 +147,7 @@ export function ConnectComputerWizard({ mode, machine, onClose }: { mode: Mode; 
         </>)}
 
         {step === "connected" && (<>
-          <h3>{t("misc.wizardConnectedTitle")}</h3>
+          <h3 id="connect-computer-title">{t("misc.wizardConnectedTitle")}</h3>
           <div className="wiz-ok">
             <CheckCircle2 size={24} className="wiz-ok-ico" />
             <div><div><b>{t("misc.wizardConnectedSuccess")}</b></div>{meta ? <div className="wiz-ok-meta">{meta}</div> : null}</div>

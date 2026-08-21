@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Star, Bookmark, AlertTriangle, Lock, MessageCircle, Eye, Plus } from "lucide-react";
+import { Star, Bookmark, AlertTriangle, Lock, MessageCircle, Eye, Plus, UserRound, Languages, Palette, Bell, Building2, UsersRound } from "lucide-react";
 import { useStore } from "../store.tsx";
 import { fmtDateTime } from "../format";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
@@ -9,7 +9,7 @@ import { IconMonitor, IconInbox } from "../icons.tsx";
 import { TaskBoard } from "../TaskBoard.tsx";
 import { PaneEmpty } from "../PaneEmpty.tsx";
 import { ConnectComputerWizard } from "./ConnectComputerWizard.tsx";
-import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
+import { useConfirm, useDialogFocus } from "../ConfirmModal.tsx";
 import { useTranslation } from "react-i18next";
 import { daemonUpdateCommandTemplate, isDaemonUpdateAvailable } from "../machineUi.ts";
 import { copyText } from "../lib/clipboard.ts";
@@ -206,26 +206,32 @@ export function Inbox() {
 // Runtime name → display label mapping
 const RT_LABEL: Record<string, string> = { claude: "Claude Code", codex: "Codex CLI", opencode: "OpenCode", copilot: "Copilot CLI", cursor: "Cursor CLI", gemini: "Gemini CLI", kimi: "Kimi", hermes: "Hermes" };
 export function Computers() {
-  const { machines, agents, slug, api, serverId, reload, attachmentUrl, capabilities, latestDaemonVersion } = useStore();
+  const { machines, machinesState, reloadMachines, agents, slug, api, serverId, reload, attachmentUrl, capabilities, latestDaemonVersion } = useStore();
   const confirm = useConfirm();
   const { t } = useTranslation();
   const { machineId } = useParams();
   const nav = useNavigate();
+  const [computerParams] = useSearchParams();
+  const computerSuffix = computerParams.get("from") === "settings" ? "?from=settings" : "";
   const [connect, setConnect] = useState(false);
   const [reconnect, setReconnect] = useState<{ id: string; name: string } | null>(null);
   const [updateGuide, setUpdateGuide] = useState<{ id: string; name: string; currentVersion: string; latestVersion: string; apiKeyPrefix?: string } | null>(null);
   const [delErr, setDelErr] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [budget, setBudget] = useState<any>(null);
-  const cur = machines.find((m) => m.id === machineId) || machines[0];
+  const [budgetState, setBudgetState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [budgetRetry, setBudgetRetry] = useState(0);
+  const cur = machineId ? machines.find((m) => m.id === machineId) : undefined;
   const fmtMem = (mb: number) => mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb + " MB";
   const onMachine = agents.filter((a) => a.machineId === cur?.id);
   const canUpdateDaemon = isDaemonUpdateAvailable(cur, latestDaemonVersion);
   // Load resource budget for the selected machine
   useEffect(() => {
-    if (!cur) { setBudget(null); return; }
-    api("GET", `/api/servers/${slug}/machines/${cur.id}/budget`).then((r) => { if (r && !r.error) setBudget(r); }).catch(() => setBudget(null));
-  }, [slug, cur?.id]);
+    if (!cur) { setBudget(null); setBudgetState("idle"); return; }
+    let cancelled = false; setBudgetState("loading");
+    api("GET", `/api/servers/${slug}/machines/${cur.id}/budget`).then((r) => { if (cancelled) return; if (!r || r.error) throw new Error(r?.error || "invalid budget response"); setBudget(r); setBudgetState("ready"); }).catch(() => { if (!cancelled) { setBudget(null); setBudgetState("error"); } });
+    return () => { cancelled = true; };
+  }, [slug, cur?.id, budgetRetry]);
   const removeMachine = async () => {
     if (!cur) return;
     setDelErr("");
@@ -235,7 +241,7 @@ export function Computers() {
     try {
       const r = await api("DELETE", `/api/servers/${serverId}/machines/${cur.id}`);
       if (r?.error) { setDelErr(r.error); return; }
-      await reload(); nav(`/s/${slug}/computer`);
+      await reload(); nav(`/s/${slug}/computer${computerSuffix}`);
     } finally { setDeleting(false); }
   };
   return (
@@ -244,15 +250,15 @@ export function Computers() {
         <div className="sb-scroll">
         <div className="sb-title">{t("misc.computersTitle")}</div>
         <div className="sec">{t("misc.computersMachines")} <span className="cnt">{machines.length}</span>{capabilities.manageMachines && <button className="addbtn" title={t("misc.computersConnectBtn")} onClick={() => setConnect(true)}>+</button>}</div>
-        {machines.length ? machines.map((m) => (
-          <button key={m.id} className={"item" + (m.id === cur?.id ? " active" : "")} onClick={() => nav(`/s/${slug}/computer/${m.id}`)}>
+        {machinesState === "loading" ? <div className="page-loading compact" role="status" aria-label={t("misc.computersLoading")}><span /><span /><span /></div> : machinesState === "error" ? <div className="page-load-error compact" role="alert"><AlertTriangle size={16} /><span>{t("misc.computersLoadFailed")}</span><button onClick={() => void reloadMachines()}>{t("misc.retry")}</button></div> : machines.length ? machines.map((m) => (
+          <button key={m.id} className={"item" + (m.id === cur?.id ? " active" : "")} onClick={() => nav(`/s/${slug}/computer/${m.id}${computerSuffix}`)}>
             <IconMonitor size={15} /><span className="grow">{m.name || m.hostname}</span><span className={"dot " + (m.status === "online" ? "online" : "")} />
           </button>
         )) : <div className="empty">{t("misc.computersNoMachine")}</div>}
         </div>
       </aside>
       <main className="content-col">
-        {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll"><PaneEmpty icon={<IconMonitor size={30} />} title={t("misc.computersNoMachine")} sub={t("misc.computersNoMachineHint")} action={capabilities.manageMachines && <button className="pe-cta" onClick={() => setConnect(true)}><Plus size={15} /> {t("misc.computersConnectBtn")}</button>} /></div></>
+        {!cur ? <><div className="head"><h1>{t("misc.computersTitle")}</h1></div><div className="scroll">{machinesState === "loading" ? <div className="page-loading" role="status" aria-label={t("misc.computersLoading")}><span /><span /><span /></div> : machinesState === "error" ? <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{t("misc.computersLoadFailed")}</span><button onClick={() => void reloadMachines()}>{t("misc.retry")}</button></div> : machineId ? <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{t("misc.computersMissing")}</span><button onClick={() => nav(`/s/${slug}/computer${computerSuffix}`)}>{t("common.back")}</button></div> : <PaneEmpty icon={<IconMonitor size={30} />} title={machines.length ? t("misc.computersSelectMachine") : t("misc.computersNoMachine")} sub={machines.length ? t("misc.computersSelectMachineHint") : t("misc.computersNoMachineHint")} action={!machines.length && capabilities.manageMachines && <button className="pe-cta" onClick={() => setConnect(true)}><Plus size={15} /> {t("misc.computersConnectBtn")}</button>} />}</div></>
           : <>
             <div className="head"><h1>{cur.name || cur.hostname}</h1><small>{cur.status === "online" ? t("misc.computersOnline") : t("misc.computersOffline")} · {t("misc.computersDaemonLabel")} {cur.daemonVersion || "?"}</small>
               {capabilities.manageMachines && <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -271,7 +277,9 @@ export function Computers() {
               </div>
               <div className="sec">{t("common.detectedRuntimes")} <span className="cnt">{(cur.runtimes || []).length}</span></div>
               <div className="rt-list">{(cur.runtimes || []).length ? (cur.runtimes || []).map((r) => <span key={r} className="rt-chip">{RT_LABEL[r] || r}</span>) : <span className="empty">{t("misc.computersNoRuntime")}</span>}</div>
-              {budget && (
+              {budgetState === "loading" && <div className="page-loading compact" role="status" aria-label={t("misc.computersBudgetLoading")}><span /><span /><span /></div>}
+              {budgetState === "error" && <div className="page-load-error compact" role="alert"><AlertTriangle size={16} /><span>{t("misc.computersBudgetFailed")}</span><button onClick={() => setBudgetRetry((value) => value + 1)}>{t("misc.retry")}</button></div>}
+              {budgetState === "ready" && budget && (
                 <div className="card">
                   <div className="meta" style={{ marginBottom: 8 }}>{t("members.resourceBudget")}</div>
                   <div className="kv"><b>{t("misc.computersBudget")}</b> {t("misc.computersBudgetValue", { mem: fmtMem(budget.availableMemMB), cpu: 100 - budget.cpuUsagePct })}</div>
@@ -296,7 +304,7 @@ export function Computers() {
 }
 
 function DaemonUpdateModal({ onClose, machine }: { onClose: () => void; machine: { id: string; name: string; currentVersion: string; latestVersion: string; apiKeyPrefix?: string } }) {
-  useEscClose(onClose);
+  const dialogRef = useDialogFocus(onClose);
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const cmd = daemonUpdateCommandTemplate(window.location.origin);
@@ -306,8 +314,8 @@ function DaemonUpdateModal({ onClose, machine }: { onClose: () => void; machine:
   };
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{t("misc.updateDaemonModalTitle", { name: machine.name })}</h3>
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="daemon-update-title" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <h3 id="daemon-update-title">{t("misc.updateDaemonModalTitle", { name: machine.name })}</h3>
         <p className="modal-note"><AlertTriangle size={14} /> {t("misc.updateDaemonModalNote", { current: machine.currentVersion, latest: machine.latestVersion })}</p>
         <div className="update-steps">
           <p>{t("misc.updateDaemonModalSavedKeyPath")}</p>
@@ -394,33 +402,40 @@ export function Search() {
   );
 }
 
-// Settings sub-pages (account/server implemented; remaining entries are navigation placeholders)
-// SETTINGS labels are i18n keys; call t(label) at render time
-const SETTINGS: [string, string][] = [
-  ["account", "misc.settingsNavAccount"],
-  ["server", "misc.settingsNavServer"],
-  ["invites", "misc.settingsNavInvites"],
-  ["notifications", "misc.settingsNavNotifications"],
-]; // Machine/Daemon management lives in the Computers view, not duplicated here
+// Settings sub-pages
+const SETTINGS = [
+  { group: "misc.settingsGroupPersonal", items: [
+    { key: "account", label: "misc.settingsNavAccount", Icon: UserRound },
+    { key: "language-region", label: "misc.settingsNavLanguage", Icon: Languages },
+    { key: "appearance", label: "misc.settingsNavAppearance", Icon: Palette },
+    { key: "notifications", label: "misc.settingsNavNotifications", Icon: Bell },
+  ] },
+  { group: "misc.settingsGroupWorkspace", items: [
+    { key: "server", label: "misc.settingsNavServer", Icon: Building2 },
+    { key: "invites", label: "misc.settingsNavInvites", Icon: UsersRound },
+    { key: "machines", label: "misc.settingsNavMachines", Icon: IconMonitor },
+  ] },
+];
+const SETTING_ITEMS = SETTINGS.flatMap((group) => group.items);
 export function Settings() {
   const { section } = useParams();
   const { slug, serverId, api } = useStore();
   const nav = useNavigate();
   const { t } = useTranslation();
-  const cur = section || "account";
-  const curLabel = t(SETTINGS.find((s) => s[0] === cur)?.[1] || cur);
+  const cur = section || "";
+  const curLabel = t(SETTING_ITEMS.find((item) => item.key === cur)?.label || "nav.settings");
   return (
     <>
-      <aside className="sidebar">
+      <aside className="sidebar settings-sidebar">
         <div className="sb-scroll">
         <div className="sb-title">{t("nav.settings")}</div>
-        <div className="settings-nav">{SETTINGS.map(([k, labelKey]) => <button key={k} className={"item" + (cur === k ? " active" : "")} onClick={() => nav(`/s/${slug}/settings/${k}`)}>{t(labelKey)}</button>)}</div>
+        <div className="settings-nav">{SETTINGS.map((group) => <div key={group.group}><div className="sec">{t(group.group)}</div>{group.items.map(({ key, label, Icon }) => <button key={key} className={"item" + (cur === key ? " active" : "")} aria-current={cur === key ? "page" : undefined} onClick={() => nav(key === "machines" ? `/s/${slug}/computer?from=settings` : `/s/${slug}/settings/${key}`)}><Icon size={15} /><span>{t(label)}</span></button>)}</div>)}</div>
         </div>
       </aside>
-      <main className="content-col">
+      <main className="content-col settings-content">
         <div className="head"><h1>{t("misc.settingsTitle", { section: curLabel })}</h1></div>
         <div className="scroll">
-          {cur === "account" ? <AccountSettings api={api} /> : cur === "server" ? <ServerSettings api={api} serverId={serverId} /> : cur === "invites" ? <InvitesSettings api={api} serverId={serverId} /> : cur === "notifications" ? <NotificationsSettings api={api} serverId={serverId} /> : <div className="empty">{t("misc.settingsWip", { section: cur })}</div>}
+          {!cur ? <PaneEmpty icon={<UserRound size={30} />} title={t("misc.settingsChooseTitle")} sub={t("misc.settingsChooseHint")} /> : cur === "account" ? <AccountSettings api={api} /> : cur === "server" ? <ServerSettings api={api} serverId={serverId} /> : cur === "invites" ? <InvitesSettings api={api} serverId={serverId} /> : cur === "notifications" ? <NotificationsSettings api={api} serverId={serverId} /> : cur === "language-region" ? <LanguageSettings /> : cur === "appearance" ? <AppearanceSettings /> : <div className="empty">{t("misc.settingsWip", { section: cur })}</div>}
         </div>
       </main>
     </>
@@ -428,60 +443,87 @@ export function Settings() {
 }
 function AccountSettings({ api }: { api: any }) {
   const { logout } = useStore();
-  const { t, i18n } = useTranslation();
-  const setLang = (l: string) => { i18n.changeLanguage(l); localStorage.setItem("open-tag.lang", l); };
+  const { t } = useTranslation();
   const [u, setU] = useState<any>(null);
+  const initial = useRef<any>(null);
+  const request = useRef(0);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
-  useEffect(() => { (async () => setU(await api("GET", "/api/auth/me")))(); }, []);
-  if (!u) return <div className="empty">{t("misc.accountLoading")}</div>;
-  const save = async () => { await api("PATCH", "/api/auth/me", { displayName: u.displayName, description: u.description }); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  const load = async () => { const id = ++request.current; setState("loading"); setError(""); try { const next = await api("GET", "/api/auth/me"); if (next?.error || !next?.id) throw new Error(next?.error || "invalid account response"); if (id !== request.current) return; initial.current = next; setU(next); setState("ready"); } catch (e: any) { if (id === request.current) { setError(String(e?.message || e)); setState("error"); } } };
+  useEffect(() => { void load(); return () => { request.current += 1; }; }, []);
+  if (state === "loading") return <div className="page-loading" role="status" aria-label={t("misc.accountLoading")}><span /><span /><span /></div>;
+  if (state === "error" || !u) return <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{error || t("misc.accountLoadFailed")}</span><button onClick={() => void load()}>{t("misc.retry")}</button></div>;
+  const save = async () => { const displayName = String(u.displayName || "").trim(); if (!displayName) { setError(t("misc.accountNameRequired")); return; } setBusy(true); setError(""); try { const next = await api("PATCH", "/api/auth/me", { displayName, description: u.description }); if (next?.error) throw new Error(next.error); const merged = { ...u, ...next, displayName }; initial.current = merged; setU(merged); setSaved(true); setTimeout(() => setSaved(false), 1500); } catch (e: any) { setError(String(e?.message || e)); } finally { setBusy(false); } };
   return (
     <div className="setform">
-      <label>{t("misc.accountDisplayName")}</label><input value={u.displayName || ""} onChange={(e) => setU({ ...u, displayName: e.target.value })} />
+      <div className="settings-card">
+      <label>{t("misc.accountDisplayName")}</label><input value={u.displayName || ""} disabled={busy} onChange={(e) => setU({ ...u, displayName: e.target.value })} />
       <label>{t("misc.accountDescription")}</label>
-      <textarea value={u.description || ""} maxLength={3000} onChange={(e) => setU({ ...u, description: e.target.value })} placeholder={t("common.describeSelfPlaceholder")} />
+      <textarea value={u.description || ""} maxLength={3000} disabled={busy} onChange={(e) => setU({ ...u, description: e.target.value })} placeholder={t("common.describeSelfPlaceholder")} />
       <div className="ta-count">{(u.description || "").length}/3000</div>
       <label>{t("misc.accountEmail")}</label><input value={u.email || ""} disabled />
-      <div className="setrow"><button className="ok" onClick={save}>{t("misc.accountSave")}</button>{saved && <span className="saved">{t("misc.accountSaved")}</span>}</div>
-      <div className="lang-row">
-        <div><div className="logout-title">{t("settings.language")}</div><div className="logout-desc">{t("settings.languageDesc")}</div></div>
-        <div className="seg-pill" role="group" aria-label={t("settings.language")}>
-          <button className={"seg-opt" + (i18n.language.startsWith("en") ? " on" : "")} onClick={() => setLang("en")}>{t("settings.langEnglish")}</button>
-          <button className={"seg-opt" + (i18n.language.startsWith("zh") ? " on" : "")} onClick={() => setLang("zh")}>{t("settings.langChinese")}</button>
-        </div>
+      {error && <div className="form-err" role="alert">{error}</div>}
+      <div className="setrow"><button className="cancel" disabled={busy} onClick={() => { setU(initial.current); setError(""); }}>{t("misc.cancel")}</button><button className="ok" disabled={busy} onClick={() => void save()}>{busy ? t("misc.saving") : t("misc.accountSave")}</button>{saved && <span className="saved">{t("misc.accountSaved")}</span>}</div>
       </div>
-      <div className="logout-row">
+      <div className="settings-card logout-row">
         <div><div className="logout-title">{t("misc.logoutTitle")}</div><div className="logout-desc">{t("misc.logoutDesc")}</div></div>
         <button className="logout-btn" onClick={logout}>{t("misc.logoutBtn")}</button>
       </div>
     </div>
   );
 }
+
+function LanguageSettings() {
+  const { t, i18n } = useTranslation();
+  const current = i18n.language.startsWith("zh") ? "zh" : "en";
+  const setLang = (value: string) => { void i18n.changeLanguage(value); localStorage.setItem("open-tag.lang", value); };
+  return <div className="setform"><div className="settings-card"><h2>{t("misc.settingsNavLanguage")}</h2><p className="modal-note">{t("misc.languageHint")}</p><div className="seg-pill" role="group" aria-label={t("settings.language")}><button className={"seg-opt" + (current === "en" ? " on" : "")} aria-pressed={current === "en"} onClick={() => setLang("en")}>{t("settings.langEnglish")}</button><button className={"seg-opt" + (current === "zh" ? " on" : "")} aria-pressed={current === "zh"} onClick={() => setLang("zh")}>{t("settings.langChinese")}</button></div></div></div>;
+}
+
+function AppearanceSettings() {
+  const { t } = useTranslation();
+  const [size, setSize] = useState(() => localStorage.getItem("open-tag.message-size") || "medium");
+  const [activity, setActivity] = useState(() => localStorage.getItem("open-tag.live-activity") !== "off");
+  const chooseSize = (next: string) => { setSize(next); localStorage.setItem("open-tag.message-size", next); document.documentElement.dataset.messageSize = next; };
+  const chooseActivity = () => { const next = !activity; setActivity(next); localStorage.setItem("open-tag.live-activity", next ? "on" : "off"); };
+  return <div className="setform"><div className="settings-card"><h2>{t("misc.appearanceMessageSize")}</h2><p className="modal-note">{t("misc.appearanceMessageSizeHint")}</p><div className="seg-pill" role="group" aria-label={t("misc.appearanceMessageSize")}>{["small", "medium", "large"].map((value) => <button key={value} className={"seg-opt" + (size === value ? " on" : "")} aria-pressed={size === value} onClick={() => chooseSize(value)}>{t(`misc.appearanceSize.${value}`)}</button>)}</div></div><div className="settings-card"><div className="toggle-row"><div className="toggle-text"><div className="toggle-title">{t("misc.appearanceLiveTitle")}</div><div className="toggle-sub">{t("misc.appearanceLiveHint")}</div></div><button role="switch" aria-checked={activity} className={"switch" + (activity ? " on" : "")} onClick={chooseActivity}><span className="knob" /></button></div></div></div>;
+}
 function ServerSettings({ api, serverId }: { api: any; serverId: string }) {
-  const { serverAvatar, uploadServerAvatar } = useStore();
+  const { serverAvatar, uploadServerAvatar, capabilities } = useStore();
   const { t } = useTranslation();
   const [s, setS] = useState<any>(null);
+  const initial = useRef<any>(null);
+  const request = useRef(0);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [avErr, setAvErr] = useState("");
   const [avBusy, setAvBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { (async () => setS(await api("GET", "/api/servers/" + serverId)))(); }, [serverId]);
-  if (!s) return <div className="empty">{t("misc.serverLoading")}</div>;
-  const save = async () => { await api("PATCH", "/api/servers/" + serverId, { name: s.name, slug: s.slug }); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  const canEdit = !!capabilities.manageServer;
+  const load = async () => { const id = ++request.current; setState("loading"); setError(""); try { const next = await api("GET", "/api/servers/" + serverId); if (next?.error || !next?.id) throw new Error(next?.error || "invalid workspace response"); if (id !== request.current) return; initial.current = next; setS(next); setState("ready"); } catch (e: any) { if (id === request.current) { setError(String(e?.message || e)); setState("error"); } } };
+  useEffect(() => { void load(); return () => { request.current += 1; }; }, [serverId]);
+  if (state === "loading") return <div className="page-loading" role="status" aria-label={t("misc.serverLoading")}><span /><span /><span /></div>;
+  if (state === "error" || !s) return <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{error || t("misc.serverLoadFailed")}</span><button onClick={() => void load()}>{t("misc.retry")}</button></div>;
+  const save = async () => { if (!canEdit) return; const name = String(s.name || "").trim(); const nextSlug = String(s.slug || "").trim(); if (!name || !nextSlug) { setError(t("misc.serverFieldsRequired")); return; } setBusy(true); setError(""); try { const next = await api("PATCH", "/api/servers/" + serverId, { name, slug: nextSlug }); if (next?.error) throw new Error(next.error); const merged = { ...s, ...next, name, slug: nextSlug }; initial.current = merged; setS(merged); setSaved(true); setTimeout(() => setSaved(false), 1500); } catch (e: any) { setError(String(e?.message || e)); } finally { setBusy(false); } };
   const onPick = async (e: any) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; setAvErr(""); setAvBusy(true); try { await uploadServerAvatar(f); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   return (
     <div className="setform">
       <label>{t("misc.serverAvatarLabel")}</label>
       <div className="avatar-edit">
         {serverAvatar ? <img className="avatar-edit-img" src={serverAvatar} alt="" /> : <div className="avatar-edit-ph">{(s.name || "?")[0].toUpperCase()}</div>}
-        <button className="ghost" disabled={avBusy} onClick={() => fileRef.current?.click()}>{avBusy ? t("misc.serverAvatarUploading") : serverAvatar ? t("misc.serverAvatarChange") : t("misc.serverAvatarUpload")}</button>
+        {canEdit ? <button className="ghost" disabled={avBusy || busy} onClick={() => fileRef.current?.click()}>{avBusy ? t("misc.serverAvatarUploading") : serverAvatar ? t("misc.serverAvatarChange") : t("misc.serverAvatarUpload")}</button> : <span className="meta">{t("misc.readOnly")}</span>}
         <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onPick} />
       </div>
       {avErr && <div className="form-err">{avErr}</div>}
-      <label>{t("misc.serverNameLabel")}</label><input value={s.name || ""} onChange={(e) => setS({ ...s, name: e.target.value })} />
-      <label>{t("misc.serverSlugLabel")}</label><input value={s.slug || ""} onChange={(e) => setS({ ...s, slug: e.target.value })} />
+      <label>{t("misc.serverNameLabel")}</label><input value={s.name || ""} disabled={!canEdit || busy} onChange={(e) => setS({ ...s, name: e.target.value })} />
+      <label>{t("misc.serverSlugLabel")}</label><input value={s.slug || ""} disabled={!canEdit || busy} onChange={(e) => setS({ ...s, slug: e.target.value })} />
       <label>{t("misc.serverPlanLabel")}</label><input value={s.plan || "free"} disabled />
-      <div className="setrow"><button className="ok" onClick={save}>{t("misc.serverSave")}</button>{saved && <span className="saved">{t("misc.serverSaved")}</span>}</div>
+      {error && <div className="form-err" role="alert">{error}</div>}
+      {canEdit ? <div className="setrow"><button className="cancel" disabled={busy} onClick={() => { setS(initial.current); setError(""); }}>{t("misc.cancel")}</button><button className="ok" disabled={busy} onClick={() => void save()}>{busy ? t("misc.saving") : t("misc.serverSave")}</button>{saved && <span className="saved">{t("misc.serverSaved")}</span>}</div> : <div className="setrow"><span className="meta">{t("misc.serverReadOnly")}</span></div>}
     </div>
   );
 }
@@ -489,14 +531,17 @@ function ServerSettings({ api, serverId }: { api: any; serverId: string }) {
 function NotificationsSettings({ api, serverId }: { api: any; serverId: string }) {
   const { t } = useTranslation();
   const [muted, setMuted] = useState<boolean | null>(null);
+  const initial = useRef(false);
+  const request = useRef(0);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
-  useEffect(() => { if (!serverId) return; (async () => { const r = await api("GET", `/api/servers/${serverId}/notification-settings`); setMuted(!!r?.serverPushMuted); })(); }, [serverId]);
-  if (muted === null) return <div className="empty">{t("misc.notifLoading")}</div>;
-  const toggle = async () => {
-    const next = !muted; setMuted(next);
-    await api("PATCH", `/api/servers/${serverId}/notification-settings`, { serverPushMuted: next });
-    setSaved(true); setTimeout(() => setSaved(false), 1500);
-  };
+  const load = async () => { const id = ++request.current; setState("loading"); setError(""); try { const r = await api("GET", `/api/servers/${serverId}/notification-settings`); if (r?.error || typeof r?.serverPushMuted !== "boolean") throw new Error(r?.error || "invalid notification response"); if (id !== request.current) return; initial.current = r.serverPushMuted; setMuted(r.serverPushMuted); setState("ready"); } catch (e: any) { if (id === request.current) { setError(String(e?.message || e)); setState("error"); } } };
+  useEffect(() => { if (serverId) void load(); return () => { request.current += 1; }; }, [serverId]);
+  if (state === "error") return <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{error || t("misc.notifLoadFailed")}</span><button onClick={() => void load()}>{t("misc.retry")}</button></div>;
+  if (state === "loading" || muted === null) return <div className="page-loading" role="status" aria-label={t("misc.notifLoading")}><span /><span /><span /></div>;
+  const save = async () => { setBusy(true); setError(""); try { const r = await api("PATCH", `/api/servers/${serverId}/notification-settings`, { serverPushMuted: muted }); if (r?.error) throw new Error(r.error); initial.current = muted; setSaved(true); setTimeout(() => setSaved(false), 1500); } catch (e: any) { setMuted(initial.current); setError(String(e?.message || e)); } finally { setBusy(false); } };
   return (
     <div className="setform">
       <div className="toggle-row">
@@ -504,9 +549,10 @@ function NotificationsSettings({ api, serverId }: { api: any; serverId: string }
           <div className="toggle-title">{t("misc.notifMuteTitle")}</div>
           <div className="toggle-sub">{t("misc.notifMuteDesc")}</div>
         </div>
-        <button role="switch" aria-checked={muted} className={"switch" + (muted ? " on" : "")} onClick={toggle}><span className="knob" /></button>
+        <button role="switch" aria-checked={muted} disabled={busy} className={"switch" + (muted ? " on" : "")} onClick={() => setMuted(!muted)}><span className="knob" /></button>
       </div>
-      {saved && <div className="setrow"><span className="saved">{t("misc.notifSaved")}</span></div>}
+      {error && <div className="form-err" role="alert">{error}</div>}
+      <div className="setrow"><button className="cancel" disabled={busy || muted === initial.current} onClick={() => { setMuted(initial.current); setError(""); }}>{t("misc.cancel")}</button><button className="ok" disabled={busy || muted === initial.current} onClick={() => void save()}>{busy ? t("misc.saving") : t("misc.save")}</button>{saved && <span className="saved">{t("misc.notifSaved")}</span>}</div>
     </div>
   );
 }
@@ -591,11 +637,17 @@ function InvitesSettings({ api, serverId }: { api: any; serverId: string }) {
   const [role, setRole] = useState("member");
   const [maxUses, setMaxUses] = useState("");
   const [copied, setCopied] = useState("");
-  const load = async () => { try { const r = await api("GET", `/api/servers/${serverId}/join-links`); setLinks(Array.isArray(r) ? r : []); } catch { setLinks([]); } };
-  useEffect(() => { load(); }, [serverId]);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const request = useRef(0);
+  const load = async () => { const id = ++request.current; setState("loading"); setError(""); try { const r = await api("GET", `/api/servers/${serverId}/join-links`); if (!Array.isArray(r)) throw new Error(r?.error || "invalid invite response"); if (id !== request.current) return; setLinks(r); setState("ready"); } catch (e: any) { if (id === request.current) { setError(String(e?.message || e)); setState("error"); } } };
+  useEffect(() => { void load(); return () => { request.current += 1; }; }, [serverId]);
   if (!capabilities.manageMembers) return <div className="empty">{t("misc.invitesAdminOnly")}</div>;
-  const create = async () => { await api("POST", `/api/servers/${serverId}/join-links`, { role, maxUses: maxUses ? Number(maxUses) : null }); setMaxUses(""); load(); };
-  const del = async (id: string) => { await api("DELETE", `/api/servers/${serverId}/join-links/${id}`); load(); };
+  if (state === "loading") return <div className="page-loading" role="status" aria-label={t("misc.invitesLoading")}><span /><span /><span /></div>;
+  if (state === "error") return <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{error || t("misc.invitesLoadFailed")}</span><button onClick={() => void load()}>{t("misc.retry")}</button></div>;
+  const create = async () => { const parsed = maxUses ? Number(maxUses) : null; if (parsed !== null && (!Number.isInteger(parsed) || parsed < 1)) { setError(t("misc.invitesInvalidUses")); return; } setBusy("create"); setError(""); try { const r = await api("POST", `/api/servers/${serverId}/join-links`, { role, maxUses: parsed }); if (r?.error || !r?.id) throw new Error(r?.error || "invalid invite response"); setLinks((current) => [r, ...current]); setMaxUses(""); } catch (e: any) { setError(String(e?.message || e)); } finally { setBusy(""); } };
+  const del = async (id: string) => { setBusy(id); setError(""); try { const r = await api("DELETE", `/api/servers/${serverId}/join-links/${id}`); if (r?.error || r?.ok === false) throw new Error(r?.error || "delete failed"); setLinks((current) => current.filter((link) => link.id !== id)); } catch (e: any) { setError(String(e?.message || e)); } finally { setBusy(""); } };
   const urlOf = (tok: string) => `${location.origin}/join/${tok}`;
   const copy = async (tok: string) => {
     const link = urlOf(tok);
@@ -611,13 +663,14 @@ function InvitesSettings({ api, serverId }: { api: any; serverId: string }) {
       <label>{t("misc.invitesLabel")}</label>
       <p className="modal-note">{t("misc.invitesNote")}</p>
       <div className="inv-new">
-        <select value={role} onChange={(e) => setRole(e.target.value)}>
+        <select value={role} disabled={!!busy} aria-label={t("misc.invitesRoleLabel")} onChange={(e) => setRole(e.target.value)}>
           <option value="member">{t("misc.invitesRoleMember")}</option>
           <option value="admin">{t("misc.invitesRoleAdmin")}</option>
         </select>
-        <input type="number" min="1" placeholder={t("misc.invitesMaxUsesPlaceholder")} value={maxUses} onChange={(e) => setMaxUses(e.target.value)} />
-        <button className="ok" onClick={create}>{t("misc.invitesGenerateBtn")}</button>
+        <input type="number" min="1" disabled={!!busy} placeholder={t("misc.invitesMaxUsesPlaceholder")} value={maxUses} onChange={(e) => setMaxUses(e.target.value)} />
+        <button className="ok" disabled={!!busy} onClick={() => void create()}>{busy === "create" ? t("misc.invitesCreating") : t("misc.invitesGenerateBtn")}</button>
       </div>
+      {error && <div className="form-err" role="alert">{error}</div>}
       <div className="inv-list">
         {links.length === 0 ? <div className="empty">{t("misc.invitesEmpty")}</div> : links.map((l) => (
           <div className="inv-item" key={l.id}>
@@ -627,8 +680,8 @@ function InvitesSettings({ api, serverId }: { api: any; serverId: string }) {
               <span className="inv-uses">{l.maxUses != null ? t("misc.invitesUsesCapped", { used: l.useCount, max: l.maxUses }) : t("misc.invitesUses", { count: l.useCount })}</span>
             </div>
             <div className="inv-acts">
-              <button className="joinbtn" onClick={() => copy(l.token)}>{copied === l.token ? t("misc.invitesCopied") : t("misc.invitesCopyBtn")}</button>
-              <button className="joinbtn" style={{ color: "var(--error)" }} onClick={() => del(l.id)}>{t("misc.invitesDeleteBtn")}</button>
+              <button className="joinbtn" disabled={!!busy} onClick={() => void copy(l.token)}>{copied === l.token ? t("misc.invitesCopied") : t("misc.invitesCopyBtn")}</button>
+              <button className="joinbtn" disabled={!!busy} style={{ color: "var(--error)" }} onClick={() => void del(l.id)}>{busy === l.id ? t("misc.invitesDeleting") : t("misc.invitesDeleteBtn")}</button>
             </div>
           </div>
         ))}

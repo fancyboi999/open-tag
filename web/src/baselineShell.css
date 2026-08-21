@@ -2,6 +2,58 @@
    remains the production/default rollback surface. The 768px seam is locked by ticket #304. */
 .mobile-detail-back,.mobile-primary-nav{display:none}
 @media (min-width:768px){
+  .shell-baseline .settings-sidebar .settings-nav{gap:0}
+  .shell-baseline .settings-sidebar .settings-nav>.sec{margin-top:16px}
+  .shell-baseline .settings-sidebar .settings-nav>.sec:first-child{margin-top:0}
+  .shell-baseline .settings-content>.head{height:62px;min-height:62px;padding:0 20px;border-bottom:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline .settings-content>.head h1{font-family:var(--sans);font-size:16px;font-weight:800;letter-spacing:0}
+  .shell-baseline .settings-content>.scroll{padding:20px 24px 40px}
+  .shell-baseline .settings-content .setform{max-width:none}
+  .shell-baseline .settings-card,.shell-baseline .settings-content .toggle-row,.shell-baseline .settings-content .logout-row,.shell-baseline .settings-content .lang-row{border:2px solid rgba(0,0,0,.3);border-radius:0;background:#fff;padding:16px}
+  .shell-baseline .settings-content .logout-row,.shell-baseline .settings-content .lang-row{margin-top:14px}
+  .shell-baseline .settings-content input,.shell-baseline .settings-content textarea,.shell-baseline .settings-content select{border:2px solid rgba(0,0,0,.3);border-radius:0;background:#fff}
+  .shell-baseline .settings-content input:focus-visible,.shell-baseline .settings-content textarea:focus-visible,.shell-baseline .settings-content select:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:1px;border-color:var(--baseline-line)}
+  .shell-baseline .settings-content .ok,.shell-baseline .settings-content .cancel,.shell-baseline .settings-content .logout-btn,.shell-baseline .settings-content .joinbtn{min-height:36px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;color:var(--baseline-line);box-shadow:2px 2px 0 #d4d0c8}
+  .shell-baseline .settings-content .ok{background:var(--baseline-pink);font-weight:800}
+  .shell-baseline .settings-content .seg-pill{border:2px solid var(--baseline-line);border-radius:0}
+  .shell-baseline .settings-content .seg-opt{min-height:36px;border-radius:0}
+  .shell-baseline .settings-content .seg-opt.on{background:var(--baseline-yellow);color:var(--baseline-line)}
+}
+@media (max-width:767px){
+  html[data-page-id="settings"] .shell-baseline>.settings-sidebar{display:flex;position:static;grid-row:1;width:auto;max-width:none;border:0;background:#fff;transform:none}
+  html[data-page-id="settings"] .shell-baseline>.settings-sidebar .sb-scroll{padding:0 12px 24px}
+  html[data-page-id="settings"] .shell-baseline>.settings-sidebar .sb-title{height:62px;margin:0 -12px 10px;padding:0 16px;border-bottom:2px solid var(--baseline-line);background:var(--baseline-yellow);font-family:var(--sans);font-size:18px;font-weight:800}
+  html[data-page-id="settings"] .shell-baseline>.settings-sidebar .sec{margin:14px 4px 5px;color:var(--baseline-line)}
+  html[data-page-id="settings"] .shell-baseline>.settings-sidebar .item{min-height:48px;padding:8px 10px;border:2px solid transparent;border-radius:0;background:#fff;color:var(--baseline-line);font-size:15px}
+  html[data-page-id="settings"] .shell-baseline>.settings-sidebar .item:active{border-color:var(--baseline-line);background:var(--baseline-pink)}
+  html[data-page-id="settings"] .shell-baseline>.settings-content{display:none}
+  html[data-page-id="computers-settings"] .shell-baseline>.sidebar{display:flex;position:static;grid-row:1;width:auto;max-width:none;border:0;background:#fff;transform:none}
+  html[data-page-id="computers-settings"] .shell-baseline>.sidebar .sb-scroll{padding:0 12px 24px}
+  html[data-page-id="computers-settings"] .shell-baseline>.sidebar .sb-title{height:62px;margin:0 -12px 10px;padding:0 16px 0 64px;border-bottom:2px solid var(--baseline-line);background:#fff;font-family:var(--sans);font-size:18px;font-weight:800}
+  html[data-page-id="computers-settings"] .shell-baseline>.sidebar .item{min-height:52px;padding:8px 10px;border:2px solid rgba(0,0,0,.3);border-radius:0;background:#fff;color:var(--baseline-line);font-size:15px}
+  html[data-page-id="computers-settings"] .shell-baseline>.sidebar .item+.item{margin-top:8px}
+  html[data-page-id="computers-settings"] .shell-baseline>.content-col{display:none}
+  .shell-baseline .settings-content>.head{height:62px;min-height:62px;padding:0 12px 0 64px;border-bottom:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline .settings-content>.head h1{font-family:var(--sans);font-size:16px;font-weight:800;letter-spacing:0}
+  .shell-baseline .settings-content>.scroll{padding:14px 12px 32px;overflow-x:hidden}
+  .shell-baseline .settings-content .settings-card,.shell-baseline .settings-content .toggle-row,.shell-baseline .settings-content .logout-row,.shell-baseline .settings-content .lang-row{padding:14px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;box-shadow:3px 3px 0 #d4d0c8}
+  .shell-baseline .settings-content .logout-row,.shell-baseline .settings-content .lang-row{margin-top:14px;align-items:flex-start;flex-direction:column}
+  .shell-baseline .settings-content input,.shell-baseline .settings-content textarea,.shell-baseline .settings-content select{min-height:44px;border:2px solid var(--baseline-line);border-radius:0;background:#fff}
+  .shell-baseline .settings-content .setrow{flex-wrap:wrap}
+  .shell-baseline .settings-content .ok,.shell-baseline .settings-content .cancel,.shell-baseline .settings-content .logout-btn,.shell-baseline .settings-content .joinbtn{min-height:44px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;color:var(--baseline-line);box-shadow:2px 2px 0 #d4d0c8}
+  .shell-baseline .settings-content .ok{background:var(--baseline-pink);font-weight:800}
+  .shell-baseline .settings-content .seg-pill{width:100%;border:2px solid var(--baseline-line);border-radius:0}
+  .shell-baseline .settings-content .seg-opt{flex:1;min-height:44px;border-radius:0}
+  .shell-baseline .settings-content .seg-opt.on{background:var(--baseline-yellow);color:var(--baseline-line)}
+  .shell-baseline .settings-content .switch{min-width:52px;min-height:44px}
+  .shell-baseline .settings-content .inv-new{align-items:stretch;flex-direction:column}
+  .shell-baseline .settings-content .inv-new input,.shell-baseline .settings-content .inv-new select{width:100%}
+  .shell-baseline .settings-content .inv-item{align-items:stretch;flex-direction:column;border:2px solid var(--baseline-line);border-radius:0;box-shadow:3px 3px 0 #d4d0c8}
+  .shell-baseline .settings-content .inv-meta{align-items:flex-start;flex-direction:column}
+  .shell-baseline .settings-content .inv-acts{width:100%}
+  .shell-baseline .settings-content .inv-acts button{flex:1}
+}
+@media (min-width:768px){
   .shell-baseline{
     --baseline-yellow:#ffd440;
     --baseline-paper:#fffaf0;

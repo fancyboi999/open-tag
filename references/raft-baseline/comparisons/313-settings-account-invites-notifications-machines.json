@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "ticket": 313,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "scope": "Settings root, Account, Language & Region, Appearance, Notifications, Workspace Profile, Invites, machine list and machine detail across desktop and both locked mobile viewports",
+  "locale": "zh",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "horizontalOverflowCssPx": 0,
+      "geometry": {
+        "globalRail": [0, 0, 64, 900],
+        "settingsSidebar": [64, 0, 240, 900],
+        "settingsContent": [304, 0, 1136, 900],
+        "detailHeaderHeight": 62
+      }
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "horizontalOverflowCssPx": 0,
+      "geometry": {
+        "settingsMenu": [0, 0, 390, 791],
+        "settingsMenuItemMinimumHeight": 48,
+        "primaryNav": [0, 791, 390, 53],
+        "detailBack": [12, 8, 44, 44]
+      }
+    },
+    {
+      "width": 375,
+      "height": 812,
+      "horizontalOverflowCssPx": 0,
+      "geometry": {
+        "detailBack": [12, 8, 44, 44],
+        "detailControlMinimumHeight": 44
+      }
+    }
+  ],
+  "interactionEvidence": {
+    "settingsHierarchy": "the mobile root renders the personal/workspace menu and primary navigation; every setting detail hides primary navigation, exposes a 44x44 Back target, and returns to Settings",
+    "machineHierarchy": "Settings opens /computer?from=settings as a detail-level machine list; machine details return to that list, then a second deterministic Back returns to Settings; neither level paints the primary bottom navigation",
+    "notificationReliability": "a browser-only forced 503 produced a retryable alert and retry restored the real switch; a forced 403 on save rolled the draft back to false and rendered no Saved confirmation",
+    "machineDialog": "the real Connect Computer wizard exposed a named aria-modal dialog, accepted Escape, restored focus to the exact + trigger, and removed the temporary offline machine created during the cancelled flow",
+    "responsiveMatrix": "Account, Language & Region, Appearance, Notifications, Workspace Profile, and Invites measured zero horizontal overflow at both 390x844 and 375x812",
+    "localPreferences": "language and appearance are device-local settings and never claim a server mutation; Account, Notifications, Workspace Profile, Invites and Machines keep their real APIs"
+  },
+  "permissionEvidence": {
+    "workspace": "editing and avatar upload require manageServer; members receive disabled fields and explicit read-only copy, while the API independently enforces the capability",
+    "invites": "manageMembers gates the complete surface and the join-link endpoints remain authoritative for list/create/delete",
+    "machines": "manageMachines gates add, reconnect, update guidance and delete; machine identity, runtime, status, Agent binding and daemon contracts are not changed",
+    "failures": "all settings writes inspect error envelopes before success state; Account and Workspace retain the editable draft for retry, Notifications roll back, and Invite mutations retain the current list"
+  },
+  "contractRegression": {
+    "unit": { "passed": 341, "failed": 0 },
+    "ticketUnit": { "passed": 8, "failed": 0 },
+    "integrationScripts": ["machineRename"],
+    "integrationResult": "pass",
+    "typecheck": "pass",
+    "previewBuild": "2558 modules transformed",
+    "referenceCheck": "29 pages, 3 required viewports, 11 representative states"
+  },
+  "artifacts": {
+    "reference": [
+      { "name": "313-reference-settings-mobile390.png", "sha256": "a6175e1e1e300182a236cbcd71a415d93eac7082491a99c6860287b23c8abc76", "committed": false },
+      { "name": "313-reference-account-desktop.png", "sha256": "c4a569043c42dba19f4e98aae238a103368e853b07d17a6dd6d717031dc071d9", "committed": false },
+      { "name": "313-reference-account-mobile390.png", "sha256": "836d2a05e0faf300893c613a6273490f153a5350f01c244813e699afd277d278", "committed": false },
+      { "name": "313-reference-notifications-desktop.png", "sha256": "0625723f85733f0361fe8dd1c83d5772a9c3de60136298006a7a1d44d7d54dbd", "committed": false },
+      { "name": "313-reference-machines-mobile390.png", "sha256": "9be3290d797e0aec115b0974a4a918f400b5d296a28b88df882b0401f732e7f7", "committed": false },
+      { "name": "313-reference-machine-detail-mobile390.png", "sha256": "c03a25daf115f53bec4bceeb0f8fe5ed2eb5600f4444fcad83ad64f14cf5afa4", "committed": false }
+    ],
+    "local": [
+      { "name": "313-local-settings-mobile390.png", "sha256": "afefa2a4a2042e2c210df2c51fef3a11f61e967a662164b2c8fd998723408eeb", "committed": false },
+      { "name": "313-local-account-desktop.png", "sha256": "c5e9b5916cf0d817d481d159280ff1f6d5b1b52d21a73ea1ecd50371b68af5e4", "committed": false },
+      { "name": "313-local-account-mobile390.png", "sha256": "741a0cd0b72327ebc637b664703bf79c4ba92fc36117d98a19bb07f30efef3ab", "committed": false },
+      { "name": "313-local-notifications-desktop.png", "sha256": "4219b1afe47ba069c399dc369a3c41e61e7385c4fa676fe8af2bee590ea79230", "committed": false },
+      { "name": "313-local-machines-mobile390.png", "sha256": "5661c1bb14d9afda0f3ecbd5dfb4485f60382c18194f17aa35b226fd72b949f4", "committed": false },
+      { "name": "313-local-machine-detail-mobile390.png", "sha256": "523313fe1438f07cfa9f715feeeabe22becc3c6c21ad7cc5dfb4485f60382c1", "committed": false }
+    ]
+  },
+  "thresholdResults": {
+    "criticalEdgeMaximumCssPx": { "limit": 2, "actual": 0, "result": "pass" },
+    "horizontalOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" }
+  },
+  "intentionalDifferences": [
+    "OpenTag keeps its real Account fields and authentication model; it does not copy Raft-only connected-account, password-email, billing, marketplace, or hosted MCP operations.",
+    "OpenTag keeps invitation management in a focused page instead of copying Raft's broader Administration console, because only join-link operations exist in the current backend contract.",
+    "OpenTag preserves real machine keys, daemon versions, runtime discovery, Agent bindings and capability gates instead of copying private Raft machine data or commands.",
+    "Classic remains unchanged as the immediate rollback surface."
+  ]
+}

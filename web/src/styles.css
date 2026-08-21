@@ -549,6 +549,14 @@ aside.traj-col h2{position:relative;font-size:12px;font-weight:600;letter-spacin
 .qs-foot{display:flex;gap:8px;align-items:center;padding:9px 16px;border-top:1px solid var(--hair);font-size:11px;color:var(--muted)}
 .qs-foot kbd{font-family:var(--sans);background:var(--surface-strong);border:1px solid var(--hair-strong);border-radius:4px;padding:1px 5px;font-size:10px;color:var(--body)}
 .settings-nav{display:flex;flex-direction:column;gap:2px}
+.settings-nav>.sec{margin-top:14px}
+.settings-nav>.sec:first-child{margin-top:0}
+.settings-card{margin-bottom:14px;padding:16px;border:1px solid var(--hair);border-radius:10px;background:var(--canvas)}
+.settings-card h2{margin:0 0 5px;font-size:15px;color:var(--ink)}
+.setform>.form-err{margin-top:14px}
+.setform button:disabled,.inv-new select:disabled,.inv-new input:disabled{opacity:.5;cursor:default}
+.page-loading.compact{min-height:52px;margin:6px 8px}
+.page-load-error.compact{margin:6px 0;padding:8px;font-size:11px;flex-wrap:wrap}
 
 /* Task board toolbar: Board/List toggle + Creator/Assignee filter + New Task */
 .task-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}

@@ -140,8 +140,12 @@ export function describeAppPage(location: AppPageLocation): AppPageDescriptor {
   }
 
   if (section === "computer") {
+    const fromSettings = new URLSearchParams(location.search).get("from") === "settings";
+    if (fromSettings && !detail) {
+      return { id: "computers-settings", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: `${root}/settings` };
+    }
     return detail
-      ? { id: "computer-detail", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: `${root}/computer` }
+      ? { id: "computer-detail", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: `${root}/computer${fromSettings ? "?from=settings" : ""}` }
       : { id: "computers", kind: "workspace-root", workspaceSlug, currentHref, parentHref: null };
   }
 
