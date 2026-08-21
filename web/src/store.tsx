@@ -363,7 +363,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Machine online/offline → reload machine list (DB is source of truth for status/daemon version/runtimes/new rows).
       // Note: machine:status payload omits id (only forwards {online,hostname,runtimes}), so targeted row update is not possible → full reload is safest.
       sock.on("machine:status", async (p: any) => {
-        try { const mc = await api("GET", `/api/servers/${sidRef.current}/machines`); setMachines(mc.machines || []); setLatestDaemonVersion(mc.latestDaemonVersion || ""); } catch { /* keep stale value on error */ }
+        const sid = sidRef.current;
+        setMachinesState((state) => state === "ready" ? "refreshing" : "loading");
+        try { const mc = await api("GET", `/api/servers/${sid}/machines`); if (!Array.isArray(mc?.machines)) throw new Error(mc?.error || "invalid machines response"); if (sidRef.current !== sid) return; setMachines(mc.machines); setLatestDaemonVersion(mc.latestDaemonVersion || ""); setMachinesState("ready"); } catch { if (sidRef.current === sid) setMachinesState("error"); }
         dispatch({ type: "machine", ...p });
       });
       sock.on("task:created", (p: any) => (p.tasks || []).forEach((t: any) => dispatch({ type: "task", op: "created", task: t }))); // payload={channelId,tasks:[]}

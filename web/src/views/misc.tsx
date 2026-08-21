@@ -642,7 +642,7 @@ function InvitesSettings({ api, serverId }: { api: any; serverId: string }) {
   const [error, setError] = useState("");
   const request = useRef(0);
   const load = async () => { const id = ++request.current; setState("loading"); setError(""); try { const r = await api("GET", `/api/servers/${serverId}/join-links`); if (!Array.isArray(r)) throw new Error(r?.error || "invalid invite response"); if (id !== request.current) return; setLinks(r); setState("ready"); } catch (e: any) { if (id === request.current) { setError(String(e?.message || e)); setState("error"); } } };
-  useEffect(() => { void load(); return () => { request.current += 1; }; }, [serverId]);
+  useEffect(() => { if (capabilities.manageMembers) void load(); return () => { request.current += 1; }; }, [serverId, capabilities.manageMembers]);
   if (!capabilities.manageMembers) return <div className="empty">{t("misc.invitesAdminOnly")}</div>;
   if (state === "loading") return <div className="page-loading" role="status" aria-label={t("misc.invitesLoading")}><span /><span /><span /></div>;
   if (state === "error") return <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{error || t("misc.invitesLoadFailed")}</span><button onClick={() => void load()}>{t("misc.retry")}</button></div>;

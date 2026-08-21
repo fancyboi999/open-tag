@@ -30,11 +30,13 @@ test("notification rejection rolls the optimistic draft back", () => {
 test("workspace and invite editing follow server capabilities", () => {
   assert.match(misc, /const canEdit = !!capabilities\.manageServer/);
   assert.match(misc, /if \(!capabilities\.manageMembers\) return/);
+  assert.match(misc, /if \(capabilities\.manageMembers\) void load\(\)/);
 });
 
 test("machine loading distinguishes loading, error, empty, and ready", () => {
   assert.match(store, /machinesState: "loading" \| "refreshing" \| "ready" \| "error"/);
   assert.match(store, /if \(!Array\.isArray\(mc\?\.machines\)\) throw/);
+  assert.match(store, /sock\.on\("machine:status"[\s\S]*?setMachinesState\("ready"\)[\s\S]*?setMachinesState\("error"\)/);
   assert.match(misc, /machinesState === "error"/);
   assert.match(misc, /computersSelectMachine/);
   assert.match(misc, /budgetState === "error"/);
