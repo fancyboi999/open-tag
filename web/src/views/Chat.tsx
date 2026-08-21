@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, Fragment, type CSSProperties, type ReactNode } from "react";
-import { useParams, useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
+import { useLocation, useParams, useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import { useStore, type Msg, type Att } from "../store.tsx";
@@ -168,7 +168,7 @@ function ActionCardMsg({ m }: { m: Msg }) {
   );
 }
 
-export function Chat() {
+export function Chat({ canonicalizeMissingChannel = true }: { canonicalizeMissingChannel?: boolean } = {}) {
   const { t } = useTranslation();
   const { api, channels, dms, unread, agents, humans, slug, me, myRole, capabilities, reload, onEvent, subscribeChannel, openDM, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, savedIds, saveMsg, unsaveMsg, agentPanelReq, clearAgentPanelReq } = useStore();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
@@ -182,6 +182,7 @@ export function Chat() {
   const manageServer = myRole === "owner" || myRole === "admin"; // server admins get the full task-status dropdown (matches TaskBoard permission model)
   const { channelId } = useParams();
   const nav = useNavigate();
+  const routeLocation = useLocation();
   const [profile, setProfile] = useState<{ type: "agent" | "human"; id: string } | null>(null); // right-column profile overlay: clicking an avatar / name / @mention (agent, human, or yourself) opens it ON TOP of the thread/trajectory ("click X → show X"); closing it reveals the layer underneath
   const [taskMenu, setTaskMenu] = useState<string | null>(null); // task badge status menu: id of the currently open message (clicking the badge changes status, does not open thread)
   const [hoverAgent, setHoverAgent] = useState<{ id: string; x: number; y: number } | null>(null); // hovering over an agent shows a quick-info hover card
@@ -217,7 +218,8 @@ export function Chat() {
   const isDm = !!dms.find((d) => d.id === cur?.id);
   const dmPeer = dms.find((d) => d.id === cur?.id);
   const dmAgent = dmPeer?.peerType === "agent" ? agents.find((a) => a.id === dmPeer.peerId) : undefined; // DM peer agent → used for the live status indicator in the header
-  const [sp, setSp] = useSearchParams();
+  const [sp] = useSearchParams();
+  const replaceSearchParams = (next: URLSearchParams) => nav({ pathname: routeLocation.pathname, search: next.toString() ? `?${next}` : "", hash: routeLocation.hash }, { replace: true });
   const chatTab = sp.get("chatTab") || "chat"; // active tab: chat | tasks (| files in channels). DMs get chat + tasks (per-DM task board); files/members stay channel-only.
   const msgParam = sp.get("msg"); // when present, scroll to and highlight the specified message id
   const threadParam = sp.get("thread"); // auto-open a thread panel (from inbox, in-message thread link, or cross-page link); value is the parent message id (full or 8-char short) or channelId:shortid
@@ -244,7 +246,7 @@ export function Chat() {
   // control that opened the contextual column. Programmatic transitions may opt out of restoration.
   const closeProfile = (restoreFocus = true) => {
     setProfile(null);
-    setSp((prev) => { const n = new URLSearchParams(prev); n.delete("agentTab"); return n; }, { replace: true });
+    const next = new URLSearchParams(sp); next.delete("agentTab"); replaceSearchParams(next);
     if (restoreFocus) restoreContextTrigger();
   };
   const closeThread = () => { setThread(null); restoreContextTrigger(); };
@@ -263,7 +265,7 @@ export function Chat() {
     setHasMore(false);
   }
 
-  useEffect(() => { if (!channelId && cur) nav(`/s/${slug}/channel/${cur.id}`, { replace: true }); }, [channelId, cur, slug, nav]);
+  useEffect(() => { if (canonicalizeMissingChannel && !channelId && cur) nav(`/s/${slug}/channel/${cur.id}`, { replace: true }); }, [canonicalizeMissingChannel, channelId, cur, slug, nav]);
   const loadCurrentMessages = async () => {
     if (!cur) return;
     const chId = cur.id;
@@ -315,7 +317,7 @@ export function Chat() {
   useEffect(() => {
     if (!agentPanelReq) return;
     setProfile({ type: "agent", id: agentPanelReq });
-    setSp((prev) => { const n = new URLSearchParams(prev); n.set("agentTab", "activity"); return n; }, { replace: true });
+    const next = new URLSearchParams(sp); next.set("agentTab", "activity"); replaceSearchParams(next);
     clearAgentPanelReq();
     // eslint-disable-next-line
   }, [agentPanelReq]);
@@ -389,7 +391,7 @@ export function Chat() {
     // eslint-disable-next-line
   }, [threadParam, msgs, hasMore]);
 
-  const setTab = (t: string) => { const n = new URLSearchParams(sp); if (t === "chat") n.delete("chatTab"); else n.set("chatTab", t); setSp(n, { replace: true }); };
+  const setTab = (t: string) => { const n = new URLSearchParams(sp); if (t === "chat") n.delete("chatTab"); else n.set("chatTab", t); replaceSearchParams(n); };
   const doDM = async (agentId: string) => { const id = await openDM("agent", agentId); if (id) nav(`/s/${slug}/channel/${id}`); }; // used by AgentProfile onMessage callback
   const doDMHuman = async (uid: string) => { const id = await openDM("user", uid); if (id) nav(`/s/${slug}/channel/${id}`); }; // used by HumanProfile onMessage callback
   // Opening a thread is an explicit "show me this thread" action → it becomes the right-column base layer and clears any profile overlay on top of it (otherwise the just-opened thread would stay hidden behind a stale profile).

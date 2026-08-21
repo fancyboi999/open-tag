@@ -63,6 +63,8 @@ floor, record a new three-sample calibration in a separate commit before changin
   touch items at `y=793` with widths `98/98/98/96px`.
 - Mobile detail pages have no primary bottom navigation. Channel, human profile, and account detail
   remained `390px` wide with no horizontal overflow.
+- Mobile detail Back uses a `44px` touch target at `x=12,y=8` around a visible `28px` square at
+  `x=20,y=16`; the top detail divider is the `2px` line at `y=60..61`.
 - Mobile channel detail uses a top back control and reserves the lower viewport for status notice
   and Composer instead of showing the primary navigation.
 - Reference typography resolved to `Raft Quote Glyphs`, `Space Grotesk`, `system-ui`, sans-serif.

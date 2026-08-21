@@ -42,6 +42,12 @@ not permission to copy third-party source or assets.
   capability state; Home/Tasks/Members/Settings use four safe-area-aware `51px` touch items above a
   `2px` divider. Real-browser `390×844`, `375×812`, `767px`, `768px`, keyboard, touch, menu Escape,
   internal-scroll, detail-hidden-nav, overflow, and Classic rollback checks pass.
+- 2026-08-21: centralized mobile detail return across channel/DM, thread/tab, Search/Activity,
+  member profiles, Tasks, Settings, and computer detail. A pushed declared parent uses native back;
+  a replace-driven query subdetail replaces itself with its parent; a refresh/deep link uses the
+  deterministic parent URL. Real-browser Home scroll restoration, forward, Members/profile,
+  Account, missing-machine route, unknown-workspace query/hash preservation, `390×844`, `375×812`,
+  and URL-stable `767px↔768px` journeys pass.
 
 ## Decision log
 
@@ -63,3 +69,7 @@ not permission to copy third-party source or assets.
   structural edges are pixel-identical; raw full-page statistics remain a visible, non-passing
   diagnostic because OpenTag uses licensed glyphs and the real local store rather than copied Raft
   workspace data. The comparison records those license, accessibility, and product exceptions.
+- Ticket #308 consumes the centralized page/parent seam; it does not infer parents from URL strings
+  or blindly call history back. The three return modes are selected from the declared parent, prior
+  route, and history index. Full message/thread/composer and Settings content parity remains assigned
+  to #309 and #313; #308 compares the unmasked Back/header structure and records those module gaps.

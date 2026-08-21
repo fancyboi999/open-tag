@@ -4,10 +4,10 @@ import { IconSearch, IconChat, IconTasks, IconUsers, IconMonitor, IconSettings, 
 import { useStore } from "./store.tsx";
 import { ServerSwitcher } from "./ServerSwitcher.tsx";
 import { QuickSwitcher } from "./QuickSwitcher.tsx";
-import { Menu, AlertTriangle, House } from "lucide-react";
+import { Menu, AlertTriangle, ArrowLeft, House } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSystemAlerts, NotificationCenter } from "./alerts.tsx";
-import type { AppPageDescriptor, ShellMode } from "./shellRouting.ts";
+import { resolveParentBackMode, type AppPageDescriptor, type ShellMode } from "./shellRouting.ts";
 
 const SECTIONS = [
   { key: "search", Icon: IconSearch, labelKey: "nav.search" },
@@ -27,7 +27,7 @@ const MOBILE_PRIMARY = [
 
 export interface LayoutOutletContext { setChatPanelOpen: Dispatch<SetStateAction<boolean>> }
 
-export function Layout({ shellMode, page }: { shellMode: ShellMode; page: AppPageDescriptor }) {
+export function Layout({ shellMode, page, previousHref, previousNavigationWasPush }: { shellMode: ShellMode; page: AppPageDescriptor; previousHref: string | null; previousNavigationWasPush: boolean }) {
   const loc = useLocation();
   const { server } = useParams();
   const nav = useNavigate();
@@ -45,6 +45,8 @@ export function Layout({ shellMode, page }: { shellMode: ShellMode; page: AppPag
   const go = (key: string) => nav(`/s/${slug}/${key}`);
   const active = (key: string) => loc.pathname.includes("/" + key);
   const totalUnread = Object.values(unread).reduce((a, b) => a + b, 0);
+  const parentBackMode = resolveParentBackMode(previousHref, page.parentHref, previousNavigationWasPush);
+  const goToParent = () => { if (!page.parentHref) return; if (parentBackMode === "history") nav(-1); else nav(page.parentHref, { replace: parentBackMode === "replace-parent" }); };
   // Panel drag-to-resize: dragging the divider updates CSS variables (--sb-w sidebar / --traj-w right panel); persisted in localStorage.
   useEffect(() => { for (const v of ["--sb-w", "--traj-w"]) { const s = localStorage.getItem("open-tag" + v); if (s) document.documentElement.style.setProperty(v, s); } }, []);
   useEffect(() => { document.body.classList.remove("sb-open"); }, [loc.pathname]); // mobile: auto-close drawer on route change (channel select / view switch)
@@ -67,6 +69,7 @@ export function Layout({ shellMode, page }: { shellMode: ShellMode; page: AppPag
       data-parent-href={page.parentHref ?? undefined}
     >
       <button className="mobile-burger" aria-label={t("common.menuToggle")} onClick={() => document.body.classList.toggle("sb-open")}><Menu size={18} /></button>
+      {shellMode === "baseline" && page.kind === "workspace-detail" && page.parentHref && <button type="button" className="mobile-detail-back" aria-label={t("common.back")} data-back-mode={parentBackMode} onClick={goToParent} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); goToParent(); } }}><span><ArrowLeft size={17} /></span></button>}
       <div className="mobile-scrim" onClick={() => document.body.classList.remove("sb-open")} />
       {showQS && <QuickSwitcher onClose={() => setShowQS(false)} />}
       <div className="rail">

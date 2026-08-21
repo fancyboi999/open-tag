@@ -15,6 +15,26 @@ export interface AppPageDescriptor {
   parentHref: string | null;
 }
 
+export function canUseNativeParentBack(previousHref: string | null, parentHref: string | null): boolean {
+  if (!previousHref || !parentHref) return false;
+  const base = "https://open-tag.invalid";
+  return new URL(previousHref, base).pathname === new URL(parentHref, base).pathname;
+}
+
+export type ParentBackMode = "history" | "replace-parent" | "parent";
+
+export function resolveParentBackMode(previousHref: string | null, parentHref: string | null, previousNavigationWasPush: boolean): ParentBackMode {
+  if (!canUseNativeParentBack(previousHref, parentHref)) return "parent";
+  return previousNavigationWasPush ? "history" : "replace-parent";
+}
+
+function detailParentHref(basePath: string, search: string, hash: string, removeKeys: string[]): string {
+  const params = new URLSearchParams(search);
+  for (const key of removeKeys) params.delete(key);
+  const query = params.toString();
+  return `${basePath}${query ? `?${query}` : ""}${hash}`;
+}
+
 export interface ShellSelectionInput {
   buildMode: string;
   previewFlag: string | undefined;
@@ -74,9 +94,17 @@ export function describeAppPage(location: AppPageLocation): AppPageDescriptor {
   }
 
   if (section === "channel") {
-    return detail
-      ? { id: "channel", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: root }
-      : { id: "channel", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: root };
+    if (!detail) return { id: "channel", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: root };
+    const channelHref = `${root}/channel/${detail}`;
+    const params = new URLSearchParams(location.search);
+    if (params.has("thread")) {
+      return { id: "thread", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: detailParentHref(channelHref, location.search, location.hash, ["thread", "agentTab"]) };
+    }
+    const tab = params.get("chatTab");
+    if (tab === "tasks" || tab === "files") {
+      return { id: `channel-${tab}`, kind: "workspace-detail", workspaceSlug, currentHref, parentHref: detailParentHref(channelHref, location.search, location.hash, ["chatTab"]) };
+    }
+    return { id: "channel", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: root };
   }
 
   if (section === "agent") {

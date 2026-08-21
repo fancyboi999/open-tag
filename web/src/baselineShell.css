@@ -1,5 +1,6 @@
 /* Preview-only Raft measurement baseline. Every selector is gated by .shell-baseline so Classic
    remains the production/default rollback surface. The 768px seam is locked by ticket #304. */
+.mobile-detail-back{display:none}
 @media (min-width:768px){
   .shell-baseline{
     --baseline-yellow:#ffd440;
@@ -163,7 +164,38 @@
   }
   .shell-baseline.is-workspace-root{grid-template-rows:minmax(0,1fr) calc(53px + env(safe-area-inset-bottom,0px))}
   .shell-baseline>.rail{display:none}
+  .shell-baseline .sidebar{display:none}
   .shell-baseline.is-workspace-root>.mobile-burger{display:none}
+  .shell-baseline.is-workspace-detail>.mobile-burger{display:none}
+  .shell-baseline .mobile-detail-back{
+    appearance:none;
+    position:fixed;
+    top:calc(8px + env(safe-area-inset-top,0px));
+    left:12px;
+    z-index:66;
+    width:44px;
+    height:44px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+    border:0;
+    background:transparent;
+    color:var(--baseline-line);
+    cursor:pointer;
+  }
+  .shell-baseline .mobile-detail-back>span{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:2px solid var(--baseline-line);background:#fff;box-shadow:2px 2px 0 #d4d0c8}
+  .shell-baseline .mobile-detail-back:hover>span{background:#fff3ce}
+  .shell-baseline .mobile-detail-back:active>span{background:var(--baseline-pink)}
+  .shell-baseline .mobile-detail-back:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:-4px}
+  .shell-baseline.is-workspace-detail .head{height:62px;min-height:62px;padding:0 16px 0 60px;align-items:center;border-bottom:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline.is-workspace-detail .chat-head{height:92px;min-height:92px;padding:0 9px 32px 60px;border-bottom:2px solid var(--baseline-line)}
+  .shell-baseline.is-workspace-detail .chat-head::before{content:"";position:absolute;left:0;right:0;top:60px;height:2px;background:var(--baseline-line)}
+  .shell-baseline.is-workspace-detail .chat-head::after{display:none}
+  .shell-baseline.is-workspace-detail .chat-head>.chtabs{position:absolute;left:0;top:62px;height:28px;margin:0;gap:0;align-items:stretch}
+  .shell-baseline.is-workspace-detail .chtabs button{min-width:76px;padding:4px 14px;border:0;border-right:2px solid var(--baseline-line);border-radius:0;background:#fff;color:var(--baseline-line);font-size:13px}
+  .shell-baseline.is-workspace-detail .chtabs button.on{background:var(--baseline-yellow);font-weight:800}
+  .shell-baseline.is-workspace-detail .chtabs button:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:-4px}
   .shell-baseline .mobile-primary-nav{
     grid-row:2;
     display:flex;

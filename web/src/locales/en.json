@@ -617,6 +617,7 @@
     "createChannelFailed": "Failed to create channel"
   },
   "common": {
+    "back": "Back",
     "agents": "Agents",
     "humans": "Humans",
     "channels": "Channels",

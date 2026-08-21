@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Activity, ArrowUpDown, Bell, Bookmark, ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
@@ -8,6 +8,7 @@ import { useAppShell } from "../AppShell.tsx";
 import { useStore } from "../store.tsx";
 import { useToast } from "../toast.tsx";
 import { channelCreateErrorMsg, CreateChannelModal } from "./ChatSidebar.tsx";
+import { Chat } from "./Chat.tsx";
 
 export function WorkspaceHome() {
   const { mode } = useAppShell();
@@ -20,6 +21,8 @@ export function WorkspaceHome() {
   const [sortAscending, setSortAscending] = useState({ joinable: false, channels: false, dms: false });
   const [creatingChannel, setCreatingChannel] = useState(false);
   const createTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollKey = `open-tag.preview-scroll:${slug}:workspace-home`;
   const [mobile, setMobile] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
 
   useEffect(() => {
@@ -38,6 +41,15 @@ export function WorkspaceHome() {
       .catch(() => { if (current) setPinned([]); });
     return () => { current = false; };
   }, [serverId]);
+
+  useEffect(() => {
+    if (!mobile) return;
+    const frame = requestAnimationFrame(() => {
+      const saved = Number(sessionStorage.getItem(scrollKey) || 0);
+      if (scrollRef.current && Number.isFinite(saved)) scrollRef.current.scrollTop = saved;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [mobile, scrollKey]);
 
   const joined = useMemo(() => channels.filter((channel) => channel.joined && channel.type !== "showcase"), [channels]);
   const joinable = useMemo(() => channels.filter((channel) => !channel.joined && channel.type !== "showcase"), [channels]);
@@ -61,7 +73,7 @@ export function WorkspaceHome() {
     {allowCreate && capabilities.manageChannels && <button type="button" aria-label={t("workspaceHome.createChannel")} onClick={(event) => { createTriggerRef.current = event.currentTarget; setCreatingChannel(true); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); createTriggerRef.current = event.currentTarget; setCreatingChannel(true); } }}><Plus size={17} /></button>}
   </>;
 
-  if (mode === "classic" || !mobile) return <Navigate to={`/s/${slug}/channel`} replace />;
+  if (mode === "classic" || !mobile) return <Chat canonicalizeMissingChannel={false} />;
 
   const channelRow = (channel: (typeof channels)[number], pinnedRow = false) => (
     <button key={channel.id} type="button" className="mobile-home-row" onClick={() => nav(`/s/${slug}/channel/${channel.id}`)}>
@@ -79,7 +91,7 @@ export function WorkspaceHome() {
         <ServerSwitcher variant="mobile" />
         <button type="button" className="workspace-home-alert" aria-label={t("nav.inbox")} onClick={() => nav(`/s/${slug}/inbox`)}><Bell size={18} />{totalUnread > 0 && <span className="workspace-home-alert-dot" aria-hidden="true" />}</button>
       </header>
-      <div className="workspace-home-scroll">
+      <div ref={scrollRef} className="workspace-home-scroll" onScroll={(event) => sessionStorage.setItem(scrollKey, String(event.currentTarget.scrollTop))}>
         <nav className="workspace-home-shortcuts" aria-label={t("workspaceHome.shortcuts") }>
           <button type="button" className="mobile-home-row" onClick={() => nav(`/s/${slug}/search`)}><Search size={17} /><span className="mobile-home-row-label">{t("nav.search")}</span></button>
           <button type="button" className="mobile-home-row" onClick={() => nav(`/s/${slug}/inbox`)}><Activity size={17} /><span className="mobile-home-row-label">{t("workspaceHome.activity")}</span>{totalUnread > 0 && <span className="mobile-home-meta">{totalUnread}</span>}</button>

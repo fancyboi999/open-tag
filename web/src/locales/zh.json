@@ -617,6 +617,7 @@
     "createChannelFailed": "创建频道失败"
   },
   "common": {
+    "back": "返回",
     "agents": "Agents",
     "humans": "人类",
     "channels": "频道",

@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "ticket": 308,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "scope": "mobile detail classification, deterministic parent return, native history preservation, and viewport-stable URLs",
+  "viewports": [
+    {
+      "width": 390,
+      "height": 844,
+      "pageId": "channel",
+      "horizontalOverflowCssPx": 0,
+      "geometry": {
+        "channelHeader": [0, 0, 390, 92],
+        "topHeaderRow": [0, 0, 390, 62],
+        "channelTabs": [0, 62, 228, 28],
+        "backTouchTarget": [12, 8, 44, 44],
+        "backVisibleBox": [20, 16, 28, 28],
+        "primaryNavigationVisible": false
+      }
+    },
+    {
+      "width": 375,
+      "height": 812,
+      "pageId": "settings-account",
+      "horizontalOverflowCssPx": 0,
+      "geometry": {
+        "detailHeader": [0, 0, 375, 62],
+        "backTouchTarget": [12, 8, 44, 44],
+        "backVisibleBox": [20, 16, 28, 28],
+        "primaryNavigationVisible": false
+      }
+    }
+  ],
+  "routingEvidence": {
+    "classificationTestCases": 16,
+    "declaredDetails": [
+      "search",
+      "activity",
+      "saved",
+      "showcase",
+      "channel",
+      "thread",
+      "channel-tasks",
+      "channel-files",
+      "agent-profile",
+      "human-profile",
+      "computer-detail",
+      "settings-detail"
+    ],
+    "nativeHistory": "Home to channel and Members to human profile incremented history, used data-back-mode=history, returned with history -1, and remained available to browser forward",
+    "replaceParent": "channel chatTab changes retain their history index; return uses data-back-mode=replace-parent so it cannot jump over the channel",
+    "deepLinkParent": "hard-loaded channel, Account, and machine-detail URLs had no trusted previous parent and used data-back-mode=parent",
+    "queryHash": "channel Tasks preserved ui=baseline, msg=m1, and #latest while removing only chatTab on return",
+    "unknownWorkspace": "/s/not-a-member/settings/account?ui=baseline#security canonicalized to /s/open-tag/settings/account?ui=baseline#security",
+    "viewportChange": "resizing /s/open-tag from 390px to 768px swapped Home for desktop Chat and back without changing the URL"
+  },
+  "journeyEvidence": {
+    "homeChannelHome": "Home scrollTop 190 survived channel navigation and native return; channel detail hid primary navigation",
+    "nativeForward": "forward returned from Home to the same channel detail URL",
+    "membersProfileMembers": "Members to /human/:id used native history and returned with Members selected",
+    "settingsAccountSettings": "hard-loaded /settings/account returned deterministically to /settings with Settings selected",
+    "machineDetailComputers": "the isolated workspace had no real machines; /computer/missing-fixture still classified as computer-detail and returned to /computer without horizontal overflow",
+    "keyboard": "the 44px Back control accepted Enter and returned Account to Settings",
+    "hiddenLegacyDrawer": "the old off-canvas sidebar is display:none in Baseline mobile, so it casts no shadow and contributes no hidden focus targets"
+  },
+  "artifacts": {
+    "reference": [
+      {
+        "name": "channel-mobile-390x844.png",
+        "sha256": "6c0ace0d0997fac4c322206c679a586d667af16ce8f3da78c918930db903a182",
+        "committed": false
+      },
+      {
+        "name": "account-mobile-375x812.png",
+        "sha256": "8aa2a03d8977609c81f4905392449e5a2364a944da2c1c03908c5765b3dc7fa8",
+        "committed": false
+      }
+    ],
+    "local": [
+      {
+        "name": "channel-deeplink-390x844-final2.png",
+        "sha256": "a96bab6910ccb9521eeb8d44f6d0a9a5d889169593a2aac238bef2e1306dc598",
+        "committed": false
+      },
+      {
+        "name": "account-deeplink-375x812-final.png",
+        "sha256": "c1c2c9d887bc5d33ca1a71d9caec6decac4dcff644ac687b6c89a327be772991",
+        "committed": false
+      }
+    ]
+  },
+  "thresholdResults": {
+    "criticalEdgeMaximumCssPx": { "limit": 2, "actual": 0, "result": "pass" },
+    "horizontalOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" },
+    "detailHeaderCriticalRegion": {
+      "method": "luma SSIM on the unmasked 2px header divider and straight 2px visible Back-control border segments",
+      "minimumSsim": 0.998,
+      "actualSsim": 1,
+      "maximumChangedPixelRatio": 0.0025,
+      "actualChangedPixelRatio": 0,
+      "maximumLumaDelta": 0,
+      "result": "pass"
+    },
+    "fullPage": {
+      "result": "deferred",
+      "reason": "message/thread/composer content belongs to ticket #309 and Account/Settings content belongs to #313; #308 does not mask those still-unaligned module regions"
+    }
+  },
+  "intentionalDifferences": [
+    "OpenTag keeps its licensed Lucide ArrowLeft glyph; the visible control border and geometry, not the private reference glyph pixels, are compared.",
+    "The Back control exposes a 44px touch target around the reference-matched 28px visible box.",
+    "No machine was created merely for screenshot parity; the missing-fixture route verifies the routing contract without substituting demo store data."
+  ]
+}
