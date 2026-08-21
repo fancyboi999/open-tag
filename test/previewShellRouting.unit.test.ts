@@ -67,6 +67,20 @@ test("page metadata centrally classifies public, auth, workspace roots, and deta
     describeAppPage({ pathname: "/join/invite", search: "", hash: "" }).kind,
     "auth",
   );
+  assert.deepEqual(describeAppPage({ pathname: "/s/acme", search: "", hash: "" }), {
+    id: "workspace-home",
+    kind: "workspace-root",
+    workspaceSlug: "acme",
+    currentHref: "/s/acme",
+    parentHref: null,
+  });
+  assert.deepEqual(describeAppPage({ pathname: "/s/acme/channel", search: "", hash: "" }), {
+    id: "channel",
+    kind: "workspace-detail",
+    workspaceSlug: "acme",
+    currentHref: "/s/acme/channel",
+    parentHref: "/s/acme",
+  });
   assert.deepEqual(
     describeAppPage({ pathname: "/s/acme/tasks", search: "?view=list", hash: "#todo" }),
     {

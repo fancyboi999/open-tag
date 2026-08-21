@@ -59,7 +59,8 @@ floor, record a new three-sample calibration in a separate commit before changin
 - Desktop global rail: `64px`; chat section sidebar begins at `x=64` and ends at `x=304`.
 - Desktop global navigation buttons: `40x40`; focused server switcher uses a `3px` focus outline.
 - Desktop body is fixed to the viewport and clips page-level overflow; internal regions scroll.
-- Mobile primary navigation at `390x844`: `y=793`, height `51px`, widths `98/98/98/96px`.
+- Mobile primary navigation at `390x844`: a `2px` top divider at `y=791`, then four `51px`
+  touch items at `y=793` with widths `98/98/98/96px`.
 - Mobile detail pages have no primary bottom navigation. Channel, human profile, and account detail
   remained `390px` wide with no horizontal overflow.
 - Mobile channel detail uses a top back control and reserves the lower viewport for status notice

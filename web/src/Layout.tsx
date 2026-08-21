@@ -4,7 +4,7 @@ import { IconSearch, IconChat, IconTasks, IconUsers, IconMonitor, IconSettings, 
 import { useStore } from "./store.tsx";
 import { ServerSwitcher } from "./ServerSwitcher.tsx";
 import { QuickSwitcher } from "./QuickSwitcher.tsx";
-import { Menu, AlertTriangle } from "lucide-react";
+import { Menu, AlertTriangle, House } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSystemAlerts, NotificationCenter } from "./alerts.tsx";
 import type { AppPageDescriptor, ShellMode } from "./shellRouting.ts";
@@ -16,6 +16,13 @@ const SECTIONS = [
   { key: "tasks", Icon: IconTasks, labelKey: "nav.tasks" },
   { key: "agent", Icon: IconUsers, labelKey: "nav.members" },
   { key: "computer", Icon: IconMonitor, labelKey: "nav.computers" },
+];
+
+const MOBILE_PRIMARY = [
+  { key: "home", Icon: House, labelKey: "nav.home", href: "" },
+  { key: "tasks", Icon: IconTasks, labelKey: "nav.tasks", href: "tasks" },
+  { key: "members", Icon: IconUsers, labelKey: "nav.members", href: "agent" },
+  { key: "settings", Icon: IconSettings, labelKey: "nav.settings", href: "settings" },
 ];
 
 export interface LayoutOutletContext { setChatPanelOpen: Dispatch<SetStateAction<boolean>> }
@@ -53,7 +60,7 @@ export function Layout({ shellMode, page }: { shellMode: ShellMode; page: AppPag
   };
   return (
     <div
-      className={`app shell-${shellMode}` + (isChat ? " is-chat" : "") + (isChat && chatPanelOpen ? " has-panel" : "")}
+      className={`app shell-${shellMode}` + (isChat ? " is-chat" : "") + (page.kind === "workspace-root" ? " is-workspace-root" : " is-workspace-detail") + (isChat && chatPanelOpen ? " has-panel" : "")}
       data-shell={shellMode}
       data-page-id={page.id}
       data-page-kind={page.kind}
@@ -81,6 +88,13 @@ export function Layout({ shellMode, page }: { shellMode: ShellMode; page: AppPag
         )}
         <button type="button" className={"t im" + (active("settings") ? " active" : "")} aria-label={t("nav.settings")} aria-current={active("settings") ? "page" : undefined} onClick={() => go("settings")}><IconSettings size={19} className="im-rotate" /><span className="t-label" aria-hidden="true">{t("nav.settings")}</span></button>
       </div>
+      {shellMode === "baseline" && page.kind === "workspace-root" && <nav className="mobile-primary-nav" aria-label={t("nav.primary")}>
+        {MOBILE_PRIMARY.map(({ key, Icon, labelKey, href }) => {
+          const selected = key === "home" ? page.id === "workspace-home" : page.id === key;
+          const destination = `/s/${slug}${href ? `/${href}` : ""}`;
+          return <button key={key} type="button" className={selected ? "active" : ""} aria-current={selected ? "page" : undefined} onClick={() => nav(destination)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); nav(destination); } }}><Icon size={19} /><span>{t(labelKey)}</span></button>;
+        })}
+      </nav>}
       {alertAnchor && alerts.length > 0 && (
         <NotificationCenter alerts={alerts} anchor={alertAnchor}
           onClose={() => setAlertAnchor(null)}

@@ -1,12 +1,12 @@
 // Top-left brand button = workspace switcher. Click to list all joined workspaces, switch between them, or create a new one.
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Check } from "lucide-react";
+import { Plus, Check, ChevronDown } from "lucide-react";
 import { useStore } from "./store.tsx";
 import { useTranslation } from "react-i18next";
 import { useEscClose } from "./ConfirmModal.tsx";
 
-export function ServerSwitcher() {
+export function ServerSwitcher({ variant = "rail" }: { variant?: "rail" | "mobile" }) {
   const { t } = useTranslation();
   const nav = useNavigate();
   const { servers, slug, serverAvatar, createServer } = useStore();
@@ -17,15 +17,15 @@ export function ServerSwitcher() {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const cur = servers.find((s) => s.slug === slug);
   // Client-side navigation (no full-page reload): the URL change drives the workspace switch via the /s/:server route guard.
-  const go = (s: { slug: string }) => { setOpen(false); if (s.slug !== slug) nav(`/s/${s.slug}/channel`); };
-  const submit = async () => { if (!name.trim() || busy) return; setBusy(true); try { const newSlug = await createServer(name.trim()); if (newSlug) { close(); nav(`/s/${newSlug}/channel`); } } finally { setBusy(false); } };
+  const workspaceHref = (workspaceSlug: string) => variant === "mobile" ? `/s/${workspaceSlug}` : `/s/${workspaceSlug}/channel`;
+  const go = (s: { slug: string }) => { setOpen(false); if (s.slug !== slug) nav(workspaceHref(s.slug)); };
+  const submit = async () => { if (!name.trim() || busy) return; setBusy(true); try { const newSlug = await createServer(name.trim()); if (newSlug) { close(); nav(workspaceHref(newSlug)); } } finally { setBusy(false); } };
   const close = () => { setOpen(false); setCreating(false); setName(""); requestAnimationFrame(() => triggerRef.current?.focus()); };
   useEscClose(() => { if (open) close(); });
   return (
-    <div className="sw-wrap">
-      <button ref={triggerRef} className="brand" title={cur?.name || "open-tag"} aria-label={t("server.switchAriaLabel")} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        {serverAvatar ? <img className="brand-img" src={serverAvatar} alt="" /> : (cur?.name?.[0]?.toUpperCase() || "f")}
-        <span className="dot" />
+    <div className={`sw-wrap sw-${variant}`}>
+      <button ref={triggerRef} className={`brand${variant === "mobile" ? " mobile-brand" : ""}`} title={cur?.name || "open-tag"} aria-label={t("server.switchAriaLabel")} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        {variant === "mobile" ? <><span className="mobile-brand-name">{cur?.name || "open-tag"}</span><ChevronDown size={14} /></> : <>{serverAvatar ? <img className="brand-img" src={serverAvatar} alt="" /> : (cur?.name?.[0]?.toUpperCase() || "f")}<span className="dot" /></>}
       </button>
       {open && (<>
         <div className="sw-backdrop" onClick={close} />

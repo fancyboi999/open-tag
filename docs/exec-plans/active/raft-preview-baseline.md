@@ -37,6 +37,11 @@ not permission to copy third-party source or assets.
   global rail, `240px` section sidebar, main content at `x=304`, a separate channel tab row, fixed
   internal scrolling, and an on-demand `320px` thread/profile column. Real-browser keyboard, hover,
   selected, menu Escape, panel Escape/focus-return, overflow, and Classic rollback journeys pass.
+- 2026-08-21: added the Baseline mobile Workspace Home through the locked `767px` seam. It reads the
+  existing StoreProvider and sidebar-order API for workspace, channel, DM, unread, saved, and
+  capability state; Home/Tasks/Members/Settings use four safe-area-aware `51px` touch items above a
+  `2px` divider. Real-browser `390×844`, `375×812`, `767px`, `768px`, keyboard, touch, menu Escape,
+  internal-scroll, detail-hidden-nav, overflow, and Classic rollback checks pass.
 
 ## Decision log
 
@@ -53,3 +58,8 @@ not permission to copy third-party source or assets.
   settings contents; those dynamic regions remain assigned to tickets #309–#313. The committed #306
   evidence records zero-delta critical shell edges and the corresponding visible content gaps rather
   than masking downstream module layout.
+- Ticket #307 owns the mobile discovery root and four-item primary navigation, not mobile detail
+  return (ticket #308) or the final module contents (tickets #309–#313). The unmasked header/nav
+  structural edges are pixel-identical; raw full-page statistics remain a visible, non-passing
+  diagnostic because OpenTag uses licensed glyphs and the real local store rather than copied Raft
+  workspace data. The comparison records those license, accessibility, and product exceptions.

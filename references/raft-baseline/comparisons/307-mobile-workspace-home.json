@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "ticket": 307,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "scope": "mobile Workspace Home, four-item primary navigation, safe viewport ownership, and Classic rollback",
+  "locale": "zh",
+  "viewports": [
+    {
+      "width": 390,
+      "height": 844,
+      "mode": "mobile",
+      "horizontalOverflowCssPx": 0,
+      "geometry": {
+        "workspaceHeader": [0, 0, 390, 62],
+        "workspaceSwitcher": [16, 8, 94, 44],
+        "alertTouchTarget": [338, 8, 44, 44],
+        "primaryNavigationBorderBox": [0, 791, 390, 53],
+        "primaryNavigationItems": [
+          [0, 793, 98, 51],
+          [98, 793, 98, 51],
+          [196, 793, 98, 51],
+          [294, 793, 96, 51]
+        ],
+        "minimumInteractiveHeightCssPx": 44
+      }
+    },
+    {
+      "width": 375,
+      "height": 812,
+      "mode": "mobile",
+      "horizontalOverflowCssPx": 0,
+      "geometry": {
+        "workspaceHeader": [0, 0, 375, 62],
+        "primaryNavigationBorderBox": [0, 759, 375, 53],
+        "primaryNavigationItems": [
+          [0, 761, 94.25, 51],
+          [94.25, 761, 94.25, 51],
+          [188.5, 761, 94.25, 51],
+          [282.75, 761, 92.25, 51]
+        ]
+      }
+    },
+    {
+      "width": 767,
+      "height": 900,
+      "mode": "mobile",
+      "workspaceHomeVisible": true,
+      "primaryNavigationBorderBox": [0, 847, 767, 53],
+      "horizontalOverflowCssPx": 0
+    },
+    {
+      "width": 768,
+      "height": 900,
+      "mode": "desktop",
+      "workspaceHomeVisible": false,
+      "redirectedPageId": "channel",
+      "horizontalOverflowCssPx": 0
+    }
+  ],
+  "storeEvidence": {
+    "source": "the existing StoreProvider channels, DMs, unread, savedIds, capabilities, servers, agents, and sidebar-order API",
+    "demoData": false,
+    "permissionResult": "channel creation affordance is only exposed when capabilities.manageChannels is true",
+    "dynamicRows": ["joined channels", "joinable channels", "direct messages", "unread counters", "saved counter"]
+  },
+  "interactionEvidence": {
+    "touchNavigation": "clicking Settings navigated to /s/open-tag/settings and exposed aria-current=page on Settings",
+    "keyboardNavigation": "a trusted Enter key event on Tasks navigated to /s/open-tag/tasks and exposed aria-current=page on Tasks",
+    "sectionActions": "44px sort controls toggle aria-pressed from the keyboard; capability-gated Create channel opens the existing real form, and Escape closes it with focus restored to its trigger",
+    "workspaceMenuEscape": "Escape closed the menu and returned focus to Switch workspace",
+    "shortViewportScroll": {
+      "viewport": [390, 320],
+      "scrollContainerClientHeight": 205,
+      "scrollContainerScrollHeight": 436,
+      "scrollTopAfter": 180,
+      "bodyScrollYAfter": 0
+    },
+    "detailNavigation": "channel detail had no mobile primary navigation and no horizontal overflow",
+    "classicRollback": "opening /s/open-tag?ui=classic immediately returned to the existing Classic channel shell"
+  },
+  "artifacts": {
+    "reference": {
+      "name": "home-mobile-390x844.png",
+      "sha256": "d7669317b0eeae83b4fa7b4337521fe7bd8256f93713ad666a8f93746f0622aa",
+      "committed": false
+    },
+    "local": [
+      {
+        "name": "home-390x844-zh-final3.png",
+        "sha256": "ef2af27319745b43815eba50a6fc40f3999463e7ee4a4ffc8e607eda8927c13a",
+        "width": 390,
+        "height": 844,
+        "committed": false
+      },
+      {
+        "name": "home-375x812-zh-final2.png",
+        "sha256": "351038560bc9d05d208f6fb0e513e13861eff0564d7f8aeb0125bfd050af8268",
+        "width": 375,
+        "height": 812,
+        "committed": false
+      }
+    ]
+  },
+  "thresholdResults": {
+    "criticalEdgeMaximumCssPx": { "limit": 2, "actual": 0, "result": "pass" },
+    "horizontalOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" },
+    "mobileShellCriticalRegion": {
+      "method": "luma SSIM on the unmasked 2px header/nav dividers and three 2px primary-navigation separators",
+      "minimumSsim": 0.998,
+      "actualSsim": 1,
+      "maximumChangedPixelRatio": 0.0025,
+      "actualChangedPixelRatio": 0,
+      "maximumLumaDelta": 0,
+      "result": "pass"
+    },
+    "rawFullPage": {
+      "minimumSsim": 0.995,
+      "actualSsim": 0.771669909,
+      "maximumChangedPixelRatio": 0.005,
+      "actualChangedPixelRatio": 0.036523271,
+      "result": "explicit-exception",
+      "reason": "the raw image intentionally compares different real workspace fixtures and licensed font/icon glyphs; it is retained as a non-passing diagnostic and is not represented as parity"
+    }
+  },
+  "intentionalDifferences": [
+    {
+      "kind": "license",
+      "owner": "OpenTag",
+      "selectors": [".workspace-home", ".mobile-primary-nav"],
+      "reason": "OpenTag retains licensed Inter/system text and Lucide icons rather than copying the reference private font or glyph assets."
+    },
+    {
+      "kind": "accessibility",
+      "owner": "OpenTag",
+      "selectors": [".mobile-brand", ".workspace-home-alert", ".mobile-home-row", ".workspace-home-section-toggle"],
+      "reason": "Visible controls keep at least 44 CSS px of touch height, including the 44px workspace switcher where the reference visible box measured about 42px."
+    },
+    {
+      "kind": "product-decision",
+      "owner": "OpenTag",
+      "selectors": [".workspace-home-scroll"],
+      "reason": "Rows render the isolated local workspace's real channels, DMs, unread counts, saved state, and capabilities; reference workspace content is never copied into an OpenTag fixture."
+    }
+  ]
+}

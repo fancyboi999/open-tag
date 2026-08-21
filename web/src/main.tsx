@@ -13,6 +13,7 @@ import { Tasks, Computers, Search, Settings, Inbox, Saved } from "./views/misc.t
 import { AuthPage, JoinPage } from "./views/Auth.tsx";
 import { Landing } from "./views/Landing.tsx";
 import { Features } from "./views/Features.tsx";
+import { WorkspaceHome } from "./views/WorkspaceHome.tsx";
 import { homeRoute } from "./routing.ts";
 import { canonicalWorkspaceHref } from "./shellRouting.ts";
 import "./i18n";
@@ -75,7 +76,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/register" element={<AuthPage mode="register" />} />
           <Route path="/join/:token" element={<JoinPage />} />
           <Route path="/s/:server" element={<WorkspaceRoute />}>
-            <Route index element={<Navigate to="channel" replace />} />
+            <Route index element={<WorkspaceHome />} />
             <Route path="inbox" element={<Inbox />} />
             <Route path="saved" element={<Saved />} />
             <Route path="showcase" element={<Showcase />} />

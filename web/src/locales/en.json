@@ -1,5 +1,7 @@
 {
   "nav": {
+    "home": "Home",
+    "primary": "Primary navigation",
     "search": "Search",
     "inbox": "Inbox",
     "channel": "Chat",
@@ -8,6 +10,18 @@
     "computers": "Computers",
     "settings": "Settings",
     "alerts": "Alerts"
+  },
+  "workspaceHome": {
+    "title": "Workspace home",
+    "shortcuts": "Workspace shortcuts",
+    "activity": "Activity",
+    "pinned": "Pinned",
+    "pinnedSection": "Pinned",
+    "pinnedHint": "Drag channels here to pin them",
+    "joinableSection": "Joinable channels",
+    "sortSection": "Sort section alphabetically",
+    "createChannel": "Create channel",
+    "unreadCount": "{{count}} unread"
   },
   "alerts": {
     "title": "Notifications",

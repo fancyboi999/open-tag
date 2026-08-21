@@ -76,7 +76,7 @@ export function describeAppPage(location: AppPageLocation): AppPageDescriptor {
   if (section === "channel") {
     return detail
       ? { id: "channel", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: root }
-      : { id: "workspace-home", kind: "workspace-root", workspaceSlug, currentHref, parentHref: null };
+      : { id: "channel", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: root };
   }
 
   if (section === "agent") {

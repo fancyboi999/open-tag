@@ -1,5 +1,7 @@
 {
   "nav": {
+    "home": "主页",
+    "primary": "一级导航",
     "search": "搜索",
     "inbox": "收件箱",
     "channel": "对话",
@@ -8,6 +10,18 @@
     "computers": "电脑",
     "settings": "设置",
     "alerts": "警告"
+  },
+  "workspaceHome": {
+    "title": "工作区主页",
+    "shortcuts": "工作区快捷入口",
+    "activity": "动态",
+    "pinned": "已置顶",
+    "pinnedSection": "已置顶",
+    "pinnedHint": "将频道拖到这里置顶",
+    "joinableSection": "联合频道",
+    "sortSection": "按名称排序",
+    "createChannel": "创建频道",
+    "unreadCount": "{{count}} 条未读"
   },
   "alerts": {
     "title": "通知",
