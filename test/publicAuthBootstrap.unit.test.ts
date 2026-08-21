@@ -22,7 +22,8 @@ test("invite discovery distinguishes transport failure from a real invalid invit
 });
 
 test("auth and invite controls preserve native keyboard form behavior", () => {
-  assert.match(auth, /<form className="auth-form" onSubmit=/);
+  assert.match(auth, /<form className="auth-form" onSubmit=.*?aria-busy=\{busy\}/);
+  assert.match(auth, /disabled=\{busy\}>\{busy \? t\("auth\.submitting"\)/);
   assert.match(auth, /className="auth-link" type="button"/);
   assert.match(auth, /className="auth-brand" href="\/" aria-label="open-tag home"/);
   assert.match(baseline, /min-height:48px/);
@@ -30,7 +31,7 @@ test("auth and invite controls preserve native keyboard form behavior", () => {
 
 test("protected routes keep bootstrap ahead of the workspace shell", () => {
   assert.match(main, /if \(!ready \|\| \(known && server !== slug\)\) return <WorkspaceSkeleton/);
-  assert.match(main, /if \(authState !== "authed"\) return <Navigate to="\/login" replace/);
+  assert.match(main, /if \(authState !== "authed"\) return <Navigate to=\{loginHrefFor/);
 });
 
 test("bootstrap transport failures settle into a retryable state instead of an infinite skeleton", () => {
@@ -39,6 +40,7 @@ test("bootstrap transport failures settle into a retryable state instead of an i
   assert.match(store, /try \{ await reload\(\); \}\s*catch \{ if \(!cancelled\) \{ setBootstrapState\("error"\); setReady\(true\); \}/);
   assert.match(main, /bootstrapState === "error"[\s\S]*?<BootstrapFailure onRetry=\{retryBootstrap\}/);
   assert.match(skeleton, /className="bootstrap-failure" role="alert"[\s\S]*?onClick=\{onRetry\}/);
+  assert.match(store, /if \(!Array\.isArray\(ch\)\) throw new Error\(ch\?\.error \|\| "invalid channels response"\)/);
 });
 
 test("a transient identity failure preserves the stored session token", () => {
@@ -54,4 +56,19 @@ test("public Raft styling is resolved from the shell and fails closed during pre
   assert.match(landing, /useOptionalAppShell\(\)\?\.mode \?\? "classic"/);
   assert.match(landing, /shellMode === "baseline" \? " lp-baseline" : ""/);
   assert.match(features, /shellMode === "baseline" \? " lp-baseline" : ""/);
+});
+
+test("protected workspace deep-links survive authentication without allowing open redirects", async () => {
+  const { loginHrefFor, workspaceReturnTo } = await import("../web/src/routing.ts");
+  const target = "/s/acme/channel/abc?thread=reply-1#message";
+  const login = loginHrefFor(target);
+  assert.equal(login, `/login?returnTo=${encodeURIComponent(target)}`);
+  assert.equal(workspaceReturnTo(new URL(login, "https://open-tag.invalid").search), target);
+  assert.equal(workspaceReturnTo("?returnTo=https%3A%2F%2Fevil.example"), null);
+  assert.equal(workspaceReturnTo("?returnTo=%2F%2Fevil.example%2Fs%2Facme"), null);
+  assert.equal(workspaceReturnTo("?returnTo=%2Ffeatures"), null);
+  assert.match(main, /loginHrefFor\(`\$\{loc\.pathname\}\$\{loc\.search\}\$\{loc\.hash\}`\)/);
+  assert.match(auth, /workspaceReturnTo\(location\.search\) \?\? await workspaceHome/);
+  assert.match(auth, /href=\{`\/login\$\{location\.search\}`\}/);
+  assert.match(auth, /href=\{`\/register\$\{location\.search\}`\}/);
 });

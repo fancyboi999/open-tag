@@ -145,9 +145,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // workspace's data — guards rapid A→B→C switches (the sequential awaits below each read the shared sidRef).
     const sid = sidRef.current;
     const fresh = () => sidRef.current === sid;
-    const ch = await api("GET", "/api/channels"); if (fresh()) setChannels(ch);
-    try { const dm = await api("GET", "/api/channels/dm"); if (fresh()) setDms(dm); } catch { if (fresh()) setDms([]); }
-    try { const un = (await api("GET", "/api/channels/unread")) || {}; if (fresh()) setUnread(un); } catch { if (fresh()) setUnread({}); }
+    const ch = await api("GET", "/api/channels"); if (!Array.isArray(ch)) throw new Error(ch?.error || "invalid channels response"); if (fresh()) setChannels(ch);
+    try { const dm = await api("GET", "/api/channels/dm"); if (!Array.isArray(dm)) throw new Error(dm?.error || "invalid DM response"); if (fresh()) setDms(dm); } catch { if (fresh()) setDms([]); }
+    try { const un = (await api("GET", "/api/channels/unread")) || {}; if (!un || Array.isArray(un) || typeof un !== "object") throw new Error("invalid unread response"); if (fresh()) setUnread(un); } catch { if (fresh()) setUnread({}); }
     await reloadMembers();
     if (fresh()) await reloadMachines();
   };

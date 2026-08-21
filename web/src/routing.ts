@@ -6,6 +6,22 @@ export type AuthState = "loading" | "authed" | "anon";
 
 export const TOKEN_KEY = "open-tag.token"; // session JWT persisted after register/login/dev-login
 
+// Preserve a protected workspace deep-link through login without accepting an open redirect.
+// Only same-app /s/* paths are valid; protocol-relative and public/auth targets are rejected.
+export function workspaceReturnTo(search: string): string | null {
+  const raw = new URLSearchParams(search).get("returnTo");
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return null;
+  try {
+    const parsed = new URL(raw, "https://open-tag.invalid");
+    if (parsed.origin !== "https://open-tag.invalid" || !parsed.pathname.startsWith("/s/")) return null;
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch { return null; }
+}
+
+export function loginHrefFor(returnTo: string): string {
+  return `/login?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
 // Synchronous best-effort read of "does this visitor have (or is starting) a session?", from the
 // same storage key the store uses + the dev-login ?as= param. Used only to pick the FIRST-render
 // auth state; the async bootstrap in store.tsx is still the source of truth.

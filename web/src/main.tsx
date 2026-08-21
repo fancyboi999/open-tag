@@ -14,7 +14,7 @@ import { AuthPage, JoinPage } from "./views/Auth.tsx";
 import { Landing } from "./views/Landing.tsx";
 import { Features } from "./views/Features.tsx";
 import { WorkspaceHome } from "./views/WorkspaceHome.tsx";
-import { homeRoute } from "./routing.ts";
+import { homeRoute, loginHrefFor } from "./routing.ts";
 import { canonicalWorkspaceHref } from "./shellRouting.ts";
 import "./i18n";
 import "./styles.css";
@@ -58,7 +58,7 @@ function WorkspaceRoute() {
   useEffect(() => { if (ready && authState === "authed" && known && server !== slug) switchServer(server!); }, [ready, authState, known, server, slug, switchServer]);
   if (bootstrapState === "error") return <BootstrapFailure onRetry={retryBootstrap} />;
   if (!ready || (known && server !== slug)) return <WorkspaceSkeleton />; // bootstrap or a switch in flight → skeleton (do NOT bounce the URL while slug catches up)
-  if (authState !== "authed") return <Navigate to="/login" replace />; // hard auth gate
+  if (authState !== "authed") return <Navigate to={loginHrefFor(`${loc.pathname}${loc.search}${loc.hash}`)} replace />; // hard auth gate; preserve the protected deep-link through auth
   if (server !== slug) { // unknown / stale slug (not a member, typo) → canonicalize to the active workspace
     return <Navigate to={canonicalWorkspaceHref(loc, slug)} replace />;
   }

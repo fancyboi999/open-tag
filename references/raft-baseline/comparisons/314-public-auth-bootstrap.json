@@ -12,14 +12,16 @@
   ],
   "interactionEvidence": {
     "publicSurfaces": "anonymous Landing and Features opt into the Raft yellow/pink/black square-border visual only when the Preview shell resolves Baseline; the first hero card remains a real static OpenTag collaboration sample and both pages measured zero horizontal overflow",
-    "authForms": "login, register and anonymous join retain native form submission, required/email validation, localized stable backend errors, composition-safe Enter handling, explicit busy disabling, 48px primary controls and 44px mobile secondary targets",
-    "inviteStates": "a temporary real join-link fixture verified current-account and anonymous register flows and was deleted after capture; an unknown token rendered the real invalid/expired state; transport failure is now a distinct retryable state instead of being misreported as an invalid invitation",
+    "authForms": "login, register and anonymous join retain native form submission, required/email validation, localized stable backend errors, composition-safe Enter handling, aria-busy plus explicit busy disabling, 48px primary controls and 44px mobile secondary targets",
+    "authDeepLinks": "an anonymous protected channel+thread+hash deep-link redirected through the encoded same-app returnTo value and the browser-only login fixture returned to the exact original channel, query and hash; external and protocol-relative returnTo values are rejected by the pure routing contract",
+    "inviteStates": "temporary real active and expired join-link fixtures verified current-account, anonymous register and expired flows and were deleted after capture; an unknown token rendered invalid; a browser-only transport failure rendered localized retry UI and retry transitioned to the authoritative invalid-token response",
     "bootstrapLoading": "a delayed real /api/auth/me response rendered the workspace Skeleton at 1440x900, 390x844 and 375x812 without painting Landing or protected workspace content",
     "bootstrapRecovery": "a browser-only forced /api/auth/me transport rejection rendered an understandable retry alert, retained the stored token, and a retry after restoring fetch navigated to the original protected workspace route",
     "classicRollback": "?ui=classic resolved document shell=classic and Landing class=lp-root without lp-baseline; static prerender has no AppShellProvider and fails closed to Classic"
   },
   "contractRegression": {
-    "ticketAndRelatedUnit": { "passed": 37, "failed": 0 },
+    "fullPureUnit": { "passed": 349, "failed": 0 },
+    "ticketAndRelatedUnit": { "passed": 38, "failed": 0 },
     "typecheck": "pass",
     "previewBuild": "2558 modules transformed and Landing prerender injected",
     "referenceCheck": "30 pages, 3 required viewports, 11 representative states"
@@ -36,15 +38,18 @@
       { "name": "314-local-features-mobile375.png", "sha256": "33b5fd38dad4d1b18a59aaf45eee65f950f8b82f357c9f92a08b002a30446542", "committed": false },
       { "name": "314-local-login-desktop.png", "sha256": "049545a2f59d53bdd66f30cc1bbc9a4a6ae8b1e79c36960c0a29ed4297703e5d", "committed": false },
       { "name": "314-local-login-error-mobile390.png", "sha256": "439f4496ba1428bd4a752f2ed4a48d28e3c9f6666332c7c2d115e9b2d204d5f1", "committed": false },
+      { "name": "314-local-login-busy-mobile390.png", "sha256": "1226c272ec1050f035b430131714ae71064341b75783aba92dec4e82be7ec2de", "committed": false },
       { "name": "314-local-register-desktop.png", "sha256": "a26f0ce5d69103e2f6b176d3cc0f3604f8d5d168bae2553bbb15b8942ced18e4", "committed": false },
       { "name": "314-local-register-mobile375.png", "sha256": "9adeeb9182841fa55ed1df2be80fa9c071bc0b6e389cbe3c433fcdca0ea9839a", "committed": false },
       { "name": "314-local-join-register-desktop.png", "sha256": "b84839e5652cecd90904f1a3183b8df4b989a9094dade27e6ac315b968ffc012", "committed": false },
       { "name": "314-local-join-register-mobile375.png", "sha256": "1d984f52068e72a2e0f02a34be2dec6e8ff1390cf9707c4c143b83e6079f6cf9", "committed": false },
       { "name": "314-local-join-invalid-mobile390.png", "sha256": "34e364f900221dd7c46ccfef983b2633648ac20c169134a3b94c697c105b8727", "committed": false },
+      { "name": "314-local-join-expired-mobile390.png", "sha256": "34e364f900221dd7c46ccfef983b2633648ac20c169134a3b94c697c105b8727", "committed": false },
+      { "name": "314-local-join-transport-error-mobile390.png", "sha256": "92d2959eb08a43cf899bc052d1a6ca89639cae77128d378767849e869299cb92", "committed": false },
       { "name": "314-local-bootstrap-loading-desktop.png", "sha256": "705e380240c9f459bde4e3ea8888395a22694bc0fe4b1e4c685a36275c70c34d", "committed": false },
       { "name": "314-local-bootstrap-loading-mobile390.png", "sha256": "6720f0bc70fa0ead344b079c010f8b62269fd76550703493388cc89ac090fa60", "committed": false },
       { "name": "314-local-bootstrap-loading-mobile375.png", "sha256": "2e2bedeefffe93ad2c680539f2d3307d8eb033b3e9a076d6926cc87c6056bc71", "committed": false },
-      { "name": "314-local-bootstrap-error-mobile390.png", "sha256": "724c597a7a5a08eb8c23312e95bf2b12f3229eca3718c0c6c18bf990ebf73e54", "committed": false }
+      { "name": "314-local-bootstrap-error-mobile390.png", "sha256": "7b064af1220b1c15d93b4a92dc250c0cd77e136755d179742266f730223d43ac", "committed": false }
     ]
   },
   "thresholdResults": {
