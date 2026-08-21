@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "ticket": 309,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "scope": "channels, human and Agent direct messages, threads, message timeline, Composer recovery, and collaboration interaction contracts",
+  "locale": "zh",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "horizontalOverflowCssPx": 0,
+      "geometry": {
+        "globalRail": [0, 0, 64, 900],
+        "sectionSidebar": [64, 0, 240, 900],
+        "mainContentX": 304,
+        "threadPanelWidth": 320
+      }
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "horizontalOverflowCssPx": 0,
+      "geometry": {
+        "channelHeader": [0, 0, 390, 92],
+        "messageWidth": 366,
+        "messageBorderRadiusCssPx": 0,
+        "composer": [0, 728, 390, 116],
+        "composerBorderRadiusCssPx": 0,
+        "threadPanel": [0, 0, 390, 844],
+        "threadHeader": [0, 0, 390, 62],
+        "threadHeaderActions": "four 44x44 controls at y=8",
+        "primaryNavigationVisible": false
+      }
+    },
+    {
+      "width": 375,
+      "height": 812,
+      "horizontalOverflowCssPx": 0,
+      "state": "offline Agent DM",
+      "geometry": {
+        "channelHeader": [0, 0, 375, 92],
+        "backTouchTarget": [12, 8, 44, 44],
+        "primaryNavigationVisible": false
+      }
+    }
+  ],
+  "identityAndStateEvidence": {
+    "fixtures": "isolated local QA human, offline machine, and inactive/offline Agent; no Production or reference data mutated",
+    "newDmMenu": "the same keyboard menu listed QA Agent 309 with server-supplied offline status and QA Human 309 without an invented Agent status",
+    "agentDm": "header rendered inactive and Composer named the offline machine reachability state",
+    "humanDm": "header rendered the human identity without an Agent status indicator",
+    "truthfulness": "no fixture state was coerced to loading, online, working, or success"
+  },
+  "interactionEvidence": {
+    "messageMenu": "focus entered the first emoji action; ArrowDown moved to the next item; Escape closed and returned to the exact message trigger",
+    "dialogs": "Channel Members exposed role=dialog/aria-modal, wrapped Tab, closed on Escape, and returned focus to Members",
+    "thread": "desktop opened a 320px context column; mobile opened a 390x844 fullscreen panel, focused Close, retained the thread Composer, hid primary navigation, and returned focus on Escape",
+    "composerFailure": "a forced local 503 retained text and attachments, exposed role=alert, and focused Retry; restoring fetch and activating Retry persisted one message, cleared the draft, and returned focus to the textarea",
+    "dmMenu": "focus entered the Agent row, ArrowDown moved to the human row, and both selections created/navigated through the real DM API",
+    "classicRollback": "the same 390x844 channel rendered Classic 8px message/Composer radii and the legacy rail after ui=classic, then returned to Baseline 0px radii and deterministic Back after ui=baseline"
+  },
+  "contractRegression": {
+    "unit": { "passed": 307, "failed": 0 },
+    "serverMessageAndReplyCoordination": { "passed": 25, "failed": 0 },
+    "integrationScripts": [
+      "channelAccess",
+      "channelAccessB2",
+      "channelAccessB3",
+      "channelAccessB4",
+      "channelAccessB5",
+      "channelAccessB6",
+      "threadChannelGuards",
+      "threadTarget",
+      "threadTargetRoundtrip",
+      "threadUnread"
+    ],
+    "integrationResult": "all pass"
+  },
+  "artifacts": {
+    "reference": [
+      { "name": "channel-desktop-1440x900.png", "sha256": "492f3a6d358709305ae4a2adb7e6653b68d1fede96227d3181ae2effc5fcd679", "committed": false },
+      { "name": "channel-mobile-390x844.png", "sha256": "6c0ace0d0997fac4c322206c679a586d667af16ce8f3da78c918930db903a182", "committed": false }
+    ],
+    "local": [
+      { "name": "channel-1440x900.png", "sha256": "83f492c8095813f87bd27913d531f9132af697ffabf3cfe4cc4918589e7ef381", "committed": false },
+      { "name": "channel-390x844.png", "sha256": "3b2b47fd85fc38eb1740575028ddfce061d8ee577b32dfb7991ca6027a9a2d55", "committed": false },
+      { "name": "thread-390x844.png", "sha256": "d1617d9ca9350c8f542a9cb0c4a47fbf487fa09025cd27622abe3aa963bb7246", "committed": false },
+      { "name": "agent-dm-offline-1440x900.png", "sha256": "1a7393c8c8510740441e690aea1d6ec77f645523f1a4c48585a01e0957db81b2", "committed": false },
+      { "name": "agent-dm-offline-375x812.png", "sha256": "dcfcd8522b69d25bdc344801f02a9d61a4abdfeb4b8860ddfb1cd1c9eb7f829f", "committed": false },
+      { "name": "human-dm-1440x900.png", "sha256": "8b73fd18928e1789b12649cb65e07d0930ab51f149e7eb175112a9d4431a7039", "committed": false }
+    ]
+  },
+  "thresholdResults": {
+    "criticalEdgeMaximumCssPx": { "limit": 2, "actual": 0, "result": "pass" },
+    "horizontalOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" },
+    "criticalRegion": {
+      "method": "unmasked 2px mobile channel header and tab-bottom dividers at y=60..61 and y=90..91",
+      "referenceSha256": "e7a5be1c45c03bd9c2f02aa48e85ed6bb2fbe1c0e8f7e6851bf60f3c75595b68",
+      "localSha256": "e7a5be1c45c03bd9c2f02aa48e85ed6bb2fbe1c0e8f7e6851bf60f3c75595b68",
+      "minimumSsim": 0.998,
+      "actualSsim": 1,
+      "maximumChangedPixelRatio": 0.0025,
+      "actualChangedPixelRatio": 0,
+      "result": "pass"
+    },
+    "rawFullPageDiagnostic": {
+      "ssim": 0.549183,
+      "result": "not a parity claim",
+      "reason": "reference contains private workspace identities, message text, timestamps, thread density, notification state, and licensed glyphs that the capture contract forbids copying; these dynamic regions were not masked with invented non-matching rectangles"
+    }
+  },
+  "intentionalDifferences": [
+    "OpenTag keeps licensed Inter/system and Lucide/DiceBear assets instead of copying private Raft fonts, glyphs, avatars, or branding.",
+    "OpenTag uses truthful isolated local message, DM, Agent, machine, and Socket.IO state rather than reference private workspace content.",
+    "Notification notice content and geometry remain owned by ticket #313; #309 does not mask or claim that region."
+  ]
+}

@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Pin, Bookmark, Check, Eye } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../store.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
-import { useEscClose } from "../ConfirmModal.tsx";
+import { useDialogFocus } from "../ConfirmModal.tsx";
 import { LiveAgentBar } from "./LiveAgentBar.tsx";
 import { useToast } from "../toast.tsx";
 
@@ -18,7 +18,7 @@ export function channelCreateErrorMsg(t: (key: string) => string, error?: string
 // Both the Chat view and the Saved view (misc.tsx) render this component so the channel list stays visible when navigating to Saved.
 export function ChatSidebar() {
   const { t } = useTranslation();
-  const { api, serverId, channels, dms, unread, agents, visibleAgents, slug, savedIds, capabilities, createChannel, openDM, joinChannel, attachmentUrl } = useStore();
+  const { api, serverId, channels, dms, unread, agents, visibleAgents, humans, me, slug, savedIds, capabilities, createChannel, openDM, joinChannel, attachmentUrl } = useStore();
   const toast = useToast();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const { channelId } = useParams();
@@ -27,6 +27,8 @@ export function ChatSidebar() {
   const [pinned, setPinned] = useState<string[]>([]);
   const [mkChan, setMkChan] = useState(false);
   const [dmPick, setDmPick] = useState(false);
+  const dmTriggerRef = useRef<HTMLButtonElement>(null);
+  const dmMenuRef = useRef<HTMLDivElement>(null);
   const onSaved = pathname.endsWith("/saved");
   const onShowcase = pathname.endsWith("/showcase");
 
@@ -45,7 +47,24 @@ export function ChatSidebar() {
     if (r?.id) { setMkChan(false); nav(`/s/${slug}/channel/${r.id}`); }
     else toast.error(channelCreateErrorMsg(t, r?.error)); // keep the modal open so the user can fix the name and retry
   };
-  const doDM = async (agentId: string) => { const id = await openDM("agent", agentId); setDmPick(false); if (id) nav(`/s/${slug}/channel/${id}`); };
+  const dmHumans = humans.filter((h) => h.userId !== me?.id);
+  const doDM = async (memberType: "agent" | "user", memberId: string) => { const id = await openDM(memberType, memberId); setDmPick(false); if (id) nav(`/s/${slug}/channel/${id}`); };
+  useEffect(() => {
+    if (!dmPick) return;
+    requestAnimationFrame(() => dmMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus());
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setDmPick(false); requestAnimationFrame(() => dmTriggerRef.current?.focus()); return; }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      const items = [...(dmMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+      if (!items.length) return;
+      event.preventDefault();
+      const current = Math.max(0, items.indexOf(document.activeElement as HTMLElement));
+      const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : event.key === "ArrowDown" ? (current + 1) % items.length : (current - 1 + items.length) % items.length;
+      items[next]?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [dmPick]);
 
   const chanRow = (c: any) => (
     <div
@@ -87,8 +106,14 @@ export function ChatSidebar() {
           <div key={c.id} className="item ghost"><span className="grow"># {c.name}</span><button className="joinbtn" onClick={() => joinChannel(c.id)}>{t("sidebar.joinBtn")}</button></div>
         ))}
       </>}
-      <div className="sec">{t("common.directMessages")} <button className="addbtn" title={t("sidebar.newDmTitle")} onClick={() => { setDmPick((v) => !v); setMkChan(false); }}>+</button></div>
-      {dmPick && <div className="dm-pick">{visibleAgents.length ? visibleAgents.map((a) => <button key={a.id} className="item" onClick={() => doDM(a.id)}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span></button>) : <div className="empty">{t("sidebar.dmPickEmpty")}</div>}</div>}
+      <div className="sec">{t("common.directMessages")} <button ref={dmTriggerRef} className="addbtn" title={t("sidebar.newDmTitle")} aria-haspopup="menu" aria-expanded={dmPick} aria-controls="new-dm-menu" onClick={() => { setDmPick((v) => !v); setMkChan(false); }}>+</button></div>
+      {dmPick && <div ref={dmMenuRef} id="new-dm-menu" className="dm-pick" role="menu" aria-label={t("sidebar.newDmTitle")}>
+        {visibleAgents.length > 0 && <div className="sec sec-sub">{t("common.agents")}</div>}
+        {visibleAgents.map((a) => <button role="menuitem" key={a.id} className="item" onClick={() => doDM("agent", a.id)}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + (a.activity || "offline")} role="img" aria-label={t("members.statusLabel", { status: a.activity || "offline" })} /></button>)}
+        {dmHumans.length > 0 && <div className="sec sec-sub">{t("common.humans")}</div>}
+        {dmHumans.map((u) => <button role="menuitem" key={u.userId} className="item" onClick={() => doDM("user", u.userId)}><Avatar seed={u.name} url={avFor(u.avatarUrl)} size={20} /><span className="grow">{u.displayName || u.name}</span></button>)}
+        {visibleAgents.length === 0 && dmHumans.length === 0 && <div className="empty">{t("sidebar.dmPickEmpty")}</div>}
+      </div>}
       {dms.map((c) => {
         const a = c.peerType === "agent" ? agents.find((x) => x.id === c.peerId) : undefined; // agent DM → show real-time status dot
         return (
@@ -109,7 +134,7 @@ export function ChatSidebar() {
 // Full create-channel form: name + description + visibility (public/private) + initial member selection (agents/humans).
 // POST /api/channels { name, visibility, agentIds, userIds }. prefill = pre-populated values from action card.
 export function CreateChannelModal({ onCreate, onClose, prefill, submitLabel }: { onCreate: (opts: { name: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }) => void; onClose: () => void; prefill?: { name?: string; description?: string; visibility?: string; agentIds?: string[]; userIds?: string[] }; submitLabel?: string }) {
-  useEscClose(onClose);
+  const dialogRef = useDialogFocus(onClose);
   const { t } = useTranslation();
   const { visibleAgents: agents, humans, me, attachmentUrl } = useStore(); // visibleAgents: showcase demo props are not offered as channel members
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
@@ -127,8 +152,8 @@ export function CreateChannelModal({ onCreate, onClose, prefill, submitLabel }: 
   const total = pickAgents.size + pickUsers.size;
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{t("sidebar.createChannelHeading")}</h3>
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="create-channel-title" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <h3 id="create-channel-title">{t("sidebar.createChannelHeading")}</h3>
         <label>{t("sidebar.fieldName")}</label><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("sidebar.namePlaceholder")} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && name.trim()) submit(); }} />
         <label>{t("sidebar.descLabel")}</label><textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={t("sidebar.descPlaceholder")} />
         <label>{t("sidebar.visibilityLabel")}</label>

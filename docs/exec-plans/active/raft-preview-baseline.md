@@ -48,6 +48,12 @@ not permission to copy third-party source or assets.
   deterministic parent URL. Real-browser Home scroll restoration, forward, Members/profile,
   Account, missing-machine route, unknown-workspace query/hash preservation, `390×844`, `375×812`,
   and URL-stable `767px↔768px` journeys pass.
+- 2026-08-21: aligned channel, human/Agent DM, thread, message timeline, and Composer collaboration
+  surfaces for Baseline desktop/mobile. New DM exposes both identity kinds and truthful offline Agent
+  state; mobile messages, thread chrome, and Composer use the square Raft baseline geometry. Message
+  submission is single-flight and preserves the entire draft for focused retry after API/network
+  failure. Menu/Dialog/thread initial focus, arrow keys, Tab containment, Escape, and exact trigger
+  return pass in ego-browser at `1440×900`, `390×844`, and `375×812`.
 
 ## Decision log
 
@@ -73,3 +79,10 @@ not permission to copy third-party source or assets.
   or blindly call history back. The three return modes are selected from the declared parent, prior
   route, and history index. Full message/thread/composer and Settings content parity remains assigned
   to #309 and #313; #308 compares the unmasked Back/header structure and records those module gaps.
+- Ticket #309 preserves every existing message, identity, capability, Socket.IO, thread, task,
+  attachment, reaction, Action Card, and Agent Activity server contract. Its QA human, offline machine,
+  and offline Agent are isolated local data fixtures used to reach required DM/status states; the UI
+  reports `inactive/offline` and never promotes the fixture to loading, online, or success. Private
+  reference workspace text is not copied: raw full-page image similarity remains a disclosed
+  diagnostic, while the unmasked channel header/tab critical dividers are byte-identical and all
+  owned control edges stay inside the locked `2 CSS px` budget.

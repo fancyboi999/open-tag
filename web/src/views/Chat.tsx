@@ -23,7 +23,7 @@ import { AgentProfile, HumanProfile, CreateAgentModal } from "./Members.tsx";
 import { ChatSidebar, CreateChannelModal, channelCreateErrorMsg } from "./ChatSidebar.tsx";
 import { ConnectComputerWizard } from "./ConnectComputerWizard.tsx";
 import { Composer } from "./Composer.tsx";
-import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
+import { useConfirm, useDialogFocus, useEscClose } from "../ConfirmModal.tsx";
 import { useToast } from "../toast.tsx";
 import { AgentActivityDisclosure, agentRunPhase } from "../AgentActivity.tsx";
 import type { LayoutOutletContext } from "../Layout.tsx";
@@ -187,6 +187,8 @@ export function Chat({ canonicalizeMissingChannel = true }: { canonicalizeMissin
   const [taskMenu, setTaskMenu] = useState<string | null>(null); // task badge status menu: id of the currently open message (clicking the badge changes status, does not open thread)
   const [hoverAgent, setHoverAgent] = useState<{ id: string; x: number; y: number } | null>(null); // hovering over an agent shows a quick-info hover card
   const [ctxMenu, setCtxMenu] = useState<{ m: Msg; x: number; y: number } | null>(null); // right-clicking a message opens the context action menu
+  const ctxMenuRef = useRef<HTMLDivElement>(null);
+  const ctxTriggerRef = useRef<HTMLElement | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [loaded, setLoaded] = useState(false); // first fetch for the current channel done — gates the empty-channel state so it never flashes mid-load
   const [loadError, setLoadError] = useState(false); // first fetch failed — exits the skeleton into a retryable error state
@@ -250,6 +252,30 @@ export function Chat({ canonicalizeMissingChannel = true }: { canonicalizeMissin
     if (restoreFocus) restoreContextTrigger();
   };
   const closeThread = () => { setThread(null); restoreContextTrigger(); };
+  const openContextMenu = (m: Msg, x: number, y: number, trigger?: HTMLElement | null) => {
+    ctxTriggerRef.current = trigger?.isConnected ? trigger : document.querySelector<HTMLElement>(`#m-${m.id} .msg-name-trigger`);
+    setCtxMenu({ m, x, y });
+  };
+  const closeContextMenu = (restoreFocus = true) => {
+    setCtxMenu(null);
+    if (restoreFocus) requestAnimationFrame(() => ctxTriggerRef.current?.isConnected && ctxTriggerRef.current.focus());
+  };
+  useEffect(() => {
+    if (!ctxMenu) return;
+    requestAnimationFrame(() => ctxMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus());
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); closeContextMenu(); return; }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      const items = [...(ctxMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+      if (!items.length) return;
+      event.preventDefault();
+      const current = Math.max(0, items.indexOf(document.activeElement as HTMLElement));
+      const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : event.key === "ArrowDown" ? (current + 1) % items.length : (current - 1 + items.length) % items.length;
+      items[next]?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [ctxMenu]);
 
   // Channel-scoped state (loaded messages + load gate + has-more) belongs to one channel. When the
   // channel changes, reset it *synchronously during render* (React's "adjust state when a prop changes"
@@ -532,11 +558,11 @@ export function Chat({ canonicalizeMissingChannel = true }: { canonicalizeMissin
                 return (
                 <Fragment key={renderKeyForMessage(m)}>
                   {dateDivider}
-                  <div className={"msg" + (shouldEnter ? " msg-enter" : "")} id={"m-" + m.id} onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ m, x: e.clientX, y: e.clientY }); }} style={isNewMsg ? { "--msg-delay": `${staggerIdx * 60}ms` } as CSSProperties : undefined}>
+                  <div className={"msg" + (shouldEnter ? " msg-enter" : "")} id={"m-" + m.id} onContextMenu={(e) => { e.preventDefault(); openContextMenu(m, e.clientX, e.clientY, e.currentTarget.querySelector<HTMLElement>(".msg-name-trigger")); }} style={isNewMsg ? { "--msg-delay": `${staggerIdx * 60}ms` } as CSSProperties : undefined}>
                   <div className="msg-toolbar">
                     <button className={"im" + (isSaved ? " on" : "")} title={isSaved ? t("chat.unsave") : t("chat.saveMessage")} onClick={() => { isSaved ? unsaveMsg(m.id) : saveMsg(m.id); }}><Bookmark size={15} className="im-pop im-fill" fill={isSaved ? "currentColor" : "none"} /></button>
                     <button className="im" title={t("chat.copyMarkdown")} onClick={() => copyMarkdown(m.content)}><Clipboard size={15} className="im-pop" /></button>
-                    <button className="im" title={t("chat.more")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setCtxMenu({ m, x: r.right - 212, y: r.bottom + 4 }); }}><MoreHorizontal size={15} className="im-pop" /></button>
+                    <button className="im" title={t("chat.more")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openContextMenu(m, r.right - 212, r.bottom + 4, e.currentTarget); }}><MoreHorizontal size={15} className="im-pop" /></button>
                   </div>
                   {ag
                     ? <button className="msg-av clickable msg-profile-trigger" aria-label={m.senderName} onClick={() => openProfile({ type: "agent", id: m.senderId! })}
@@ -619,18 +645,18 @@ export function Chat({ canonicalizeMissingChannel = true }: { canonicalizeMissin
       {showEdit && cur && <EditChannelModal channel={cur} onClose={() => setShowEdit(false)} onDone={async () => { setShowEdit(false); await reload(); }} onDeleted={() => { setShowEdit(false); reload(); nav(`/s/${slug}/channel`); }} />}
       {ctxMenu && (() => {
         const m = ctxMenu.m;
-        const close = () => setCtxMenu(null);
+        const close = () => closeContextMenu();
         const copy = async (text: string, label: string) => { if (!await copyText(text)) window.prompt(label, text); close(); };
         const link = `${location.origin}/s/${slug}/channel/${m.channelId}?msg=${m.id}`;
         return (
           <div className="ctx-backdrop" onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }}>
-            <div className="ctx-menu" style={{ left: Math.min(ctxMenu.x, window.innerWidth - 230), top: Math.min(ctxMenu.y, window.innerHeight - 320) }} onClick={(e) => e.stopPropagation()}>
-              <div className="ctx-rx">{QUICK_EMOJIS.slice(0, 6).map((e) => <button key={e} title={e} onClick={() => { react(m.id, e, false); close(); }}>{e}</button>)}</div>
-              <button className="ctx-item" onClick={() => copy(m.content, t("chat.copyMarkdown"))}><Clipboard size={14} /> {t("chat.copyMarkdown")}</button>
-              <button className="ctx-item" onClick={() => copy(link, t("chat.copyLink"))}><Link2 size={14} /> {t("chat.copyLink")}</button>
-              <button className="ctx-item" onClick={() => { const stableTrigger = document.querySelector<HTMLElement>(`#m-${m.id} .msg-toolbar button:last-child`); startThread(m, stableTrigger); close(); }}><MessageCircle size={14} /> {t("chat.openThread")}</button>
-              <button className="ctx-item" onClick={() => { savedIds.has(m.id) ? unsaveMsg(m.id) : saveMsg(m.id); close(); }}><Bookmark size={14} fill={savedIds.has(m.id) ? "currentColor" : "none"} /> {savedIds.has(m.id) ? t("chat.unsave") : t("chat.saveMessage")}</button>
-              <button className="ctx-item" onClick={async () => { close(); await api("POST", "/api/tasks/convert-message", { messageId: m.id }); }}><CheckSquare size={14} /> {t("chat.convertToTask")}</button>
+            <div ref={ctxMenuRef} className="ctx-menu" role="menu" aria-label={t("chat.messageActions")} style={{ left: Math.min(ctxMenu.x, window.innerWidth - 230), top: Math.min(ctxMenu.y, window.innerHeight - 320) }} onClick={(e) => e.stopPropagation()}>
+              <div className="ctx-rx">{QUICK_EMOJIS.slice(0, 6).map((e) => <button role="menuitem" key={e} title={e} aria-label={t("chat.reactWith", { emoji: e })} onClick={() => { react(m.id, e, false); close(); }}>{e}</button>)}</div>
+              <button role="menuitem" className="ctx-item" onClick={() => copy(m.content, t("chat.copyMarkdown"))}><Clipboard size={14} /> {t("chat.copyMarkdown")}</button>
+              <button role="menuitem" className="ctx-item" onClick={() => copy(link, t("chat.copyLink"))}><Link2 size={14} /> {t("chat.copyLink")}</button>
+              <button role="menuitem" className="ctx-item" onClick={() => { const stableTrigger = ctxTriggerRef.current; startThread(m, stableTrigger); closeContextMenu(false); }}><MessageCircle size={14} /> {t("chat.openThread")}</button>
+              <button role="menuitem" className="ctx-item" onClick={() => { savedIds.has(m.id) ? unsaveMsg(m.id) : saveMsg(m.id); close(); }}><Bookmark size={14} fill={savedIds.has(m.id) ? "currentColor" : "none"} /> {savedIds.has(m.id) ? t("chat.unsave") : t("chat.saveMessage")}</button>
+              <button role="menuitem" className="ctx-item" onClick={async () => { close(); await api("POST", "/api/tasks/convert-message", { messageId: m.id }); }}><CheckSquare size={14} /> {t("chat.convertToTask")}</button>
             </div>
           </div>
         );
@@ -657,7 +683,7 @@ export function Chat({ canonicalizeMissingChannel = true }: { canonicalizeMissin
 // Edit-channel modal: name + description + visibility toggle + archive + delete. Replaces the old prompt()-based rename dropdown.
 function EditChannelModal({ channel, onClose, onDone, onDeleted }: { channel: any; onClose: () => void; onDone: () => void; onDeleted: () => void }) {
   const { t } = useTranslation();
-  useEscClose(onClose);
+  const dialogRef = useDialogFocus(onClose);
   const { api } = useStore();
   const confirm = useConfirm();
   const [name, setName] = useState(channel.name as string);
@@ -687,8 +713,8 @@ function EditChannelModal({ channel, onClose, onDone, onDeleted }: { channel: an
 
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{t("chat.editChannel")}</h3>
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="edit-channel-title" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <h3 id="edit-channel-title">{t("chat.editChannel")}</h3>
         <label>{t("sidebar.fieldName")}</label>
         <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("sidebar.namePlaceholder")} onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing && name.trim()) save(); }} />
         <label>{t("sidebar.descLabel")}</label>
@@ -802,12 +828,12 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
     );
   };
   return (
-    <aside className="thread-panel">
+    <aside className="thread-panel" aria-label={t("chat.thread")}>
       <div className="thread-head"><span className="grow">{t("chat.thread")}</span>
         <button className="tp-link" title={t("chat.markDone")} onClick={async () => { await api("POST", "/api/channels/threads/done", { threadChannelId: channelId }); onClose(); }}><CheckCircle2 size={14} /></button>
         <button className="tp-link" title={t("chat.unfollowThread")} onClick={async () => { await api("POST", "/api/channels/threads/unfollow", { threadChannelId: channelId }); onClose(); }}><BellOff size={14} /></button>
         <button className="tp-link" onClick={() => nav(`/s/${slug}/channel/${parent.channelId}?msg=${parent.id}`)} title={t("chat.viewInChannel")}><ExternalLink size={14} /></button>
-        <button className="tp-close" onClick={onClose} title={t("chat.close")}><X size={15} /></button></div>
+        <button className="tp-close" autoFocus onClick={onClose} title={t("chat.close")}><X size={15} /></button></div>
       <div className="scroll" ref={scrollRef}>
         <div className="thread-parent">{row(parent)}</div>
         <div className="thread-sep">{t("chat.replyCount", { count: msgs.length })}</div>
@@ -830,7 +856,7 @@ function ThreadPanel({ channelId, parent, onClose, onOpenProfile }: { channelId:
 function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: string; channelName: string; onClose: () => void }) {
   /* avatars: data.agents/humans come from /channels/:id/members (carry avatarUrl); resolve to signed/scheme via resolveAvatar */
   const { t } = useTranslation();
-  useEscClose(onClose);
+  const dialogRef = useDialogFocus(onClose);
   const { api, visibleAgents: agents, attachmentUrl, capabilities } = useStore(); // visibleAgents: showcase demo props are not offered in the "add agent" list
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const [data, setData] = useState<{ agents: any[]; humans: any[] }>({ agents: [], humans: [] });
@@ -842,8 +868,8 @@ function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: s
   const remove = async (agentId: string) => { await api("DELETE", `/api/channels/${channelId}/members`, { agentId }); load(); };
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3># {channelName} · {t("chat.membersCount", { count: data.agents.length + data.humans.length })}</h3>
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="channel-members-title" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+        <h3 id="channel-members-title"># {channelName} · {t("chat.membersCount", { count: data.agents.length + data.humans.length })}</h3>
         <div className="sec">{t("common.agents")} <span className="cnt">{data.agents.length}</span></div>
         {data.agents.map((a) => (
           <div key={a.id} className="item"><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + (a.activity || a.status)} />{capabilities.manageChannels && <button className="joinbtn" onClick={() => remove(a.id)}>{t("chat.remove")}</button>}</div>

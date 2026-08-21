@@ -198,6 +198,28 @@
   .shell-baseline.is-workspace-detail .chtabs button{min-width:76px;padding:4px 14px;border:0;border-right:2px solid var(--baseline-line);border-radius:0;background:#fff;color:var(--baseline-line);font-size:13px}
   .shell-baseline.is-workspace-detail .chtabs button.on{background:var(--baseline-yellow);font-weight:800}
   .shell-baseline.is-workspace-detail .chtabs button:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:-4px}
+  .shell-baseline main.content-col>.scroll{padding:12px 12px 150px;background:#fff}
+  .shell-baseline .msg{margin-bottom:6px;padding:8px 6px 6px;border-radius:0;background:#fff;box-shadow:none}
+  .shell-baseline .msg:hover{background:#fffaf0;box-shadow:none}
+  .shell-baseline .msg-enter{clip-path:none}
+  .shell-baseline .date-divider::before{border-top:2px solid #ddd9d2}
+  .shell-baseline .date-divider-label{font-family:var(--mono);background:#fff}
+  .shell-baseline main.content-col>.composer{right:0;padding:12px;border-top:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline .composer-box{border:2px solid var(--baseline-line);border-radius:0;padding:8px;box-shadow:4px 4px 0 #d4d0c8}
+  .shell-baseline .composer-box:hover,.shell-baseline .composer-box:focus-within{box-shadow:4px 4px 0 #d4d0c8}
+  .shell-baseline .cb-icon,.shell-baseline .send-btn{width:32px;height:32px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;color:var(--baseline-line);box-shadow:2px 2px 0 #d4d0c8}
+  .shell-baseline .send-btn:disabled{border-color:var(--baseline-line);background:#f8d9e3;color:#777;opacity:.55}
+
+  .shell-baseline .thread-panel{background:#fff;color:var(--baseline-line)}
+  .shell-baseline .thread-head{height:62px;min-height:62px;padding:0 5px 0 16px;border-bottom:2px solid var(--baseline-line);background:#fff;font-family:var(--sans);font-size:18px;font-weight:800}
+  .shell-baseline .tp-link,.shell-baseline .tp-close{width:44px;height:44px;padding:0;border:2px solid transparent;border-radius:0;background:transparent;color:var(--baseline-line)}
+  .shell-baseline .tp-link:hover,.shell-baseline .tp-close:hover{border-color:var(--baseline-line);background:#fff3ce}
+  .shell-baseline .tp-link:focus-visible,.shell-baseline .tp-close:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:-4px}
+  .shell-baseline .thread-panel>.scroll{min-height:0;padding:12px 12px 20px;background:#fff}
+  .shell-baseline .thread-parent{margin:0 0 8px;padding:0;border-bottom:2px solid #ddd9d2}
+  .shell-baseline .thread-sep{min-height:28px;margin:6px 0 8px;font-family:var(--mono);font-size:11px;line-height:28px}
+  .shell-baseline .thread-composer{padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px));border-top:2px solid var(--baseline-line);background:#fff}
+  .shell-baseline .thread-panel .msg{padding-left:4px;padding-right:4px}
   .shell-baseline .mobile-primary-nav{
     grid-row:2;
     display:flex;
