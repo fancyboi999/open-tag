@@ -71,10 +71,9 @@ floor, record a new three-sample calibration in a separate commit before changin
   These names are measurements, not permission to copy a private font. OpenTag must use only assets
   with a verified license and record any resulting intentional difference.
 
-## Known gaps
+## Gap handling
 
-`matrix.json` explicitly marks states that could not be reached without mutating account or
-workspace data, including anonymous auth screens in an already authenticated task space, invite
-success/expiry variants, destructive settings states, and server-supplied loading/error cases.
-Those rows remain mandatory for the corresponding implementation ticket, using OpenTag fixtures
-and a handoff-backed reference session when available. A gap is not evidence of parity.
+The initial investigation explicitly marked states that could not be reached without changing
+account or workspace data. Tickets #305-#315 closed those rows with isolated OpenTag fixtures and
+the handoff-backed reference session; `matrix.json` now has no viewport gaps. A future inaccessible
+row must be added back to `gaps` and may not be treated as evidence of parity until it is observed.

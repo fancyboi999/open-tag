@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "ticket": 315,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "baseCommit": "6c30b081efbbede4cc5a2e9b4f9d2dc4aee85530",
+  "scope": "complete page-by-viewport-by-state coverage, unified desktop/mobile journeys, runtime failure and recovery, build regression, protected-surface diff, and Preview/Production rollback",
+  "matrix": {
+    "pages": 30,
+    "viewports": 3,
+    "states": 14,
+    "gaps": 0,
+    "artifactRoot": ".shots/raft-baseline/final",
+    "artifactFiles": 84,
+    "capturePairs": 28,
+    "manifestSha256": "e30992f97753792a06e0d583dd5dd618ff04736753e7a2bfcbbcec20ff06a9c3",
+    "ticketComparisons": [305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315]
+  },
+  "lockedThresholds": {
+    "fullPageMinimumSsim": 0.995,
+    "fullPageMaximumChangedPixelRatio": 0.005,
+    "criticalRegionMinimumSsim": 0.998,
+    "criticalRegionMaximumChangedPixelRatio": 0.0025,
+    "criticalEdgeMaximumDeltaCssPx": 2,
+    "maximumHorizontalOverflowCssPx": 0,
+    "actualMaximumCriticalEdgeDeltaCssPx": 0,
+    "actualMaximumHorizontalOverflowCssPx": 0,
+    "result": "pass"
+  },
+  "journeys": {
+    "desktop": {
+      "result": "pass",
+      "surfaces": ["workspace", "channel", "direct-message", "thread", "tasks", "files", "search", "activity", "saved", "showcase", "members", "human-profile", "agent-profile", "settings", "account", "machines", "public", "auth"],
+      "interactions": ["click", "keyboard", "hover", "focus", "selected", "menu", "dialog", "context-panel", "scroll", "focus-restore", "browser-back"]
+    },
+    "mobile": {
+      "result": "pass",
+      "viewports": ["390x844", "375x812"],
+      "interactions": ["real-touch", "keyboard", "native-back", "deterministic-parent-return", "detail-hidden-navigation", "safe-area", "scroll"]
+    },
+    "network": {
+      "result": "pass",
+      "slowLoadingObserved": true,
+      "slowRecoveryObserved": true,
+      "offlineRoutePreserved": true,
+      "reconnected": true,
+      "catchUpRequest": "/api/messages/sync?since=7",
+      "expectedOfflineTransportErrors": 2,
+      "unexpectedPostRecoveryErrors": 0
+    },
+    "runtimeStates": {
+      "result": "pass",
+      "browser": ["offline Agent direct-message", "offline machine detail"],
+      "contractTests": ["working", "thinking", "error", "sleeping", "recovery"]
+    }
+  },
+  "browserDiagnostics": {
+    "unexpectedConsoleErrors": 0,
+    "pageExceptions": 0,
+    "hydrationWarnings": 0,
+    "horizontalOverflowCssPx": 0
+  },
+  "regression": {
+    "typecheck": "pass",
+    "productionBuild": { "result": "pass", "modulesTransformed": 2558, "landingPrerender": "injected" },
+    "fullUnit": { "result": "pass", "passed": 341, "failed": 0 },
+    "referenceCheck": "30 pages, 3 required viewports, 14 representative states"
+  },
+  "rollback": {
+    "previewClassicQuery": { "result": "pass", "baselineClass": false, "classicShell": true },
+    "previewBaselineQuery": { "result": "pass", "baselineClass": true },
+    "productionForcedBaselineQuery": { "result": "pass", "baselineClass": false, "classicAuthForm": true },
+    "productionCapability": "disabled"
+  },
+  "protectedSurfaceDiff": {
+    "result": "pass",
+    "baseCommit": "6c30b081efbbede4cc5a2e9b4f9d2dc4aee85530",
+    "forbiddenRoots": ["src", "daemon", "connectors", "migrations"],
+    "serverDatabaseRestSocketDaemonAgentRuntimeConnectorChanges": 0,
+    "binaryAssetsAddedOrModified": 0,
+    "thirdPartySourceCopied": false,
+    "privateAssetsCopied": false
+  },
+  "intentionalDifferences": [
+    {
+      "kind": "license",
+      "reason": "OpenTag uses licensed system/Inter, Lucide, DiceBear, and existing project assets instead of copying reference-only fonts, glyphs, icons, avatars, or branding.",
+      "owner": "OpenTag product owner",
+      "selectors": ["html", ".avatar", ".icon", ".brand"]
+    },
+    {
+      "kind": "product",
+      "reason": "Apps and hosted MCP settings are explicit unsupported-capability states because OpenTag has no corresponding backend contract; no contract is invented for visual parity.",
+      "owner": "OpenTag product owner",
+      "selectors": [".settings-apps", ".settings-mcp"]
+    },
+    {
+      "kind": "product",
+      "reason": "Private dynamic reference workspace data is not copied. Raw full-page differences remain disclosed diagnostics while owned structural geometry is checked independently.",
+      "owner": "OpenTag product owner",
+      "selectors": [".messages", ".member-list", ".task-board", ".settings-content"]
+    },
+    {
+      "kind": "accessibility",
+      "reason": "OpenTag retains 44px mobile targets, visible keyboard focus, semantic labels, Dialog containment, Escape handling, and exact focus restoration where the reference differs.",
+      "owner": "OpenTag product owner",
+      "selectors": [".mobile-detail-back", ".mobile-primary-nav button", ".addbtn", "[role=dialog]"]
+    },
+    {
+      "kind": "product",
+      "reason": "Showcase remains OpenTag's static read-only product surface because the reference exposes no equivalent route; it shares the verified shell geometry without copied claims or data.",
+      "owner": "OpenTag product owner",
+      "selectors": [".showcase"]
+    }
+  ],
+  "excluded": ["VIBES visual redesign", "Production enablement", "server or runtime contract changes"]
+}
