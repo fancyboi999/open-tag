@@ -170,7 +170,7 @@ mark{background:var(--g-peach);color:var(--ink);padding:0 2px;border-radius:4px}
 .inv-acts{display:flex;gap:6px;flex:0 0 auto}
 .auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--canvas-soft);padding:20px}
 .auth-card{width:100%;max-width:380px;background:var(--canvas);border:1px solid var(--hair-strong);border-radius:8px;padding:28px 26px;box-shadow:0 8px 28px var(--shadow-3)}
-.auth-brand{font-family:var(--serif);font-size:22px;color:var(--ink);margin-bottom:6px}
+.auth-brand{display:inline-block;font-family:var(--serif);font-size:22px;color:var(--ink);margin-bottom:6px;text-decoration:none}
 .auth-card h1{font-size:20px;margin:0 0 16px;color:var(--ink)}
 .auth-field{display:block;margin-bottom:10px}
 .auth-field span{display:block;font-size:13px;font-weight:500;color:var(--body);margin:0 0 5px}
@@ -181,6 +181,12 @@ mark{background:var(--g-peach);color:var(--ink);padding:0 2px;border-radius:4px}
 .auth-submit{width:100%;margin-top:4px;padding:10px}
 .auth-alt{margin-top:14px;font-size:13px;color:var(--muted);text-align:center}
 .auth-alt a{color:var(--ink);cursor:pointer;text-decoration:underline}
+.auth-link{appearance:none;border:0;background:transparent;padding:0;color:var(--ink);font:inherit;cursor:pointer;text-decoration:underline}
+.auth-link:focus-visible,.auth-home-link:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.auth-state-card{text-align:center}
+.auth-state-card .auth-home-link{display:inline-block;margin-top:16px;color:var(--ink)}
+.auth-loading{display:flex;justify-content:center;gap:7px;margin:22px 0 8px}
+.auth-loading span{width:38px;height:12px;border-radius:4px;background:var(--surface-strong)}
 .logout-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:26px;padding-top:18px;border-top:1px solid var(--hair)}
 /* Language switcher: segmented control (settings account page).
    Uses .seg-pill (pill border-radius:9999px) to distinguish from the rect .seg

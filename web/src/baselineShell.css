@@ -1,6 +1,38 @@
 /* Preview-only Raft measurement baseline. Every selector is gated by .shell-baseline so Classic
    remains the production/default rollback surface. The 768px seam is locked by ticket #304. */
 .mobile-detail-back,.mobile-primary-nav{display:none}
+.auth-page.auth-baseline{
+  --baseline-yellow:#ffd440;
+  --baseline-paper:#fffaf0;
+  --baseline-pink:#ff83ad;
+  --baseline-line:#000;
+  min-height:100dvh;
+  overflow-x:hidden;
+  background:linear-gradient(135deg,var(--baseline-yellow) 0 34%,var(--baseline-paper) 34% 100%);
+  color:var(--baseline-line);
+}
+.auth-baseline .auth-card{max-width:430px;padding:32px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;box-shadow:8px 8px 0 var(--baseline-line)}
+.auth-baseline .auth-brand{font-family:var(--sans);font-size:18px;font-weight:900;letter-spacing:-.04em;color:var(--baseline-line)}
+.auth-baseline .auth-card h1{margin:12px 0 22px;font-family:var(--sans);font-size:28px;line-height:1.1;font-weight:900;color:var(--baseline-line)}
+.auth-baseline .auth-field{margin-bottom:16px}
+.auth-baseline .auth-field span{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--baseline-line)}
+.auth-baseline .auth-card input{min-height:48px;border:2px solid var(--baseline-line);border-radius:0;background:#fff;color:var(--baseline-line)}
+.auth-baseline .auth-card input:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:2px;border-color:var(--baseline-line);box-shadow:none}
+.auth-baseline .auth-submit{min-height:48px;border:2px solid var(--baseline-line);border-radius:0;background:var(--baseline-pink);color:var(--baseline-line);font-weight:900;box-shadow:4px 4px 0 var(--baseline-line)}
+.auth-baseline .auth-submit:hover:not(:disabled){transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--baseline-line)}
+.auth-baseline .auth-submit:active:not(:disabled){transform:translate(2px,2px);box-shadow:2px 2px 0 var(--baseline-line)}
+.auth-baseline .auth-submit:focus-visible,.auth-baseline .auth-link:focus-visible,.auth-baseline .auth-home-link:focus-visible,.auth-baseline .auth-brand:focus-visible{outline:3px solid var(--baseline-yellow);outline-offset:3px}
+.auth-baseline .auth-submit:disabled{opacity:.55;cursor:wait}
+.auth-baseline .auth-alt,.auth-baseline .modal-note,.auth-baseline .auth-state-card p{color:rgba(0,0,0,.65)}
+.auth-baseline .auth-link,.auth-baseline .auth-home-link{min-height:44px;color:var(--baseline-line);font-weight:700}
+.auth-baseline .form-err{border:2px solid var(--baseline-line);border-radius:0;background:#fff3ce;color:var(--baseline-line)}
+.auth-baseline .auth-loading span{border:2px solid var(--baseline-line);border-radius:0;background:var(--baseline-yellow)}
+@media (max-width:767px){
+  .auth-page.auth-baseline{align-items:flex-start;padding:12px;background:var(--baseline-yellow)}
+  .auth-baseline .auth-card{max-width:none;margin-top:8vh;padding:24px 20px;box-shadow:5px 5px 0 var(--baseline-line)}
+  .auth-baseline .auth-card h1{font-size:24px}
+  .auth-baseline .auth-link,.auth-baseline .auth-home-link{display:inline-flex;align-items:center}
+}
 @media (min-width:768px){
   .shell-baseline .settings-sidebar .settings-nav{gap:0}
   .shell-baseline .settings-sidebar .settings-nav>.sec{margin-top:16px}

@@ -1,10 +1,11 @@
 // Register/login page and invite landing page. Independent of StoreProvider bootstrap — fetches /api/auth/* directly, stores the token on success, and redirects to the main app (re-runs bootstrap with the real token).
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { TOKEN_KEY } from "../routing.ts"; // single source for the session-token storage key (shared with store.tsx + the "/" guard)
+import { useAppShell } from "../AppShell.tsx";
 
 // On successful login/register: persist token, clear dev user, and redirect to target. The caller resolves the
 // user's workspace (see workspaceHome); "/" is only a defensive fallback (it renders the marketing Landing, NOT a redirect).
@@ -80,6 +81,7 @@ function AuthFields({
 
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const { t } = useTranslation();
+  const { mode: shellMode } = useAppShell();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -98,9 +100,9 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
     } catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
   return (
-    <div className="auth-page">
+    <div className={`auth-page${shellMode === "baseline" ? " auth-baseline" : ""}`}>
       <div className="auth-card">
-        <div className="auth-brand">open-tag</div>
+        <a className="auth-brand" href="/" aria-label="open-tag home">open-tag</a>
         <h1>{mode === "register" ? t("auth.createAccount") : t("auth.login")}</h1>
         <form className="auth-form" onSubmit={submit}>
           <AuthFields mode={mode} name={name} email={email} password={password} err={err} onName={setName} onEmail={setEmail} onPassword={setPassword} />
@@ -114,13 +116,30 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
 
 export function JoinPage() {
   const { t } = useTranslation();
+  const { mode: shellMode } = useAppShell();
   const { token } = useParams();
   const [info, setInfo] = useState<any>(null);
+  const [infoState, setInfoState] = useState<"loading" | "ready" | "error">("loading");
   const [mode, setMode] = useState<"login" | "register">("register");
   const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const infoRequest = useRef(0);
   const loggedIn = !!localStorage.getItem(TOKEN_KEY);
-  useEffect(() => { (async () => { try { setInfo(await (await fetch(`/api/auth/invite-info?token=${encodeURIComponent(token || "")}`)).json()); } catch { setInfo({ valid: false }); } })(); }, [token]);
+  const loadInfo = useCallback(async () => {
+    const request = ++infoRequest.current;
+    setInfoState("loading"); setErr("");
+    try {
+      const response = await fetch(`/api/auth/invite-info?token=${encodeURIComponent(token || "")}`);
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data || typeof data.valid !== "boolean") throw new Error(data?.error || t("auth.inviteLoadFailed"));
+      if (request !== infoRequest.current) return;
+      setInfo(data); setInfoState("ready");
+    } catch (error: any) {
+      if (request !== infoRequest.current) return;
+      setErr(String(error?.message || t("auth.inviteLoadFailed"))); setInfoState("error");
+    }
+  }, [t, token]);
+  useEffect(() => { void loadInfo(); return () => { infoRequest.current += 1; }; }, [loadInfo]);
   const accept = async (authToken: string) => {
     const r = await fetch("/api/auth/accept-invite", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + authToken }, body: JSON.stringify({ token }) });
     const d = await r.json();
@@ -140,12 +159,14 @@ export function JoinPage() {
       await accept(d.token);
     } catch (e: any) { setErr(String(e?.message || e)); } finally { setBusy(false); }
   };
-  if (!info) return <div className="auth-page"><div className="auth-card">{t("auth.loading")}</div></div>;
-  if (!info.valid) return <div className="auth-page"><div className="auth-card"><div className="auth-brand">open-tag</div><h1>{t("auth.invalidInvite")}</h1><p className="modal-note">{t("auth.invalidInviteDesc")}</p><a href="/">{t("auth.backHome")}</a></div></div>;
+  const pageClass = `auth-page${shellMode === "baseline" ? " auth-baseline" : ""}`;
+  if (infoState === "loading") return <div className={pageClass}><div className="auth-card auth-state-card" role="status" aria-busy="true"><a className="auth-brand" href="/" aria-label="open-tag home">open-tag</a><div className="auth-loading" aria-hidden="true"><span /><span /><span /></div><p>{t("auth.loading")}</p></div></div>;
+  if (infoState === "error") return <div className={pageClass}><div className="auth-card auth-state-card"><a className="auth-brand" href="/" aria-label="open-tag home">open-tag</a><h1>{t("auth.inviteLoadTitle")}</h1><div className="form-err" role="alert">{err}</div><button className="ok auth-submit" type="button" onClick={() => void loadInfo()}>{t("auth.retry")}</button><a className="auth-home-link" href="/">{t("auth.backHome")}</a></div></div>;
+  if (!info?.valid) return <div className={pageClass}><div className="auth-card auth-state-card"><a className="auth-brand" href="/" aria-label="open-tag home">open-tag</a><h1>{t("auth.invalidInvite")}</h1><p className="modal-note">{t("auth.invalidInviteDesc")}</p><a className="auth-home-link" href="/">{t("auth.backHome")}</a></div></div>;
   return (
-    <div className="auth-page">
+    <div className={pageClass}>
       <div className="auth-card">
-        <div className="auth-brand">open-tag</div>
+        <a className="auth-brand" href="/" aria-label="open-tag home">open-tag</a>
         <h1>{t("auth.joinTitle", { serverName: info.serverName })}</h1>
         <p className="modal-note">{info.inviterName ? t("auth.invitedBy", { inviter: info.inviterName }) : t("auth.youAreInvited")}{t("auth.joinWorkspace", { serverName: info.serverName, role: info.role })}</p>
         {loggedIn ? (
@@ -155,7 +176,7 @@ export function JoinPage() {
             <AuthFields mode={mode} name={name} email={email} password={password} err={err} onName={setName} onEmail={setEmail} onPassword={setPassword} />
             <button className="ok auth-submit" type="submit" disabled={busy}>{busy ? "…" : mode === "register" ? t("auth.registerAndJoin") : t("auth.loginAndJoin")}</button>
           </form>
-          <div className="auth-alt">{mode === "register" ? <>{t("auth.hasAccount")}<a onClick={() => { setMode("login"); setErr(""); }}>{t("auth.login")}</a></> : <>{t("auth.newUser")}<a onClick={() => { setMode("register"); setErr(""); }}>{t("auth.register")}</a></>}</div>
+          <div className="auth-alt">{mode === "register" ? <>{t("auth.hasAccount")}<button className="auth-link" type="button" onClick={() => { setMode("login"); setErr(""); }}>{t("auth.login")}</button></> : <>{t("auth.newUser")}<button className="auth-link" type="button" onClick={() => { setMode("register"); setErr(""); }}>{t("auth.register")}</button></>}</div>
         </>)}
       </div>
     </div>
