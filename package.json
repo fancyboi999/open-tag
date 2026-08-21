@@ -49,6 +49,7 @@
     "cli": "tsx src/cli/index.ts",
     "pkg:daemon:build": "node scripts/build-daemon-pkg.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web/tsconfig.json",
+    "reference:check": "node scripts/check-raft-reference.mjs",
     "wt:add": "bash scripts/wt-add.sh",
     "wt:rm": "bash scripts/wt-rm.sh",
     "dev:e2e:up": "bash scripts/dev-e2e-up.sh",

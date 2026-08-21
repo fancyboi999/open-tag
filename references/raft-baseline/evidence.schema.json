@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getopentag.com/schemas/raft-baseline-evidence.schema.json",
+  "title": "Preview visual comparison evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "matrixPageId",
+    "viewportId",
+    "state",
+    "theme",
+    "locale",
+    "precondition",
+    "reference",
+    "local",
+    "masks",
+    "comparison",
+    "intentionalDifferences"
+  ],
+  "properties": {
+    "matrixPageId": { "type": "string", "minLength": 1 },
+    "viewportId": { "enum": ["desktop", "mobile390", "mobile375"] },
+    "state": {
+      "enum": [
+        "default",
+        "hover",
+        "focus",
+        "pressed",
+        "selected",
+        "disabled",
+        "loading",
+        "open",
+        "closed",
+        "scrolled",
+        "responsive"
+      ]
+    },
+    "theme": { "const": "light" },
+    "locale": { "type": "string", "minLength": 2 },
+    "precondition": { "type": "string", "minLength": 1 },
+    "reference": { "$ref": "#/$defs/capture" },
+    "local": { "$ref": "#/$defs/capture" },
+    "masks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rect" }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fullPageSsim",
+        "fullPageChangedPixelRatio",
+        "criticalRegionSsim",
+        "criticalRegionChangedPixelRatio",
+        "maximumCriticalEdgeDeltaCssPx",
+        "horizontalOverflowCssPx",
+        "passed"
+      ],
+      "properties": {
+        "fullPageSsim": { "type": "number", "minimum": 0, "maximum": 1 },
+        "fullPageChangedPixelRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "criticalRegionSsim": { "type": "number", "minimum": 0, "maximum": 1 },
+        "criticalRegionChangedPixelRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "maximumCriticalEdgeDeltaCssPx": { "type": "number", "minimum": 0 },
+        "horizontalOverflowCssPx": { "type": "number", "minimum": 0 },
+        "passed": { "type": "boolean" }
+      }
+    },
+    "intentionalDifferences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "reason", "owner", "selectors"],
+        "properties": {
+          "kind": { "enum": ["license", "accessibility", "product-decision"] },
+          "reason": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 },
+          "selectors": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height", "reason"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number", "minimum": 0 },
+        "height": { "type": "number", "minimum": 0 },
+        "reason": { "enum": ["user-text", "timestamp", "avatar", "counter", "caret"] }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "semanticSnapshotSha256",
+        "fullPageScreenshotSha256",
+        "criticalRegionScreenshotSha256",
+        "geometry",
+        "computedStyles"
+      ],
+      "properties": {
+        "url": { "type": "string", "minLength": 1 },
+        "semanticSnapshotSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "fullPageScreenshotSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "criticalRegionScreenshotSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "geometry": { "type": "object" },
+        "computedStyles": { "type": "object" }
+      }
+    }
+  }
+}

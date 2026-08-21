@@ -12,6 +12,10 @@
 
 ## Active
 
+- **Preview-only Raft reference baseline** — preserve the classic shell and every existing business
+  contract while a Production-fail-closed Preview shell is measured and implemented slice by slice.
+  Plan: [`docs/exec-plans/active/raft-preview-baseline.md`](./exec-plans/active/raft-preview-baseline.md).
+
 - **Authorization hardening** — a two-plane security audit (human `routes-api` + agent `routes-agent`)
   surfaced ~20 access-control gaps; nearly all are closed. The canonical model + the **live status
   register** are in **[`docs/authorization.md`](./authorization.md)** §6 — check there, not here

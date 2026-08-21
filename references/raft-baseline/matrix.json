@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "referenceOrigin": "https://app.raft.build",
+  "marketingOrigin": "https://raft.build",
+  "viewports": [
+    { "id": "desktop", "width": 1440, "height": 900, "mode": "desktop" },
+    { "id": "mobile390", "width": 390, "height": 844, "mode": "mobile" },
+    { "id": "mobile375", "width": 375, "height": 812, "mode": "mobile" }
+  ],
+  "breakpoints": [
+    { "width": 768, "mode": "desktop", "condition": "global rail visible" },
+    { "width": 767, "mode": "mobile", "condition": "primary bottom navigation visible on roots" }
+  ],
+  "stateCatalog": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "selected",
+    "disabled",
+    "loading",
+    "open",
+    "closed",
+    "scrolled",
+    "responsive"
+  ],
+  "pages": [
+    { "id": "marketing", "kind": "public", "route": "https://raft.build/", "parent": null, "precondition": "anonymous public URL", "states": ["default", "hover", "focus", "scrolled", "responsive"], "observed": ["desktop"], "gaps": ["mobile390", "mobile375"] },
+    { "id": "auth-login", "kind": "auth", "route": "/login", "parent": "marketing", "precondition": "anonymous session", "states": ["default", "focus", "disabled", "loading"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "auth-register", "kind": "auth", "route": "/register", "parent": "marketing", "precondition": "anonymous session", "states": ["default", "focus", "disabled", "loading"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "auth-join", "kind": "auth", "route": "/join/:invite", "parent": "marketing", "precondition": "valid, expired, invalid, and forbidden invite fixtures", "states": ["default", "loading", "disabled"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "bootstrap", "kind": "auth", "route": "/s/:workspace", "parent": "marketing", "precondition": "identity resolution in progress", "states": ["loading", "responsive"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "workspace-home", "kind": "workspace-root", "route": "/s/:workspace", "parent": null, "precondition": "authenticated member with channel and DM", "states": ["default", "selected", "scrolled", "responsive"], "observed": ["mobile390"], "gaps": ["desktop", "mobile375"] },
+    { "id": "search", "kind": "workspace-root", "route": "/s/:workspace/search?channelId=:channel", "parent": "workspace-home", "precondition": "searchable messages", "states": ["default", "focus", "loading", "selected", "responsive"], "observed": ["desktop"], "gaps": ["mobile390", "mobile375"] },
+    { "id": "activity", "kind": "workspace-root", "route": "/s/:workspace/activity", "parent": "workspace-home", "precondition": "read and unread activity", "states": ["default", "selected", "loading", "scrolled", "responsive"], "observed": ["desktop"], "gaps": ["mobile390", "mobile375"] },
+    { "id": "saved", "kind": "workspace-root", "route": "/s/:workspace/saved", "parent": "workspace-home", "precondition": "saved and empty fixtures", "states": ["default", "loading", "scrolled", "responsive"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "showcase", "kind": "workspace-root", "route": "/s/:workspace/showcase", "parent": "workspace-home", "precondition": "static showcase available", "states": ["default", "scrolled", "responsive"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "channel", "kind": "detail", "route": "/s/:workspace/channel/:channel", "parent": "workspace-home", "precondition": "channel with messages, replies, reactions, and composer", "states": ["default", "hover", "focus", "disabled", "loading", "scrolled", "responsive"], "observed": ["desktop", "mobile390"], "gaps": ["mobile375"] },
+    { "id": "direct-message", "kind": "detail", "route": "/s/:workspace/dm/:dm", "parent": "workspace-home", "precondition": "human or Agent DM", "states": ["default", "loading", "scrolled", "responsive"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "thread", "kind": "detail", "route": "/s/:workspace/thread/:thread", "parent": "channel", "precondition": "message with replies", "states": ["default", "open", "closed", "loading", "scrolled", "responsive"], "observed": ["desktop"], "gaps": ["mobile390", "mobile375"] },
+    { "id": "channel-tasks", "kind": "detail", "route": "/s/:workspace/channel/:channel?tab=tasks", "parent": "channel", "precondition": "channel task fixtures", "states": ["default", "selected", "loading", "responsive"], "observed": ["desktop"], "gaps": ["mobile390", "mobile375"] },
+    { "id": "channel-files", "kind": "detail", "route": "/s/:workspace/channel/:channel?tab=files", "parent": "channel", "precondition": "channel file fixtures", "states": ["default", "loading", "responsive"], "observed": ["desktop"], "gaps": ["mobile390", "mobile375"] },
+    { "id": "tasks", "kind": "workspace-root", "route": "/s/:workspace/tasks", "parent": null, "precondition": "board and list fixtures", "states": ["default", "selected", "disabled", "loading", "responsive"], "observed": ["desktop", "mobile390"], "gaps": ["mobile375"] },
+    { "id": "members", "kind": "workspace-root", "route": "/s/:workspace/members", "parent": null, "precondition": "human and Agent members", "states": ["default", "selected", "loading", "responsive"], "observed": ["desktop", "mobile390"], "gaps": ["mobile375"] },
+    { "id": "human-profile", "kind": "detail", "route": "/s/:workspace/human/:human", "parent": "members", "precondition": "readable member profile", "states": ["default", "open", "closed", "loading", "responsive"], "observed": ["mobile390"], "gaps": ["desktop", "mobile375"] },
+    { "id": "agent-profile", "kind": "detail", "route": "/s/:workspace/agent/:agent", "parent": "members", "precondition": "Agent with runtime status", "states": ["default", "loading", "responsive"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "computers", "kind": "workspace-root", "route": "/s/:workspace/computers", "parent": "workspace-home", "precondition": "at least one machine", "states": ["default", "loading", "responsive"], "observed": ["desktop"], "gaps": ["mobile390", "mobile375"] },
+    { "id": "computer-detail", "kind": "detail", "route": "/s/:workspace/computer/:computer", "parent": "computers", "precondition": "offline and online machine fixtures", "states": ["default", "disabled", "loading", "open", "closed", "responsive"], "observed": ["desktop"], "gaps": ["mobile390", "mobile375"] },
+    { "id": "settings", "kind": "workspace-root", "route": "/s/:workspace/settings", "parent": null, "precondition": "authenticated member", "states": ["default", "selected", "responsive"], "observed": ["desktop", "mobile390"], "gaps": ["mobile375"] },
+    { "id": "settings-account", "kind": "detail", "route": "/s/:workspace/settings/account", "parent": "settings", "precondition": "authenticated member", "states": ["default", "focus", "disabled", "loading", "responsive"], "observed": ["desktop", "mobile390", "mobile375"], "gaps": [] },
+    { "id": "settings-appearance", "kind": "detail", "route": "/s/:workspace/settings/appearance", "parent": "settings", "precondition": "authenticated member", "states": ["default", "selected", "responsive"], "observed": ["desktop"], "gaps": ["mobile390", "mobile375"] },
+    { "id": "settings-notifications", "kind": "detail", "route": "/s/:workspace/settings/notifications", "parent": "settings", "precondition": "notification preferences", "states": ["default", "disabled", "loading", "responsive"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "settings-workspace", "kind": "detail", "route": "/s/:workspace/settings/server", "parent": "settings", "precondition": "owner, admin, member permission fixtures", "states": ["default", "disabled", "loading", "responsive"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "settings-invites", "kind": "detail", "route": "/s/:workspace/settings/members", "parent": "settings", "precondition": "invite and capability fixtures", "states": ["default", "open", "closed", "disabled", "loading", "responsive"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "settings-apps", "kind": "detail", "route": "/s/:workspace/settings/apps", "parent": "settings", "precondition": "connected and empty fixtures", "states": ["default", "loading", "responsive"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] },
+    { "id": "settings-mcp", "kind": "detail", "route": "/s/:workspace/settings/mcp", "parent": "settings", "precondition": "configured and empty fixtures", "states": ["default", "loading", "responsive"], "observed": [], "gaps": ["desktop", "mobile390", "mobile375"] }
+  ]
+}

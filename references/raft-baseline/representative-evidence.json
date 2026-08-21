@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "capturedAt": "2026-08-21",
+  "environment": {
+    "browser": "Chromium 150",
+    "taskSpace": "raft baseline issue 304",
+    "pageScaleFactor": 1,
+    "deviceScaleFactor": 1,
+    "theme": "light",
+    "dynamicMasks": ["user text", "timestamps", "avatars", "notification counters", "text caret"]
+  },
+  "noiseCalibration": {
+    "samples": 3,
+    "byteIdenticalPairs": 1,
+    "minimumSsim": 1,
+    "minimumSsimDb": 79.241276,
+    "maximumLumaDelta": 8,
+    "meanLumaDelta": 0.0000192901
+  },
+  "thresholds": {
+    "fullPageMinimumSsim": 0.995,
+    "fullPageMaximumChangedPixelRatio": 0.005,
+    "criticalRegionMinimumSsim": 0.998,
+    "criticalRegionMaximumChangedPixelRatio": 0.0025,
+    "criticalEdgeMaximumDeltaCssPx": 2,
+    "maximumHorizontalOverflowCssPx": 0
+  },
+  "geometry": {
+    "desktop1440": {
+      "globalRail": { "x": 0, "y": 0, "width": 64, "height": 900 },
+      "chatSectionSidebar": { "x": 64, "y": 0, "width": 240, "height": 900 },
+      "globalNavigationButton": { "width": 40, "height": 40 },
+      "body": { "width": 1440, "height": 900, "overflowX": "hidden", "overflowY": "hidden" }
+    },
+    "mobile390": {
+      "primaryNavigation": { "x": 0, "y": 793, "width": 390, "height": 51 },
+      "primaryItems": [
+        { "x": 0, "width": 98 },
+        { "x": 98, "width": 98 },
+        { "x": 196, "width": 98 },
+        { "x": 294, "width": 96 }
+      ],
+      "body": { "width": 390, "height": 844, "overflowX": "hidden", "overflowY": "hidden" }
+    },
+    "mobile375": {
+      "accountDetail": { "width": 375, "height": 812, "primaryNavigationVisible": false },
+      "horizontalOverflowCssPx": 0
+    }
+  },
+  "computedStyles": {
+    "body": {
+      "fontFamily": "Raft Quote Glyphs, Space Grotesk, system-ui, sans-serif",
+      "fontSize": "16px",
+      "lineHeight": "24px",
+      "color": "rgb(20, 17, 17)",
+      "backgroundColor": "rgb(255, 255, 255)",
+      "position": "relative",
+      "overflow": "hidden"
+    },
+    "desktopFocus": { "outlineWidth": "3px", "borderWidth": "2px", "borderRadius": "0px" },
+    "desktopSelected": { "ariaPressed": "true", "borderWidth": "2px", "borderRadius": "0px", "shadowOffset": "2px 2px" },
+    "mobileSelected": { "backgroundColor": "rgb(255, 212, 64)", "fontSize": "10px", "fontWeight": "700", "lineHeight": "15px" },
+    "composerDisabledSend": { "width": 28, "height": 28, "borderWidth": "2px", "borderRadius": "0px", "shadowOffset": "2px 2px" },
+    "notificationOpen": { "width": 320, "height": 288, "borderWidth": "2px", "borderRadius": "0px", "shadowOffset": "4px 4px", "overflow": "hidden" }
+  },
+  "stateEvidence": {
+    "default": "desktop channel, workspace roots, and mobile roots observed",
+    "hover": "desktop global search control measured with a real pointer",
+    "focus": "desktop server switcher reached by Tab and measured with a 3px outline",
+    "pressed": "desktop selected navigation control measured during real pointer press",
+    "selected": "desktop aria-pressed navigation and mobile yellow primary item measured",
+    "disabled": "empty channel Composer send control measured",
+    "loading": "visible initial channel loading text observed; deterministic slow-server capture remains a matrix gap",
+    "open": "notification dialog and thread preview observed",
+    "closed": "dialog remains mounted but not visible after Escape",
+    "scrolled": "channel timeline internal scroll observed while body stayed fixed",
+    "responsive": "768px desktop and 767px mobile seam measured"
+  },
+  "licenses": [
+    {
+      "surface": "reference fonts, icons, logo, and brand colors",
+      "decision": "measurement only; do not copy without a verified license",
+      "requiredFallback": "record exact visual delta and use licensed OpenTag-owned assets"
+    }
+  ]
+}
