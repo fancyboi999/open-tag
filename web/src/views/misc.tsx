@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Star, Bookmark, AlertTriangle, Lock, MessageCircle, Eye, Plus } from "lucide-react";
 import { useStore } from "../store.tsx";
 import { fmtDateTime } from "../format";
@@ -76,27 +76,42 @@ export function Inbox() {
   const { api, slug, markRead, onEvent } = useStore();
   const nav = useNavigate();
   const { t } = useTranslation();
-  const [filter, setFilter] = useState("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilter = INBOX_FILTERS.some((f) => f.key === searchParams.get("filter")) ? searchParams.get("filter")! : "all";
+  const [filter, setFilter] = useState(initialFilter);
   const [items, setItems] = useState<InboxItem[]>([]);
   const [mentions, setMentions] = useState<MentionItem[]>([]);
   const [mentionsHasMore, setMentionsHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const filterRef = useRef("all");
+  const loadSeqRef = useRef(0);
   const MENTIONS_PAGE = 50;
+  const selectFilter = (nextFilter: string) => {
+    setFilter(nextFilter);
+    const next = new URLSearchParams(searchParams);
+    if (nextFilter === "all") next.delete("filter"); else next.set("filter", nextFilter);
+    setSearchParams(next, { replace: true });
+  };
+  const activitySource = () => `from=activity${filter === "all" ? "" : `&activityFilter=${encodeURIComponent(filter)}`}`;
 
   const load = (f: string, silent = false) => {
+    const seq = ++loadSeqRef.current;
     if (!silent) setLoading(true);
+    if (!silent) setLoadError(false);
     // Mentions is a message-grained activity stream (every @ of me, read or not — GET /api/mentions), paginated
     // with a Load-more button; all/unread stay channel-aggregated via the inbox endpoint. A realtime reload
     // resets to the first page (newest @s are at the top).
     const req = f === "mentions"
-      ? api("GET", `/api/mentions?limit=${MENTIONS_PAGE}`).then((r) => { setMentions(r?.items || []); setMentionsHasMore(!!r?.hasMore); }).catch(() => { setMentions([]); setMentionsHasMore(false); })
-      : api("GET", `/api/channels/inbox?filter=${f}&limit=50`).then((r) => setItems(r?.items || [])).catch(() => setItems([]));
-    req.finally(() => setLoading(false));
+      ? api("GET", `/api/mentions?limit=${MENTIONS_PAGE}`).then((r) => { if (!Array.isArray(r?.items)) throw new Error("invalid mentions response"); if (seq !== loadSeqRef.current) return; setMentions(r.items); setMentionsHasMore(!!r.hasMore); })
+      : api("GET", `/api/channels/inbox?filter=${f}&limit=50`).then((r) => { if (!Array.isArray(r?.items)) throw new Error("invalid inbox response"); if (seq !== loadSeqRef.current) return; setItems(r.items); });
+    req.catch(() => { if (!silent && seq === loadSeqRef.current) setLoadError(true); }).finally(() => { if (seq === loadSeqRef.current) setLoading(false); });
   };
   // Append the next page of mentions (offset = how many we already hold).
-  const loadMoreMentions = () => api("GET", `/api/mentions?limit=${MENTIONS_PAGE}&offset=${mentions.length}`)
-    .then((r) => { setMentions((prev) => [...prev, ...(r?.items || [])]); setMentionsHasMore(!!r?.hasMore); }).catch(() => {});
+  const loadMoreMentions = () => { setLoadingMore(true); setLoadError(false); return api("GET", `/api/mentions?limit=${MENTIONS_PAGE}&offset=${mentions.length}`)
+    .then((r) => { if (!Array.isArray(r?.items)) throw new Error("invalid mentions response"); setMentions((prev) => [...prev, ...r.items]); setMentionsHasMore(!!r.hasMore); })
+    .catch(() => setLoadError(true)).finally(() => setLoadingMore(false)); };
   useEffect(() => { filterRef.current = filter; load(filter); /* eslint-disable-next-line */ }, [filter]);
 
   // Real-time: on incoming message/message:updated socket events, debounce a silent re-fetch of the current filter to stay fresh without manual refresh.
@@ -114,14 +129,14 @@ export function Inbox() {
   const open = (it: InboxItem) => {
     if (it.unreadCount > 0) markRead(it.channelId);
     // Thread entry → navigate to parent channel and open the thread panel; non-thread unread → jump to first unread message; otherwise navigate to channel
-    if (it.kind === "thread" && it.parentChannelId && it.parentMessageId) nav(`/s/${slug}/channel/${it.parentChannelId}?thread=${it.parentMessageId}`);
-    else if (it.firstUnreadMessageId) nav(`/s/${slug}/channel/${it.channelId}?msg=${it.firstUnreadMessageId}`);
-    else nav(`/s/${slug}/channel/${it.channelId}`);
+    if (it.kind === "thread" && it.parentChannelId && it.parentMessageId) nav(`/s/${slug}/channel/${it.parentChannelId}?thread=${it.parentMessageId}&${activitySource()}`);
+    else if (it.firstUnreadMessageId) nav(`/s/${slug}/channel/${it.channelId}?msg=${it.firstUnreadMessageId}&${activitySource()}`);
+    else nav(`/s/${slug}/channel/${it.channelId}?${activitySource()}`);
   };
   // Jump straight to the @-mention: highlight that message via ?msg=; a thread mention opens the parent thread panel.
   const openMention = (m: MentionItem) => {
-    if (m.channelType === "thread" && m.parentChannelId && m.parentMessageId) nav(`/s/${slug}/channel/${m.parentChannelId}?thread=${m.parentMessageId}`);
-    else nav(`/s/${slug}/channel/${m.channelId}?msg=${m.messageId}`);
+    if (m.channelType === "thread" && m.parentChannelId && m.parentMessageId) nav(`/s/${slug}/channel/${m.parentChannelId}?thread=${m.parentMessageId}&${activitySource()}`);
+    else nav(`/s/${slug}/channel/${m.channelId}?msg=${m.messageId}&${activitySource()}`);
   };
 
   const curFilter = INBOX_FILTERS.find((f) => f.key === filter);
@@ -137,16 +152,21 @@ export function Inbox() {
         <div className="sb-title">{t("misc.inboxTitle")}</div>
         <div className="sec">{t("misc.inboxFilter")}</div>
         {INBOX_FILTERS.map((f) => (
-          <button key={f.key} className={"item" + (filter === f.key ? " active" : "")} onClick={() => setFilter(f.key)}>
+          <button key={f.key} className={"item" + (filter === f.key ? " active" : "")} onClick={() => selectFilter(f.key)}>
             <span className="grow">{t(f.label)}</span>
           </button>
         ))}
         </div>
       </aside>
-      <main className="content-col">
+      <main className="content-col activity-page">
         <div className="head"><h1>{t("misc.inboxTitle")}</h1><small>{loading ? t("misc.inboxLoading") : t("misc.inboxSummary", { count: listCount, filter: curFilterLabel })}</small></div>
+        <div className="activity-filters" role="group" aria-label={t("misc.inboxFilter")}>
+          {INBOX_FILTERS.map((f) => <button key={f.key} className={filter === f.key ? "on" : ""} aria-pressed={filter === f.key} onClick={() => selectFilter(f.key)}>{t(f.label)}</button>)}
+        </div>
         <div className="inbox-list">
-          {!loading && isEmpty && (
+          {loading && <div className="page-loading" role="status" aria-label={t("misc.inboxLoading")}><span /><span /><span /></div>}
+          {!loading && loadError && <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{t("misc.activityLoadError")}</span><button onClick={() => load(filter)}>{t("misc.retry")}</button></div>}
+          {!loading && !loadError && isEmpty && (
             <PaneEmpty icon={<IconInbox size={30} />} title={filter === "all" ? t("misc.inboxEmptyAll") : t("misc.inboxEmptyFilter", { filter: curFilterLabel })} />
           )}
           {!isMentions && items.map((it) => (
@@ -176,7 +196,7 @@ export function Inbox() {
               </span>
             </button>
           ))}
-          {isMentions && mentionsHasMore && !loading && <button className="loadmore" onClick={loadMoreMentions}>{t("misc.loadMore")}</button>}
+          {isMentions && mentionsHasMore && !loading && !loadError && <button className="loadmore" disabled={loadingMore} onClick={loadMoreMentions}>{loadingMore ? t("misc.inboxLoading") : t("misc.loadMore")}</button>}
         </div>
       </main>
     </>
@@ -314,35 +334,60 @@ export function Search() {
   const { api, slug } = useStore();
   const nav = useNavigate();
   const { t } = useTranslation();
-  const [q, setQ] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [q, setQ] = useState(() => searchParams.get("q") ?? "");
   const [results, setResults] = useState<any[]>([]);
   const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const queryRef = useRef(q);
+  queryRef.current = q;
+  const changeQuery = (value: string) => {
+    setQ(value);
+    const next = new URLSearchParams(searchParams);
+    if (value.trim()) next.set("q", value); else next.delete("q");
+    setSearchParams(next, { replace: true });
+  };
   useEffect(() => {
     const v = q.trim();
-    if (!v) { setResults([]); setSearched(false); return; }
+    if (!v) { setResults([]); setSearched(false); setLoading(false); setLoadError(false); setHasMore(false); return; }
     let cancelled = false;
     const h = setTimeout(async () => {
-      const d = await api("GET", `/api/messages/search?q=${encodeURIComponent(v)}`);
-      if (cancelled) return;
-      setResults(d?.results || []);
-      setSearched(true);
+      setLoading(true); setLoadError(false);
+      try {
+        const d = await api("GET", `/api/messages/search?q=${encodeURIComponent(v)}`);
+        if (cancelled) return;
+        if (!Array.isArray(d?.results)) throw new Error("invalid search response");
+        setResults(d.results); setHasMore(!!d.hasMore); setSearched(true);
+      } catch { if (!cancelled) { setLoadError(true); setSearched(false); } }
+      finally { if (!cancelled) setLoading(false); }
     }, 300);
     return () => { cancelled = true; clearTimeout(h); };
-  }, [q]);
+  }, [q, retryNonce]);
+  const loadMore = async () => {
+    const v = q.trim(); setLoading(true); setLoadError(false);
+    try { const d = await api("GET", `/api/messages/search?q=${encodeURIComponent(v)}&offset=${results.length}`); if (!Array.isArray(d?.results)) throw new Error("invalid search response"); if (queryRef.current.trim() !== v) return; setResults((prev) => [...prev, ...d.results]); setHasMore(!!d.hasMore); }
+    catch { if (queryRef.current.trim() === v) setLoadError(true); } finally { if (queryRef.current.trim() === v) setLoading(false); }
+  };
   return (
     <>
       <aside className="sidebar"><div className="sb-scroll"><div className="sb-title">{t("nav.search")}</div><div className="empty">{t("misc.searchSidebarHint")}</div></div></aside>
-      <main className="content-col">
+      <main className="content-col search-page">
         <div className="head"><h1>{t("nav.search")}</h1><small>{searched ? t("misc.searchResults", { count: results.length }) : ""}</small></div>
         <div className="scroll">
-          <input type="text" value={q} onChange={(e) => setQ(e.target.value)} autoFocus placeholder={t("misc.searchPlaceholder")} style={{ width: "100%", fontSize: 16, padding: "11px 16px", border: "1px solid var(--hair-strong)", borderRadius: 8, marginBottom: 16, outline: "none" }} />
+          <input className="search-input" type="search" value={q} onChange={(e) => changeQuery(e.target.value)} autoFocus aria-label={t("misc.searchPlaceholder")} placeholder={t("misc.searchPlaceholder")} />
+          {loading && !results.length && <div className="page-loading" role="status" aria-label={t("misc.searchLoading")}><span /><span /><span /></div>}
+          {loadError && <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{t("misc.searchLoadError")}</span><button onClick={() => setRetryNonce((n) => n + 1)}>{t("misc.retry")}</button></div>}
           {searched && results.length === 0 && <div className="empty">{t("misc.searchNoResults", { q })}</div>}
           {results.map((r) => (
-            <div className="card" key={r.id} style={{ cursor: "pointer" }} onClick={() => nav(`/s/${slug}/channel/${r.channelId}?msg=${r.id}`)}>
+            <button className="card search-result" key={r.id} onClick={() => nav(`/s/${slug}/channel/${r.channelId}?msg=${r.id}&from=search&searchQ=${encodeURIComponent(q)}`)}>
               <div className="kv"><b># {r.channelName}</b> · {r.senderName} · {fmtDateTime(r.createdAt)}</div>
               <div className="mbody" dangerouslySetInnerHTML={{ __html: hilite(r.snippet || r.content, q) }} />
-            </div>
+            </button>
           ))}
+          {hasMore && !loadError && <button className="loadmore" disabled={loading} onClick={loadMore}>{loading ? t("misc.searchLoading") : t("misc.loadMore")}</button>}
         </div>
       </main>
     </>
@@ -488,19 +533,21 @@ export function Saved() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   // Paginate by DB-row offset, NOT items.length: listSaved now filters out saved rows whose channel the
   // caller can't currently read (IDOR-B5 read-time gate), so the visible count is ≤ the rows the server
   // consumed. Deriving the next offset from items.length would re-request overlapping windows (duplicate
   // bookmarks) or, when a whole window is filtered out, repeat the same offset forever (stuck "load more").
   const [nextOffset, setNextOffset] = useState(0);
-  const load = (off = 0) => listSaved(PAGE, off).then((r) => {
+  const load = (off = 0) => { if (off) setLoadingMore(true); else setLoading(true); setLoadError(false); return listSaved(PAGE, off).then((r) => {
     setItems((prev) => (off ? [...prev, ...r.saved] : r.saved));
     setHasMore(r.hasMore);
     setNextOffset(off + PAGE);
-  }).finally(() => setLoading(false));
+  }).catch(() => setLoadError(true)).finally(() => { setLoading(false); setLoadingMore(false); }); };
   useEffect(() => { load(0); /* eslint-disable-next-line */ }, []);
-  const open = (it: any) => nav(`/s/${slug}/channel/${it.channelId}?msg=${it.messageId}`);
-  const unsave = (e: React.MouseEvent, it: any) => { e.stopPropagation(); unsaveMsg(it.messageId); setItems((p) => p.filter((x) => x.messageId !== it.messageId)); setNextOffset((n) => Math.max(0, n - 1)); };
+  const open = (it: any) => nav(`/s/${slug}/channel/${it.channelId}?msg=${it.messageId}&from=saved`);
+  const unsave = async (e: React.MouseEvent, it: any) => { e.stopPropagation(); const index = items.findIndex((x) => x.messageId === it.messageId); setItems((p) => p.filter((x) => x.messageId !== it.messageId)); setNextOffset((n) => Math.max(0, n - 1)); try { await unsaveMsg(it.messageId); } catch { setItems((p) => { const next = [...p]; next.splice(Math.max(0, index), 0, it); return next; }); setNextOffset((n) => n + 1); setLoadError(true); } };
   const source = (it: any) => it.channelType === "thread"
     ? <><MessageCircle size={12} /> {t("misc.savedThread")}{it.parentChannelType === "dm" ? "@" : "#"}{it.parentChannelName ?? "?"}</>
     : it.channelType === "private"
@@ -509,23 +556,27 @@ export function Saved() {
   return (
     <>
       <ChatSidebar />
-      <main className="content-col">
+      <main className="content-col saved-page">
         <div className="head"><h1>{t("common.saved")}</h1><small>{loading ? t("misc.savedLoading") : t("misc.savedCount", { count: items.length })}</small></div>
         <div className="inbox-list">
-          {!loading && !items.length && <PaneEmpty icon={<Bookmark size={28} />} title={t("misc.savedEmpty")} />}
+          {loading && <div className="page-loading" role="status" aria-label={t("misc.savedLoading")}><span /><span /><span /></div>}
+          {!loading && loadError && <div className="page-load-error" role="alert"><AlertTriangle size={18} /><span>{t("misc.savedLoadError")}</span><button onClick={() => load(0)}>{t("misc.retry")}</button></div>}
+          {!loading && !loadError && !items.length && <PaneEmpty icon={<Bookmark size={28} />} title={t("misc.savedEmpty")} />}
           {items.map((it) => (
-            <button key={it.messageId} className="inbox-row" onClick={() => open(it)}>
-              <span className="ib-main">
-                <span className="ib-top">
-                  <span className="ib-name">{source(it)}</span>
-                  <span className="ib-time">{relTime(it.createdAt, t)}</span>
+            <div key={it.messageId} className="inbox-row saved-row">
+              <button className="saved-open" onClick={() => open(it)}>
+                <span className="ib-main">
+                  <span className="ib-top">
+                    <span className="ib-name">{source(it)}</span>
+                    <span className="ib-time">{relTime(it.createdAt, t)}</span>
+                  </span>
+                  <span className="ib-preview"><b>{it.senderName ?? (it.senderType === "agent" ? t("chat.agentKind") : t("chat.userKind"))}</b>: {it.content}</span>
                 </span>
-                <span className="ib-preview"><b>{it.senderName ?? (it.senderType === "agent" ? t("chat.agentKind") : t("chat.userKind"))}</b>: {it.content}</span>
-              </span>
-              <span className="ib-save on" title={t("misc.savedUnsave")} onClick={(e) => unsave(e, it)}><Bookmark size={15} fill="currentColor" /></span>
-            </button>
+              </button>
+              <button className="ib-save on" aria-label={t("misc.savedUnsave")} title={t("misc.savedUnsave")} onClick={(e) => unsave(e, it)}><Bookmark size={15} fill="currentColor" /></button>
+            </div>
           ))}
-          {hasMore && !loading && <button className="loadmore" onClick={() => load(nextOffset)}>{t("misc.savedLoadMore")}</button>}
+          {hasMore && !loading && !loadError && <button className="loadmore" disabled={loadingMore} onClick={() => load(nextOffset)}>{loadingMore ? t("misc.savedLoading") : t("misc.savedLoadMore")}</button>}
         </div>
       </main>
     </>

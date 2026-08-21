@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "ticket": 311,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "scope": "Search, Activity, Saved, and the truthful static Showcase across desktop and both locked mobile viewports, including detail return and reliability states",
+  "locale": "zh",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "horizontalOverflowCssPx": 0,
+      "verticalPageOverflowCssPx": 0,
+      "geometry": {
+        "searchInput": [80, 20, 1344, 44],
+        "searchResult": [80, 80, 1344, 79],
+        "activityFilter": [80, 72, 44, 32],
+        "activityResult": [80, 132, 1344, 64.5],
+        "savedResult": [304, 70, 1136, 65],
+        "savedAction": [1386, 80.5, 44, 44],
+        "showcaseShell": [304, 0, 1136, 900],
+        "showcaseThread": [1080, 0, 360, 900]
+      }
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "horizontalOverflowCssPx": 0,
+      "verticalPageOverflowCssPx": 0,
+      "geometry": {
+        "searchResult": [12, 130, 366, 77],
+        "activityResult": [16, 132, 358, 61.5],
+        "savedResult": [16, 70, 358, 62],
+        "showcaseCase": [12, 104, 350, 212.9375],
+        "detailBack": [12, 8, 44, 44]
+      }
+    },
+    {
+      "width": 375,
+      "height": 812,
+      "horizontalOverflowCssPx": 0,
+      "verticalPageOverflowCssPx": 0,
+      "geometry": {
+        "searchInput": [12, 70, 351, 44],
+        "searchResult": [12, 130, 351, 77],
+        "activityFilter": [16, 72, 44, 32],
+        "activityResult": [16, 132, 343, 61.5],
+        "savedResult": [16, 70, 343, 62],
+        "savedAction": [311, 78.5, 44, 44],
+        "showcaseThread": [0, 0, 375, 812],
+        "showcaseClose": [326, 8, 44, 44],
+        "detailBack": [12, 8, 44, 44]
+      },
+      "primaryNavigation": "absent on all four detail pages"
+    }
+  ],
+  "interactionEvidence": {
+    "searchReliability": "a forced 503 produced a retryable alert; retry cleared it; a 900ms request exposed three status skeletons before five real QA results returned",
+    "searchHistory": "a direct ?q=QA refresh restored the query and five results; opening a result added from=search and searchQ=QA; the 44px mobile Back control returned to the same query and results",
+    "activityReliability": "a forced Mentions 503 produced a retryable alert; retry restored the selected filter; a 900ms request exposed three status skeletons before the truthful empty Mentions state",
+    "activityHistory": "the filter is URL-backed, refresh selected Mentions, source navigation declared /inbox as parent, and mobile Back returned to Activity with no primary navigation",
+    "savedReliability": "forced initial list failure stayed distinct from empty and retried to the real bookmark; 900ms loading exposed three skeletons; forced DELETE failure restored both the row and sidebar count",
+    "savedAccessibility": "the message opener and remove action are sibling native buttons, the remove action is a measured 44x44 keyboard/touch target, and no action depends on hover",
+    "showcaseHistory": "four static cases render with no Composer; ?case=0 opens an eight-message read-only thread; browser back closes it and forward reopens it",
+    "showcaseMobile": "the selected thread occupies 375x812, exposes 44px Back and Close controls, has zero page overflow, and renders no primary navigation"
+  },
+  "permissionEvidence": {
+    "search": "the existing search endpoint derives its candidate channel ids from the current user's memberships before querying messages",
+    "activity": "Inbox and Mentions continue to consume the authenticated user's existing scoped endpoints and invent no cross-channel aggregation capability",
+    "saved": "channelAccessB5 and B6 prove bookmark writes and reads cannot reveal private or DM content after access is absent or revoked",
+    "showcase": "the page is client-only static data with inert internal tokens, non-clickable demo identities, no workspace API, and no profile or Composer capability"
+  },
+  "contractRegression": {
+    "unit": { "passed": 317, "failed": 0 },
+    "integrationScripts": ["channelAccessB5", "channelAccessB6", "threadUnread", "mention"],
+    "integrationResult": "all pass",
+    "typecheck": "pass",
+    "previewBuild": "2557 modules transformed",
+    "referenceCheck": "29 pages, 3 required viewports, 11 representative states"
+  },
+  "artifacts": {
+    "reference": [
+      { "name": "311-reference-search-1440.png", "sha256": "055a4e863fbd1f9232ddf1be4f64738dc0aefec8b4c0b456382fd97eec4e62fc", "committed": false },
+      { "name": "311-reference-search-375.png", "sha256": "a0831d21c7d5e8525263659cfa0ed2c3c2f165b06b7ff8d25ec5a7b337ac182e", "committed": false },
+      { "name": "311-reference-activity-1440.png", "sha256": "4876fc236f43077f0160dee1bada9fed2f69aabb53a64c963a7f1a53fb4b48cb", "committed": false },
+      { "name": "311-reference-activity-375.png", "sha256": "a66207e58c725252f659cd8728b0aa8b2a830dcabd1eac484f4ab7fa9d56a5d3", "committed": false },
+      { "name": "311-reference-saved-1440.png", "sha256": "1a035838331f4b1d9dd8b2a2853de40796f63f88acbe9996035eecf19623eb3e", "committed": false },
+      { "name": "311-reference-saved-375.png", "sha256": "c40e4742460543c8a2e1fa916e5811859b63935faaf24640219ff5ec1a6dd134", "committed": false }
+    ],
+    "local": [
+      { "name": "311-local-search-1440.png", "sha256": "0ad555c7e8b55ede8dfa0bdcb01b15434b532092c94c436eab320b2a5cd8692b", "committed": false },
+      { "name": "311-local-search-375.png", "sha256": "9cacaff486fcf2952dc61ea086ea0447487a4cfa8f3dcf2f914118ced7f2b454", "committed": false },
+      { "name": "311-local-activity-1440.png", "sha256": "0d8bba612e33165f07c0d262f2de6d3f55533021a3e437ea03915869bd82fba1", "committed": false },
+      { "name": "311-local-activity-375.png", "sha256": "25e62c209bc53fcaf5120dd40daa1add1d6d6098de9619f51acca8bf92212c33", "committed": false },
+      { "name": "311-local-saved-1440.png", "sha256": "538a3112c9adfc044a55aa6bc5f535e01e667b51c5100226bf00971dd9b0773e", "committed": false },
+      { "name": "311-local-saved-375.png", "sha256": "1875d2777d9e9373aa075f6d7facbb5329c62eee2f522df75a9e0732db7f69f0", "committed": false },
+      { "name": "311-local-showcase-1440.png", "sha256": "65d90bae62141ac466ae3cf4dd5b58f1347a7ed63cdb3569637c6b5c889cee52", "committed": false },
+      { "name": "311-local-showcase-thread-1440.png", "sha256": "7ac88ff79ceb9da85a3b3fb65b481d83adb9a104d3e72bf6f21486c42716adf3", "committed": false },
+      { "name": "311-local-showcase-thread-375.png", "sha256": "8ee3d5d1075a86069184b11a84e9e7b5edee8335db457d8b2cb4560e3ca4baf7", "committed": false }
+    ]
+  },
+  "thresholdResults": {
+    "criticalEdgeMaximumCssPx": { "limit": 2, "actual": 0, "result": "pass" },
+    "horizontalOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" },
+    "verticalPageOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" }
+  },
+  "intentionalDifferences": [
+    "OpenTag preserves its real message, activity, bookmark, channel, and identity data instead of copying private Raft content.",
+    "Raft has no independent /showcase route in the observed workspace and redirects it to a channel; OpenTag keeps its documented static, read-only Showcase and applies only the shared Raft channel/thread geometry.",
+    "OpenTag exposes only the real full-text query and paging supported by its API; it does not invent Raft sender, date, scope, or relevance filters.",
+    "Classic remains unchanged and is the immediate rollback surface."
+  ]
+}

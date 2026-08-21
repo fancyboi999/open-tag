@@ -194,9 +194,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const openAgentPanel = (agentId: string) => setAgentPanelReq(agentId); // LiveAgentBar → Chat: open the agent profile panel (Activity tab); Chat consumes & clears
   const clearAgentPanelReq = () => setAgentPanelReq(null);
   // Saved messages: private bookmarks, optimistically update savedIds.
-  const saveMsg = async (messageId: string) => { setSavedIds((s) => new Set(s).add(messageId)); await api("POST", "/api/channels/saved", { messageId }); };
-  const unsaveMsg = async (messageId: string) => { setSavedIds((s) => { const n = new Set(s); n.delete(messageId); return n; }); await api("DELETE", `/api/channels/saved/${messageId}`); };
-  const listSaved = async (limit = 20, offset = 0) => { const r = await api("GET", `/api/channels/saved?limit=${limit}&offset=${offset}`); return { saved: r?.saved ?? [], hasMore: !!r?.hasMore }; };
+  const saveMsg = async (messageId: string) => { setSavedIds((s) => new Set(s).add(messageId)); try { const r = await api("POST", "/api/channels/saved", { messageId }); if (r?.ok !== true) throw new Error(r?.error || "save message failed"); } catch (error) { setSavedIds((s) => { const n = new Set(s); n.delete(messageId); return n; }); throw error; } };
+  const unsaveMsg = async (messageId: string) => { setSavedIds((s) => { const n = new Set(s); n.delete(messageId); return n; }); try { const r = await api("DELETE", `/api/channels/saved/${messageId}`); if (r?.ok !== true) throw new Error(r?.error || "unsave message failed"); } catch (error) { setSavedIds((s) => new Set(s).add(messageId)); throw error; } };
+  const listSaved = async (limit = 20, offset = 0) => { const r = await api("GET", `/api/channels/saved?limit=${limit}&offset=${offset}`); if (!Array.isArray(r?.saved)) throw new Error("invalid saved messages response"); return { saved: r.saved, hasMore: !!r.hasMore }; };
 
   // ── Auth bootstrap (runs once): resolve a session token + the user's workspace list, then pick the initial workspace
   //    from the URL. Loading that workspace (its data + socket) is the activation effect below, keyed on activeId — the

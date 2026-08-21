@@ -171,6 +171,26 @@ test("a task source deep-link returns to the Tasks root", () => {
   assert.equal(resolveParentBackMode("/s/acme/tasks?ui=baseline", "/s/acme/tasks", true), "history");
 });
 
+test("global result deep-links return to the originating workspace page", () => {
+  for (const [source, parent] of [
+    ["search", "/s/acme/search"],
+    ["activity", "/s/acme/inbox"],
+    ["saved", "/s/acme/saved"],
+  ] as const) {
+    const page = describeAppPage({ pathname: "/s/acme/channel/c1", search: `?msg=m1&from=${source}`, hash: "" });
+    assert.equal(page.id, `${source}-source`);
+    assert.equal(page.parentHref, parent);
+  }
+  assert.equal(
+    describeAppPage({ pathname: "/s/acme/channel/c1", search: "?msg=m1&from=search&searchQ=release%20gate", hash: "" }).parentHref,
+    "/s/acme/search?q=release%20gate",
+  );
+  assert.equal(
+    describeAppPage({ pathname: "/s/acme/channel/c1", search: "?msg=m1&from=activity&activityFilter=mentions", hash: "" }).parentHref,
+    "/s/acme/inbox?filter=mentions",
+  );
+});
+
 test("every implemented workspace matrix route has an explicit root/detail class and parent", () => {
   const cases: Array<[string, string, "workspace-root" | "workspace-detail" | "unknown", string | null]> = [
     ["/s/acme", "workspace-home", "workspace-root", null],

@@ -9,9 +9,10 @@
 // Reuses the Chat message/thread styles (.msg / .msg-col / .mbody / .msg-meta / .task-pill / .thread-pill /
 // .thread-panel / .thread-head / .thread-sep / Avatar / MessageContent). Agent avatars/names are
 // intentionally NON-clickable and trigger no profile/API: the old DB-channel showcase leaked host-machine
-// skills on avatar click, so this static page never makes an avatar interactive. Thread open/close is pure
-// useState over static data — never openThread/startThread (those hit the server).
+// skills on avatar click, so this static page never makes an avatar interactive. Thread selection is URL state
+// over static data — never openThread/startThread (those hit the server).
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Eye, CheckCircle2, MessageCircle, X } from "lucide-react";
 import { Avatar } from "../Avatar.tsx";
@@ -125,8 +126,15 @@ function ShowcaseThread({ c, onClose }: { c: ShowcaseCase; onClose: () => void }
 
 export function Showcase() {
   const { t } = useTranslation();
-  // Index of the case whose thread panel is open (null = closed). Pure local state over static data — no API.
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  // The selected case is URL-backed so deep links, refresh, and browser back/forward preserve the static thread.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedCase = Number(searchParams.get("case"));
+  const openIdx = searchParams.has("case") && Number.isInteger(requestedCase) && requestedCase >= 0 && requestedCase < CASES.length ? requestedCase : null;
+  const setOpenIdx = (index: number | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (index == null) next.delete("case"); else next.set("case", String(index));
+    setSearchParams(next, { replace: false });
+  };
   const openCase = openIdx != null ? CASES[openIdx] : null;
   return (
     <>

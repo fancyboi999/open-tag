@@ -561,7 +561,7 @@ export function Chat({ canonicalizeMissingChannel = true }: { canonicalizeMissin
                   {dateDivider}
                   <div className={"msg" + (shouldEnter ? " msg-enter" : "")} id={"m-" + m.id} onContextMenu={(e) => { e.preventDefault(); openContextMenu(m, e.clientX, e.clientY, e.currentTarget.querySelector<HTMLElement>(".msg-name-trigger")); }} style={isNewMsg ? { "--msg-delay": `${staggerIdx * 60}ms` } as CSSProperties : undefined}>
                   <div className="msg-toolbar">
-                    <button className={"im" + (isSaved ? " on" : "")} title={isSaved ? t("chat.unsave") : t("chat.saveMessage")} onClick={() => { isSaved ? unsaveMsg(m.id) : saveMsg(m.id); }}><Bookmark size={15} className="im-pop im-fill" fill={isSaved ? "currentColor" : "none"} /></button>
+                    <button className={"im" + (isSaved ? " on" : "")} title={isSaved ? t("chat.unsave") : t("chat.saveMessage")} onClick={() => { void (isSaved ? unsaveMsg(m.id) : saveMsg(m.id)).catch(() => {}); }}><Bookmark size={15} className="im-pop im-fill" fill={isSaved ? "currentColor" : "none"} /></button>
                     <button className="im" title={t("chat.copyMarkdown")} onClick={() => copyMarkdown(m.content)}><Clipboard size={15} className="im-pop" /></button>
                     <button className="im" title={t("chat.more")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openContextMenu(m, r.right - 212, r.bottom + 4, e.currentTarget); }}><MoreHorizontal size={15} className="im-pop" /></button>
                   </div>
@@ -656,7 +656,7 @@ export function Chat({ canonicalizeMissingChannel = true }: { canonicalizeMissin
               <button role="menuitem" className="ctx-item" onClick={() => copy(m.content, t("chat.copyMarkdown"))}><Clipboard size={14} /> {t("chat.copyMarkdown")}</button>
               <button role="menuitem" className="ctx-item" onClick={() => copy(link, t("chat.copyLink"))}><Link2 size={14} /> {t("chat.copyLink")}</button>
               <button role="menuitem" className="ctx-item" onClick={() => { const stableTrigger = ctxTriggerRef.current; startThread(m, stableTrigger); closeContextMenu(false); }}><MessageCircle size={14} /> {t("chat.openThread")}</button>
-              <button role="menuitem" className="ctx-item" onClick={() => { savedIds.has(m.id) ? unsaveMsg(m.id) : saveMsg(m.id); close(); }}><Bookmark size={14} fill={savedIds.has(m.id) ? "currentColor" : "none"} /> {savedIds.has(m.id) ? t("chat.unsave") : t("chat.saveMessage")}</button>
+              <button role="menuitem" className="ctx-item" onClick={() => { void (savedIds.has(m.id) ? unsaveMsg(m.id) : saveMsg(m.id)).catch(() => {}); close(); }}><Bookmark size={14} fill={savedIds.has(m.id) ? "currentColor" : "none"} /> {savedIds.has(m.id) ? t("chat.unsave") : t("chat.saveMessage")}</button>
               <button role="menuitem" className="ctx-item" onClick={async () => { close(); await api("POST", "/api/tasks/convert-message", { messageId: m.id }); }}><CheckSquare size={14} /> {t("chat.convertToTask")}</button>
             </div>
           </div>

@@ -97,8 +97,15 @@ export function describeAppPage(location: AppPageLocation): AppPageDescriptor {
     if (!detail) return { id: "channel", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: root };
     const channelHref = `${root}/channel/${detail}`;
     const params = new URLSearchParams(location.search);
-    if (params.get("from") === "tasks") {
-      return { id: "task-source", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: `${root}/tasks` };
+    const source = params.get("from");
+    const sourceParents: Record<string, string> = {
+      tasks: `${root}/tasks`,
+      search: `${root}/search${params.get("searchQ") ? `?q=${encodeURIComponent(params.get("searchQ")!)}` : ""}`,
+      activity: `${root}/inbox${params.get("activityFilter") ? `?filter=${encodeURIComponent(params.get("activityFilter")!)}` : ""}`,
+      saved: `${root}/saved`,
+    };
+    if (source && sourceParents[source]) {
+      return { id: source === "tasks" ? "task-source" : `${source}-source`, kind: "workspace-detail", workspaceSlug, currentHref, parentHref: sourceParents[source] };
     }
     if (params.has("thread")) {
       return { id: "thread", kind: "workspace-detail", workspaceSlug, currentHref, parentHref: detailParentHref(channelHref, location.search, location.hash, ["thread", "agentTab"]) };
