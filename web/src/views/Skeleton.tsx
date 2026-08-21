@@ -50,3 +50,17 @@ export function WorkspaceSkeleton({ chat }: { chat?: boolean }) {
     </div>
   );
 }
+
+export function BootstrapFailure({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <main className="bootstrap-failure" role="alert">
+      <div className="bootstrap-failure-card">
+        <strong className="auth-brand">open-tag</strong>
+        <h1>{t("common.bootstrapFailedTitle")}</h1>
+        <p>{t("common.bootstrapFailedBody")}</p>
+        <button type="button" className="ok" onClick={onRetry}>{t("common.retryBootstrap")}</button>
+      </div>
+    </main>
+  );
+}

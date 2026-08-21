@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "ticket": 314,
+  "capturedAt": "2026-08-21",
+  "taskSpace": "raft baseline issue 304",
+  "scope": "Raft marketing reference plus OpenTag Landing, Features, login, register, valid/current-account join, anonymous join, invalid invite, Bootstrap loading, Bootstrap transport failure and retry across the locked desktop and mobile viewports",
+  "locale": "zh",
+  "viewports": [
+    { "width": 1440, "height": 900, "horizontalOverflowCssPx": 0, "publicNavHeight": 66, "authInputHeight": 48, "authSubmitHeight": 48 },
+    { "width": 390, "height": 844, "horizontalOverflowCssPx": 0, "publicNavHeight": 66, "authInputHeight": 48, "authSubmitHeight": 48, "authSecondaryControlMinimumHeight": 44 },
+    { "width": 375, "height": 812, "horizontalOverflowCssPx": 0, "publicNavHeight": 66, "authInputHeight": 48, "authSubmitHeight": 48, "authSecondaryControlMinimumHeight": 44 }
+  ],
+  "interactionEvidence": {
+    "publicSurfaces": "anonymous Landing and Features opt into the Raft yellow/pink/black square-border visual only when the Preview shell resolves Baseline; the first hero card remains a real static OpenTag collaboration sample and both pages measured zero horizontal overflow",
+    "authForms": "login, register and anonymous join retain native form submission, required/email validation, localized stable backend errors, composition-safe Enter handling, explicit busy disabling, 48px primary controls and 44px mobile secondary targets",
+    "inviteStates": "a temporary real join-link fixture verified current-account and anonymous register flows and was deleted after capture; an unknown token rendered the real invalid/expired state; transport failure is now a distinct retryable state instead of being misreported as an invalid invitation",
+    "bootstrapLoading": "a delayed real /api/auth/me response rendered the workspace Skeleton at 1440x900, 390x844 and 375x812 without painting Landing or protected workspace content",
+    "bootstrapRecovery": "a browser-only forced /api/auth/me transport rejection rendered an understandable retry alert, retained the stored token, and a retry after restoring fetch navigated to the original protected workspace route",
+    "classicRollback": "?ui=classic resolved document shell=classic and Landing class=lp-root without lp-baseline; static prerender has no AppShellProvider and fails closed to Classic"
+  },
+  "contractRegression": {
+    "ticketAndRelatedUnit": { "passed": 37, "failed": 0 },
+    "typecheck": "pass",
+    "previewBuild": "2558 modules transformed and Landing prerender injected",
+    "referenceCheck": "30 pages, 3 required viewports, 11 representative states"
+  },
+  "artifacts": {
+    "reference": [
+      { "name": "314-reference-marketing-desktop.png", "sha256": "c4bb684a77136aa25bb1b66d57c48b1bbd5af2305eaf13e21973289033d96c87", "committed": false },
+      { "name": "314-reference-marketing-mobile390.png", "sha256": "5ddc06aec2298505019b7580bfd411d9c28f520b87aa4fb940d1cd7254c783be", "committed": false }
+    ],
+    "local": [
+      { "name": "314-local-marketing-desktop.png", "sha256": "4d45ee6c02899fdd4bb6cde7df394ea712a07014578394a404207c8ce2679f6b", "committed": false },
+      { "name": "314-local-marketing-mobile390.png", "sha256": "a9f2f4496ba1428bd4a752f2ed4a48d28e3c9f6666332c7c2d115e9b2d204d5f1", "committed": false },
+      { "name": "314-local-features-desktop.png", "sha256": "6f016b66e203402c7ef345796e464f0954933f8bc4b70c2003f1b649bdacfbdd", "committed": false },
+      { "name": "314-local-features-mobile375.png", "sha256": "33b5fd38dad4d1b18a59aaf45eee65f950f8b82f357c9f92a08b002a30446542", "committed": false },
+      { "name": "314-local-login-desktop.png", "sha256": "049545a2f59d53bdd66f30cc1bbc9a4a6ae8b1e79c36960c0a29ed4297703e5d", "committed": false },
+      { "name": "314-local-login-error-mobile390.png", "sha256": "439f4496ba1428bd4a752f2ed4a48d28e3c9f6666332c7c2d115e9b2d204d5f1", "committed": false },
+      { "name": "314-local-register-desktop.png", "sha256": "a26f0ce5d69103e2f6b176d3cc0f3604f8d5d168bae2553bbb15b8942ced18e4", "committed": false },
+      { "name": "314-local-register-mobile375.png", "sha256": "9adeeb9182841fa55ed1df2be80fa9c071bc0b6e389cbe3c433fcdca0ea9839a", "committed": false },
+      { "name": "314-local-join-register-desktop.png", "sha256": "b84839e5652cecd90904f1a3183b8df4b989a9094dade27e6ac315b968ffc012", "committed": false },
+      { "name": "314-local-join-register-mobile375.png", "sha256": "1d984f52068e72a2e0f02a34be2dec6e8ff1390cf9707c4c143b83e6079f6cf9", "committed": false },
+      { "name": "314-local-join-invalid-mobile390.png", "sha256": "34e364f900221dd7c46ccfef983b2633648ac20c169134a3b94c697c105b8727", "committed": false },
+      { "name": "314-local-bootstrap-loading-desktop.png", "sha256": "705e380240c9f459bde4e3ea8888395a22694bc0fe4b1e4c685a36275c70c34d", "committed": false },
+      { "name": "314-local-bootstrap-loading-mobile390.png", "sha256": "6720f0bc70fa0ead344b079c010f8b62269fd76550703493388cc89ac090fa60", "committed": false },
+      { "name": "314-local-bootstrap-loading-mobile375.png", "sha256": "2e2bedeefffe93ad2c680539f2d3307d8eb033b3e9a076d6926cc87c6056bc71", "committed": false },
+      { "name": "314-local-bootstrap-error-mobile390.png", "sha256": "724c597a7a5a08eb8c23312e95bf2b12f3229eca3718c0c6c18bf990ebf73e54", "committed": false }
+    ]
+  },
+  "thresholdResults": {
+    "criticalEdgeMaximumCssPx": { "limit": 2, "actual": 0, "result": "pass" },
+    "horizontalOverflowCssPx": { "limit": 0, "actual": 0, "result": "pass" },
+    "mobileInteractiveTargetCssPx": { "limitMinimum": 44, "actualMinimum": 44, "result": "pass" }
+  },
+  "intentionalDifferences": [
+    "Raft exposes only its marketing site publicly in this test environment, so OpenTag login/register/join use the measured Raft marketing primitives rather than copying an unavailable private authentication page.",
+    "OpenTag keeps its real self-hosted account, invite-token, role, workspace-resolution and localized backend error contracts; no identity or server API was changed.",
+    "OpenTag keeps its existing marketing content and real product mock instead of copying Raft claims, assets or private workspace data.",
+    "Classic remains unchanged as the default and immediate rollback surface."
+  ]
+}

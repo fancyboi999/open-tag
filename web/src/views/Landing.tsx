@@ -12,6 +12,7 @@ import { useStore } from "../store.tsx";
 import { COPY as FEATURE_COPY, currentLang, type Lang } from "./Features.tsx";
 import { ProductMock } from "./ProductMock.tsx";
 import { MarketingNav, PublicBrand } from "../landing/MarketingNav.tsx";
+import { useOptionalAppShell } from "../AppShell.tsx";
 import { GITHUB_URL, resolveDocsHref } from "../landing/publicNav.ts";
 import "../landing/landing.css";
 
@@ -299,6 +300,7 @@ function HeroCaseDeck({ lang, label }: { lang: Lang; label: string }) {
 
 export function Landing() {
   const { me, slug } = useStore();
+  const shellMode = useOptionalAppShell()?.mode ?? "classic";
   const navigate = useNavigate();
   const [lang, setLang] = useState<Lang>(() => detectLandingLang());
   const enterWorkspace = () => navigate(me ? `/s/${slug}/channel` : "/login");
@@ -323,7 +325,7 @@ export function Landing() {
   }, []);
 
   return (
-    <main className="lp-root">
+    <main className={`lp-root${shellMode === "baseline" ? " lp-baseline" : ""}`}>
       <MarketingNav
         variant="landing"
         labels={{

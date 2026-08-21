@@ -64,6 +64,13 @@ export function useAppShell(): AppShellContextValue {
   return value;
 }
 
+// Public landing is also rendered by the static prerender entry, which intentionally has no
+// BrowserRouter/AppShellProvider. It must fail closed to Classic there, then resolve Preview mode
+// from the real provider when the client app mounts.
+export function useOptionalAppShell(): AppShellContextValue | null {
+  return useContext(AppShellContext);
+}
+
 export function WorkspaceShell() {
   const { mode, page, previousHref, previousNavigationWasPush } = useAppShell();
   return <Layout shellMode={mode} page={page} previousHref={previousHref} previousNavigationWasPush={previousNavigationWasPush} />;

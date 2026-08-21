@@ -19,7 +19,7 @@ export interface Msg { id: string; seq: number; channelId: string; senderType: s
 type Ev = { type: string; [k: string]: any };
 
 interface Store {
-  ready: boolean; authState: "loading" | "authed" | "anon"; serverId: string; slug: string; me: Me | null; myRole: string; serverAvatar: string | null;
+  ready: boolean; authState: "loading" | "authed" | "anon"; bootstrapState: "loading" | "ready" | "error"; retryBootstrap: () => void; serverId: string; slug: string; me: Me | null; myRole: string; serverAvatar: string | null;
   servers: ServerInfo[]; capabilities: Record<string, boolean>;
   uploadServerAvatar: (file: File) => Promise<void>;
   uploadAgentAvatar: (agentId: string, file: File) => Promise<string>;
@@ -70,6 +70,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // paint Landing with no skeleton/Landing flash — while a stored token or in-flight ?as= dev-login
   // defers to "loading" until the async bootstrap below resolves it.
   const [authState, setAuthState] = useState<AuthState>(initialAuthState);
+  const [bootstrapState, setBootstrapState] = useState<"loading" | "ready" | "error">("loading");
+  const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
   const [serverId, setServerId] = useState("");
   const [slug, setSlug] = useState("open-tag");
   const [servers, setServers] = useState<ServerInfo[]>([]);          // all servers the user belongs to (used by server switcher)
@@ -235,6 +237,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const saveMsg = async (messageId: string) => { setSavedIds((s) => new Set(s).add(messageId)); try { const r = await api("POST", "/api/channels/saved", { messageId }); if (r?.ok !== true) throw new Error(r?.error || "save message failed"); } catch (error) { setSavedIds((s) => { const n = new Set(s); n.delete(messageId); return n; }); throw error; } };
   const unsaveMsg = async (messageId: string) => { setSavedIds((s) => { const n = new Set(s); n.delete(messageId); return n; }); try { const r = await api("DELETE", `/api/channels/saved/${messageId}`); if (r?.ok !== true) throw new Error(r?.error || "unsave message failed"); } catch (error) { setSavedIds((s) => new Set(s).add(messageId)); throw error; } };
   const listSaved = async (limit = 20, offset = 0) => { const r = await api("GET", `/api/channels/saved?limit=${limit}&offset=${offset}`); if (!Array.isArray(r?.saved)) throw new Error("invalid saved messages response"); return { saved: r.saved, hasMore: !!r.hasMore }; };
+  const retryBootstrap = () => { setBootstrapState("loading"); setReady(false); setAuthState(initialAuthState()); setActiveId(""); setBootstrapAttempt((attempt) => attempt + 1); };
 
   // ── Auth bootstrap (runs once): resolve a session token + the user's workspace list, then pick the initial workspace
   //    from the URL. Loading that workspace (its data + socket) is the activation effect below, keyed on activeId — the
@@ -242,6 +245,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setBootstrapState("loading");
+      try {
       // Resolve a session token. Precedence: explicit ?as= dev-login (dev only) > stored JWT. NO silent fallback —
       // an anonymous visitor never auto-logs-in; the /s/* route guard sends them to /login (see main.tsx).
       const asParam = new URLSearchParams(window.location.search).get("as");
@@ -249,33 +254,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       let user: Me | null = null;
       if (asParam) { // explicit developer action: dev-login only succeeds when the backend has ALLOW_DEV_LOGIN=true; on success persist the JWT as a normal session
         const r = await fetch("/api/auth/dev-login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: asParam }) });
+        if (r.status >= 500) throw new Error("developer login unavailable");
         if (r.ok) { const d = await r.json().catch(() => null); if (d?.token) { token = d.token; user = d.user ?? null; localStorage.setItem(TOKEN_KEY, d.token); } }
       }
       if (!token) {
         const storedToken = localStorage.getItem(TOKEN_KEY); // JWT persisted after real register/login (or dev-login above)
         if (storedToken) {
-          const meRes = await (await fetch("/api/auth/me", { headers: { authorization: "Bearer " + storedToken } })).json().catch(() => null);
+          const meResponse = await fetch("/api/auth/me", { headers: { authorization: "Bearer " + storedToken } });
+          const meRes = await meResponse.json().catch(() => null);
           if (meRes?.id) { token = storedToken; user = meRes; }
-          else localStorage.removeItem(TOKEN_KEY); // expired / invalid / 401 → drop it so the guard redirects to /login
+          else if (meResponse.status === 401 || meResponse.status === 403) localStorage.removeItem(TOKEN_KEY); // only a confirmed auth rejection may discard the session
+          else throw new Error(meRes?.error || "identity response unavailable");
         }
       }
       if (cancelled) return;
-      if (!token) { setAuthState("anon"); setReady(true); return; } // unauthenticated: auth pages & landing render; protected routes redirect to /login
+      if (!token) { setAuthState("anon"); setBootstrapState("ready"); setReady(true); return; } // unauthenticated: auth pages & landing render; protected routes redirect to /login
       tokenRef.current = token;
       meIdRef.current = user?.id;
       setMe(user);
       setAuthState("authed");
-      const serverList: ServerInfo[] = await (await fetch("/api/servers", { headers: { authorization: "Bearer " + tokenRef.current } })).json();
+      const serversResponse = await fetch("/api/servers", { headers: { authorization: "Bearer " + tokenRef.current } });
+      const serverList = await serversResponse.json().catch(() => null);
+      if (!serversResponse.ok || !Array.isArray(serverList)) throw new Error(serverList?.error || "workspace response unavailable");
       if (cancelled) return;
       serversRef.current = serverList;
       setServers(serverList);
       const urlSlug = location.pathname.match(/\/s\/([^/]+)/)?.[1]; // resolve workspace from URL /s/:slug (multi-workspace support); fall back to first
       const cur = serverList.find((s) => s.slug === urlSlug) || serverList[0];
-      if (!cur) { setReady(true); return; } // no workspace found: prevent white screen (defensive fallback; workspace is normally created on register/dev-login)
+      if (!cur) { setBootstrapState("ready"); setReady(true); return; } // no workspace found: prevent white screen (defensive fallback; workspace is normally created on register/dev-login)
       setActiveId(cur.id); // → activation effect loads this workspace + opens the socket
+      } catch {
+        if (!cancelled) { setBootstrapState("error"); setReady(true); }
+      }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [bootstrapAttempt]);
 
   // ── Workspace activation (runs on the initial pick + every client-side switch): load the active workspace's data and
   //    open a socket scoped to it. Resets all per-workspace state first so nothing leaks across a switch, and flips
@@ -297,7 +310,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const myId = meIdRef.current;
     // Point at the active workspace + clear the previous one's state so a switch starts from a clean slate; the
     // ready=false → workspace skeleton shows while it reloads.
-    setReady(false);
+    setBootstrapState("loading"); setReady(false);
     sidRef.current = cur.id; setServerId(cur.id); setSlug(cur.slug || "open-tag"); setMyRole(cur.role || "member"); setCapabilities(cur.capabilities || {});
     setServerAvatar(cur.avatarUrl ? `${cur.avatarUrl}?token=${encodeURIComponent(tokenRef.current)}` : null);
     setChannels([]); setDms([]); setUnread({}); setAgents([]); setMachines([]); setHumans([]); setMachinesState("loading"); setMembersState("loading"); setSavedIds(new Set()); setAgentPanelReq(null);
@@ -305,14 +318,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     sockRef.current = null; // the previous socket is closed by this effect's cleanup; drop the stale ref until the new one connects
     let lastSeq = 0;
     (async () => {
-      await reload();
+      try { await reload(); }
+      catch { if (!cancelled) { setBootstrapState("error"); setReady(true); } return; }
       if (cancelled) return;
       // Pre-load saved message id set (small enough for a single full fetch; drives bookmark state + Saved count).
       try { const sv = await api("GET", "/api/channels/saved?limit=100"); setSavedIds(new Set((sv?.saved ?? []).map((s: any) => s.messageId))); } catch { /* */ }
       // Track highest seq so reconnect can fetch only missed messages incrementally.
       try { const s = await api("GET", "/api/messages/sync?since=0"); lastSeq = s?.maxSeq ?? 0; } catch { /* */ }
       if (cancelled) return;
-      setReady(true);
+      setBootstrapState("ready"); setReady(true);
       // Socket.io handshake auth carries {token, serverId}; event names follow the workspace protocol
       // (message:new / agent:activity / machine:status).
       sock = io("/", { auth: { token: tokenRef.current, serverId: sidRef.current }, transports: ["websocket"] });
@@ -384,5 +398,5 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Showcase demo agents (creatorType="system") stay in `agents` so #showcase history still resolves their
   // avatar/name/profile by id — but they are not real members, so every roster / picker uses `visibleAgents`.
   const visibleAgents = agents.filter((a) => a.creatorType !== "system");
-  return <Ctx.Provider value={{ ready, authState, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, switchServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, visibleAgents, machines, machinesState, reloadMachines, latestDaemonVersion, humans, membersState, reloadMembers, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ready, authState, bootstrapState, retryBootstrap, serverId, slug, me, myRole, serverAvatar, servers, capabilities, createServer, switchServer, logout, uploadServerAvatar, uploadAgentAvatar, uploadUserAvatar, channels, dms, unread, agents, visibleAgents, machines, machinesState, reloadMachines, latestDaemonVersion, humans, membersState, reloadMembers, api, reload, onEvent, subscribeChannel, createChannel, markActionExecuted, createTasks, openDM, joinChannel, leaveChannel, markRead, uploadFiles, uploadOne, attachmentUrl, react, openThread, openAgentPanel, agentPanelReq, clearAgentPanelReq, savedIds, saveMsg, unsaveMsg, listSaved }}>{children}</Ctx.Provider>;
 }

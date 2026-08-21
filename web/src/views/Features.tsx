@@ -11,6 +11,7 @@ import {
 import { useStore } from "../store.tsx";
 import { ProductMock, type ProductMockCase } from "./ProductMock.tsx";
 import { MarketingNav } from "../landing/MarketingNav.tsx";
+import { useOptionalAppShell } from "../AppShell.tsx";
 import { GITHUB_URL } from "../landing/publicNav.ts";
 import "../landing/landing.css";
 
@@ -523,6 +524,7 @@ function DialoguePictogram() {
 
 export function Features() {
   const { me, slug } = useStore();
+  const shellMode = useOptionalAppShell()?.mode ?? "classic";
   const { i18n } = useTranslation();
   const navigate = useNavigate();
   const lang = currentLang(i18n.resolvedLanguage || i18n.language);
@@ -552,7 +554,7 @@ export function Features() {
   }, []);
 
   return (
-    <main className="lp-root lp-features">
+    <main className={`lp-root lp-features${shellMode === "baseline" ? " lp-baseline" : ""}`}>
       <MarketingNav
         variant="features"
         labels={{

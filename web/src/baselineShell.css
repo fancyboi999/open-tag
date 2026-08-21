@@ -27,11 +27,90 @@
 .auth-baseline .auth-link,.auth-baseline .auth-home-link{min-height:44px;color:var(--baseline-line);font-weight:700}
 .auth-baseline .form-err{border:2px solid var(--baseline-line);border-radius:0;background:#fff3ce;color:var(--baseline-line)}
 .auth-baseline .auth-loading span{border:2px solid var(--baseline-line);border-radius:0;background:var(--baseline-yellow)}
+html[data-shell="baseline"] .bootstrap-failure{background:linear-gradient(135deg,#ffd440 0 34%,#fffaf0 34% 100%)}
+html[data-shell="baseline"] .bootstrap-failure-card{border:2px solid #000;border-radius:0;background:#fff;box-shadow:7px 7px 0 #000}
+html[data-shell="baseline"] .bootstrap-failure-card .auth-brand{font-family:var(--sans);font-size:18px;font-weight:900}
+html[data-shell="baseline"] .bootstrap-failure-card .ok{border:2px solid #000;border-radius:0;background:#ff83ad;color:#000;font-weight:900;box-shadow:3px 3px 0 #000}
+html[data-shell="baseline"] .bootstrap-failure-card .ok:focus-visible{outline:3px solid #ffd440;outline-offset:3px}
 @media (max-width:767px){
   .auth-page.auth-baseline{align-items:flex-start;padding:12px;background:var(--baseline-yellow)}
   .auth-baseline .auth-card{max-width:none;margin-top:8vh;padding:24px 20px;box-shadow:5px 5px 0 var(--baseline-line)}
   .auth-baseline .auth-card h1{font-size:24px}
   .auth-baseline .auth-link,.auth-baseline .auth-home-link{display:inline-flex;align-items:center}
+}
+
+/* Public pages share the same Preview-only Raft surface. The lp-baseline class is resolved by
+   AppShellProvider on the first render, so Classic never receives these overrides or a CSS flash. */
+.lp-root.lp-baseline{
+  --lp-bg:#fffaf0;--lp-bg-2:#fff3ce;--lp-surface:#fff;--lp-surface-warm:#fff3ce;
+  --lp-fg:#000;--lp-fg-2:#292524;--lp-muted:#68635d;--lp-muted-soft:#8a847c;
+  --lp-border:#000;--lp-border-soft:rgba(0,0,0,.28);--lp-accent:#ff83ad;--lp-accent-on:#000;
+  --lp-accent-hover:#ff6f9f;--lp-accent-active:#f85d91;--lp-forest:#000;
+  --lp-font-display:Inter,system-ui,-apple-system,sans-serif;--lp-radius-xs:0;--lp-radius-sm:0;--lp-radius-md:0;--lp-radius-lg:0;--lp-radius-pill:0;
+  --lp-elev-ring:0 0 0 2px #000;--lp-elev-raised:7px 7px 0 #000;--lp-elev-soft:4px 4px 0 #000;--lp-focus-ring:0 0 0 3px #ffd440;
+  background:var(--lp-bg);color:#000;
+}
+.lp-baseline .lp-nav{position:sticky;border-bottom:2px solid #000;background:#ffd440;backdrop-filter:none}
+.lp-baseline.lp-features .lp-nav{position:relative}
+.lp-baseline .lp-brand-mark{border:2px solid #000;border-radius:0;image-rendering:pixelated}
+.lp-baseline .lp-brand{min-height:44px}
+.lp-baseline .lp-brand-word{font-family:var(--lp-font-body);font-size:20px;font-weight:900;letter-spacing:-.04em}
+.lp-baseline .lp-nav__links a{color:#000;font-size:13px;font-weight:800}
+.lp-baseline .lp-nav__links a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+.lp-baseline .lp-btn{min-height:40px;border:2px solid #000;border-radius:0;background:#fff;color:#000;font-size:14px;font-weight:800;box-shadow:3px 3px 0 #000}
+.lp-baseline .lp-btn--primary{background:#ff83ad}
+.lp-baseline .lp-btn:hover{border-color:#000;transform:translate(-1px,-1px);box-shadow:4px 4px 0 #000}
+.lp-baseline .lp-btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #000}
+.lp-baseline .lp-btn:focus-visible{outline:3px solid #000;outline-offset:3px;box-shadow:0 0 0 6px #ffd440}
+.lp-baseline .lp-hero{min-height:calc(100dvh - 66px);padding:72px 0 80px;background:#fffaf0}
+.lp-baseline .lp-hero>.lp-container{display:grid;grid-template-columns:minmax(360px,.8fr) minmax(520px,1.2fr);align-items:center;gap:64px}
+.lp-baseline .lp-orbs{display:none}
+.lp-baseline .lp-hero__intro{max-width:560px;margin:0;text-align:left}
+.lp-baseline .lp-hero__intro .lp-eyebrow{justify-content:flex-start;color:#000;font-weight:800}
+.lp-baseline .lp-hero__intro .lp-hero__title{margin-top:24px;font-family:var(--lp-font-body);font-size:60px;line-height:1.14;font-weight:900;letter-spacing:-.035em}
+.lp-baseline .lp-hero__title em{font-style:normal;color:#000}
+.lp-baseline .lp-caret{background:#000}
+.lp-baseline .lp-hero__intro .lp-hero__sub{margin:28px 0 0;max-width:38ch;color:#68635d;font-size:18px}
+.lp-baseline .lp-hero__actions{justify-content:flex-start;margin-top:28px}
+.lp-baseline .lp-hero__intro .lp-hero__note{text-align:left;color:#68635d}
+.lp-baseline .lp-hero-cases{left:auto;width:auto;margin:0;transform:none;overflow:visible;padding:0}
+.lp-baseline .lp-hero-cases__rail{display:block;overflow:visible;padding:0}
+.lp-baseline .lp-hero-case-card{display:none}
+.lp-baseline .lp-hero-case-card:first-child{display:block;width:100%;margin:0;border:2px solid #000;border-radius:0;box-shadow:7px 7px 0 #000;transform:none}
+.lp-baseline .lp-hero-case-card__copy{grid-template-columns:auto 1fr;padding:12px 16px;border-bottom:2px solid #000;background:#fff;min-height:56px}
+.lp-baseline .lp-hero-case-card__copy span{border:2px solid #000;border-radius:0;background:#ffd440;color:#000}
+.lp-baseline .lp-hero-case-card__copy p{display:none}
+.lp-baseline .lp-hero-case-card .lp-product-app{height:380px}
+.lp-baseline .lp-section--alt{border-block:2px solid #000;background:#fff3ce}
+.lp-baseline .lp-pillar,.lp-baseline .lp-cap,.lp-baseline .lp-engine,.lp-baseline .lp-arch__card,.lp-baseline .lp-feature-case,.lp-baseline .lp-feature-grid article,.lp-baseline .lp-feature-proof{border:2px solid #000;border-radius:0;background:#fff;box-shadow:4px 4px 0 #000}
+.lp-baseline .lp-feature-hero{border-bottom:2px solid #000;background:#fffaf0}
+.lp-baseline .lp-feature-hero__title,.lp-baseline .lp-section-title,.lp-baseline .lp-cta__title{font-family:var(--lp-font-body);font-weight:900;letter-spacing:-.035em}
+.lp-baseline .lp-feature-tabs{border-bottom:2px solid #000}
+.lp-baseline .lp-feature-tabs button{min-height:44px;border:2px solid transparent;border-radius:0;color:#000}
+.lp-baseline .lp-feature-tabs button.is-active{border-color:#000;background:#ffd440;box-shadow:3px 3px 0 #000}
+@media (max-width:980px){
+  .lp-baseline .lp-hero>.lp-container{grid-template-columns:1fr;gap:48px}
+  .lp-baseline .lp-hero__intro{max-width:680px}
+}
+@media (max-width:620px){
+  .lp-root.lp-baseline{--lp-gutter:20px}
+  .lp-baseline .lp-nav__inner{height:64px}
+  .lp-baseline .lp-nav__cta{gap:8px}
+  .lp-baseline .lp-nav__cta>a{display:none}
+  .lp-baseline .lp-nav__cta .lp-btn{min-width:44px;min-height:44px;padding:8px 10px;box-shadow:2px 2px 0 #000}
+  .lp-baseline .lp-nav__cta .lp-btn--primary{font-size:0;width:44px}
+  .lp-baseline .lp-nav__cta .lp-btn--primary::after{content:"→";font-size:20px}
+  .lp-baseline .lp-hero{padding:52px 0 64px}
+  .lp-baseline .lp-hero>.lp-container{gap:36px}
+  .lp-baseline .lp-hero__intro .lp-hero__title{font-size:43px;line-height:1.08}
+  .lp-baseline .lp-hero__intro .lp-hero__sub{font-size:17px}
+  .lp-baseline .lp-hero__actions{display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
+  .lp-baseline .lp-hero__actions .lp-btn{justify-content:center;padding:12px 14px}
+  .lp-baseline .lp-hero__actions .lp-btn:last-child{grid-column:1/-1}
+  .lp-baseline .lp-hero-case-card__copy{grid-template-columns:1fr}
+  .lp-baseline .lp-hero-case-card__copy strong{font-size:15px}
+  .lp-baseline .lp-hero-case-card .lp-product-app{height:360px}
+  .lp-baseline .lp-feature-hero__title{font-size:43px}
 }
 @media (min-width:768px){
   .shell-baseline .settings-sidebar .settings-nav{gap:0}
