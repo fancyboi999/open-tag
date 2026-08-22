@@ -37,6 +37,9 @@ open-tag-daemon --server-url https://your-open-tag-server --api-key sk_machine_x
 - **Node.js ≥ 20** on the target machine.
 - At least one supported agent CLI on `$PATH` (e.g. `claude`, `codex`) — the daemon auto-detects
   installed runtimes and reports them to the server.
+- `OPEN_TAG_PI_COMMAND` optionally selects an explicit Pi-compatible executable. This is useful on
+  Windows when a fork such as Oh My Pi must be launched directly instead of through a `.cmd` shim;
+  direct launching preserves multiline turn prompts and JSON-mode arguments.
 
 ## License
 

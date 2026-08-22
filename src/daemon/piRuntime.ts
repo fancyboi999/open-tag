@@ -30,6 +30,16 @@ export interface PiEmit {
   error?: string; // a model/turn error Pi reports IN the message (it still exits 0) — must be surfaced loudly
 }
 
+export function piCommand(env: NodeJS.ProcessEnv): string {
+  return env.OPEN_TAG_PI_COMMAND?.trim() || "pi";
+}
+
+export function piNoJsonError(jsonEventCount: number): string | null {
+  return jsonEventCount === 0
+    ? "pi exited 0 without parseable JSON events; check OPEN_TAG_PI_COMMAND and --mode json forwarding"
+    : null;
+}
+
 // handlePiEvent maps one parsed `pi -p --mode json` event to open-tag callbacks. Verified vs pi 0.73.1:
 // a `session` event carries `.id`; `message_end` carries `.message` (role + content[] blocks of
 // {type:"text",text} and {type:"toolCall",name,arguments}, plus stopReason/errorMessage). We read
@@ -127,16 +137,18 @@ class PiRun {
     }
     this.cb.onActivity("working", "turn");
     const args = buildArgs(prompt, this.opts.model, this.sessionId, this.opts.stateDir, this.promptFile);
-    const proc = spawnSafe("pi", args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: this.env });
+    const proc = spawnSafe(piCommand(this.env), args, { cwd: this.opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: this.env });
     this.proc = proc;
     proc.once("spawn", () => { input.admission.accept(); if (input.initial) this.admission.accept(); });
     let buf = "";
     let turnFailed = false;
     const errTail: string[] = [];
     let errLen = 0;
+    let jsonEventCount = 0;
     const processLine = (ln: string) => {
       const t = ln.trim(); if (!t) return;
       let evt: any; try { evt = JSON.parse(t); } catch { return; }
+      jsonEventCount++;
       const emit = handlePiEvent(evt);
       if (emit.sessionId && emit.sessionId !== this.sessionId) { this.sessionId = emit.sessionId; this.cb.onSession(emit.sessionId); }
       if (emit.trajectory.length) this.cb.onTrajectory(emit.trajectory);
@@ -169,6 +181,15 @@ class PiRun {
       this.proc = null; this.turnBusy = false; if (this.stopped) { this.reportExit(code); return; }
       if (this.currentInput === input) this.currentInput = null;
       if (code === 0) {
+        const noJsonError = piNoJsonError(jsonEventCount);
+        if (noJsonError) {
+          const error = new Error(noJsonError);
+          this.cb.onTrajectory([{ kind: "text", text: "[pi error] " + noJsonError }]);
+          this.cb.onActivity("error", noJsonError);
+          if (!this.everSucceeded) { this.rejectQueue(error); this.reportExit(1); return; }
+          this.pump();
+          return;
+        }
         if (turnFailed) {
           if (!this.everSucceeded) { this.rejectQueue(new Error("pi initial turn failed")); this.reportExit(1); return; }
           this.cb.onAcceptedTurnFailure?.(input); this.pump(); return;

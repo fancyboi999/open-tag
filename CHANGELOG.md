@@ -9,6 +9,12 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Pi-compatible runtimes can be launched through an explicit `OPEN_TAG_PI_COMMAND`, avoiding
+  Windows batch wrappers that truncate multiline wake prompts. A zero exit with no parseable JSON
+  events is now reported as an error instead of producing a misleading empty "Handled" receipt.
+
 ## [0.15.0] — 2026-08-02
 
 ### Added
