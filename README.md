@@ -167,6 +167,11 @@ For frontend development with Vite HMR:
 npm --prefix web run dev
 ```
 
+The web app also supports Tailwind CSS v4 utilities through Vite. Use complete
+utility class names in `web/src` components. `web/src/tailwind.css` imports the
+theme and utilities without Tailwind Preflight, so the existing base styles in
+`web/src/styles.css` remain in effect.
+
 ### Object storage (attachments)
 
 Attachments default to **local disk** (`$OPEN_TAG_HOME/uploads/`, overridable with

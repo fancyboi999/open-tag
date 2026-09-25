@@ -15,6 +15,7 @@ import { Landing } from "./views/Landing.tsx";
 import { Features } from "./views/Features.tsx";
 import { homeRoute } from "./routing.ts";
 import "./i18n";
+import "./tailwind.css";
 import "./styles.css";
 import "./iconMotion.css";
 

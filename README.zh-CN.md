@@ -155,6 +155,10 @@ npm run daemon
 npm --prefix web run dev
 ```
 
+Web 前端已通过 Vite 支持 Tailwind CSS v4 工具类。在 `web/src` 组件中使用完整的工具类名。
+`web/src/tailwind.css` 只引入主题和工具类，不引入 Tailwind Preflight，因此现有的
+`web/src/styles.css` 基础样式继续生效。
+
 ### 对象存储（附件）
 
 附件默认使用 **本地磁盘**（`$OPEN_TAG_HOME/uploads/`，可用 `OPEN_TAG_UPLOAD_DIR` 覆盖）：零配置，数据留在运行 server 的机器上。
