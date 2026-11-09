@@ -167,6 +167,10 @@ For frontend development with Vite HMR:
 npm --prefix web run dev
 ```
 
+## One-Click Deploy
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/OpenTag/)
+
 ### Object storage (attachments)
 
 Attachments default to **local disk** (`$OPEN_TAG_HOME/uploads/`, overridable with
